@@ -5,7 +5,7 @@ Advanced configuration
 Supported configuration fields
 ==============================
 
-DRAKVUF Sandbox configuration is defined in ``/etc/drakrun/config.toml`` file. Here is the specification:
+CHIMERA configuration is defined in ``/etc/drakrun/config.toml`` file. Here is the specification:
 
 [redis] section
 ~~~~~~~~~~~~~~~
@@ -181,7 +181,7 @@ This section defines parameters for Capa postprocessing (TTPs).
    * - max_total_dumps_size
      - 524288000 (500 MB)
      - Maximum total size in bytes of collected, uncompressed dumps. When collected dumps exceed this value,
-       DRAKVUF Sandbox will remove some dumps starting from the most commonly dumped memory regions and dumps
+       CHIMERA will remove some dumps starting from the most commonly dumped memory regions and dumps
        made near the end of the analysis.
    * - min_single_dump_size
      - 512
@@ -251,7 +251,7 @@ or you want to customize the DRAKVUF behavior, you can pass additional arguments
 
 ``[drakrun].extra_drakvuf_args`` accepts key/value pairs, following the `TOML table syntax <https://toml.io/en/v1.0.0#inline-table>`_
 Key defines the argument and value defines the value for this argument. When value is ``true``, argument is considered a flag and is added without a value.
-If you need to, you can also override default flags applied by DRAKVUF Sandbox as well. E.g. using ``false`` value, we can remove the default flag applied by DRAKVUF Sandbox.
+If you need to, you can also override default flags applied by CHIMERA as well. E.g. using ``false`` value, we can remove the default flag applied by CHIMERA.
 
 The following example creates ``extracted_files`` subdirectory to be used by fileextractor plugin and adds ``--disable-sysret`` flag for syscalls plugin.
 
@@ -265,7 +265,7 @@ The following example creates ``extracted_files`` subdirectory to be used by fil
 Changing post-restore script
 ============================
 
-DRAKVUF Sandbox launches by default a simple Powershell script after starting a VM for analysis. The script does two things:
+CHIMERA launches by default a simple Powershell script after starting a VM for analysis. The script does two things:
 
 - runs ``ipconfig /release`` and ``ipconfig /renew`` to fetch machine IP and DNS server from DHCP (dnsmasq) when ``net_enable`` is true
 - runs elevated shell with ``Set-Date -Date $DRAKVUF_DATE`` command to synchronize the clock.
@@ -275,7 +275,7 @@ If you want to customize it, you can create ``/etc/drakrun/vm-post-restore.ps1``
 Customizing network configuration
 =================================
 
-Every time the VM is started, DRAKVUF Sandbox creates ``drakN`` bridge, starts ``dnsmasq`` and applies iptables rules to setup the network.
+Every time the VM is started, CHIMERA creates ``drakN`` bridge, starts ``dnsmasq`` and applies iptables rules to setup the network.
 In non-trivial configurations you may want to run your own commands.
 
 You can provide your own scripts that are executed each time the network is created/removed:
@@ -377,7 +377,7 @@ Another common use-case is limiting the bandwidth for the VM: https://wiki.gento
 Configuration presets
 =====================
 
-DRAKVUF Sandbox implements configuration mechanism called "preset". We can define alternative ``[drakrun]`` configurations
+CHIMERA implements configuration mechanism called "preset". We can define alternative ``[drakrun]`` configurations
 depending on which "preset" was chosen in analysis options. Presets are not yet exposed in the Web UI, but can be used
 via API and CLI.
 

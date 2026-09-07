@@ -1,8 +1,8 @@
 ===================
-DRAKVUF Sandbox FAQ
+CHIMERA FAQ
 ===================
 
-Can I run DRAKVUF Sandbox in the cloud?
+Can I run CHIMERA in the cloud?
 ---------------------------------------
 
 We've done some research regarding the deployment of the sandbox in the cloud.
@@ -19,7 +19,7 @@ Tested service providers:
 * `Scaleway Bare Metal <https://www.scaleway.com/en/bare-metal-servers/>`_
 
 Unfortunately, AWS EC2 Metal seems to be broken at the moment (see `this issue <https://github.com/CERT-Polska/drakvuf-sandbox/issues/222>`_).
-If you've managed to run DRAKVUF Sandbox on a previously untested cloud service, send us a PR to add it to this list.
+If you've managed to run CHIMERA on a previously untested cloud service, send us a PR to add it to this list.
 
 .. _check-cpu:
 
@@ -43,7 +43,7 @@ If you're running fairly recent Intel CPU, it's probably going to have all of th
 
 If both flags are present, you're good to go.
 
-I have an AMD CPU which supports NPT. Can I run DRAKVUF Sandbox?
+I have an AMD CPU which supports NPT. Can I run CHIMERA?
 ----------------------------------------------------------------
 
 DRAKVUF is tightly coupled with `altp2m <https://xenproject.org/2016/04/13/stealthy-monitoring-with-xen-altp2m/>`_ feature, implemented

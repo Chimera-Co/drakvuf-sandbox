@@ -71,7 +71,7 @@ export function PluginPicker({ onChange, name }) {
         (currentValue) => {
             if (currentValue.some((data) => data.__isNew__)) {
                 setWarning(
-                    "Picked custom plugin which may be not supported by Drakvuf Sandbox",
+                    "Picked custom plugin which may be not supported by CHIMERA",
                 );
             } else if (
                 currentValue.length > 0 &&

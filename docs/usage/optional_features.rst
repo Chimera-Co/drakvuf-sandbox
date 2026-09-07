@@ -3,14 +3,14 @@
 Optional features
 =================
 
-This sections contains various information about optional features that may be enabled when setting up DRAKVUF Sandbox.
+This sections contains various information about optional features that may be enabled when setting up CHIMERA.
 
 .. _s3-integration:
 
 S3 integration
 --------------
 
-DRAKVUF Sandbox can use S3 bucket as a primary storage for your analyses.
+CHIMERA can use S3 bucket as a primary storage for your analyses.
 
 You can configure it by adding ``[s3]`` section to the ``/etc/drakrun/config.toml`` configuration file.
 
@@ -33,7 +33,7 @@ Locally stored analyses will not be available. If you already made some, you nee
 
 ZFS storage backend
 -------------------
-If you want to install DRAKVUF Sandbox with a ZFS storage backend, you should perform the following extra steps before executing ``drakrun install`` command:
+If you want to install CHIMERA with a ZFS storage backend, you should perform the following extra steps before executing ``drakrun install`` command:
 
 1. Install ZFS on your machine (guide for: `Debian Buster <https://github.com/openzfs/zfs/wiki/Debian>`_, `Ubuntu 18.04 <https://ubuntu.com/tutorials/setup-zfs-storage-pool#2-installing-zfs>`_)
 2. Create a ZFS pool on a free partition:
@@ -44,7 +44,7 @@ If you want to install DRAKVUF Sandbox with a ZFS storage backend, you should pe
 
    where ``<partiton_name>`` is e.g. ``/dev/sda3``. Be aware that all data stored on the selected partition may be erased.
 
-3. Create a dataset for DRAKVUF Sandbox:
+3. Create a dataset for CHIMERA:
 
    .. code-block:: console
    
@@ -98,7 +98,7 @@ and check if your snapshot is configured correctly and doesn't generate too much
 Using "drakshell" command
 -------------------------
 
-DRAKVUF Sandbox during VM profiling injects a small shellcode agent called "drakshell" that is injected into ``explorer.exe``
+CHIMERA during VM profiling injects a small shellcode agent called "drakshell" that is injected into ``explorer.exe``
 and assists in VM preparation. The analysis process itself is still agentless - drakshell is terminated and removes itself
 from the memory before malware sample is executed. Agent communicates with Dom0 over serial port and allows to interactively e
 xecute arbitrary commands.
@@ -117,7 +117,7 @@ We can use drakshell to spawn an interactive shell directly:
 
   C:\Windows\system32>
 
-DRAKVUF Sandbox is able to work without drakshell and use only pure VMI for preparation commands but this approach is
+CHIMERA is able to work without drakshell and use only pure VMI for preparation commands but this approach is
 usually not stable.
 
 DRAKVUF comes with an "injector" that is able to inject arbitrary code into any running thread in the guest VM. DRAKVUF
@@ -174,7 +174,7 @@ Spawning Drakvuf engine manually
 --------------------------------
 
 Sometimes during debug or development we may want to run DRAKVUF engine directly. DRAKVUF commands are quite lengthy and
-that's why DRAKVUF Sandbox CLI comes with simple utility that prints the DRAKVUF command with base arguments on standard output.
+that's why the CHIMERA CLI comes with simple utility that prints the DRAKVUF command with base arguments on standard output.
 
 .. code-block:: console
 
@@ -232,7 +232,7 @@ Using dnschef
 You may optionally configure your guests to use dnschef.
 
 1. Setup `dnschef <https://github.com/iphelix/dnschef>`_ tool.
-2. Start ``dnschef`` in such way to make it listen on all ``drak*`` interfaces that belong to DRAKVUF Sandbox.
+2. Start ``dnschef`` in such way to make it listen on all ``drak*`` interfaces that belong to CHIMERA.
 3. Set ``dns_server = "use-gateway-address"`` in ``/etc/drakrun/config.toml``.
 4. Restart your drakrun instances: ``systemctl restart 'drakrun-worker@*'``.
 

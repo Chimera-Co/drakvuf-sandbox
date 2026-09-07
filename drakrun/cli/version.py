@@ -12,10 +12,10 @@ from drakrun.version import __version__
 log = logging.getLogger(__name__)
 
 
-@click.command("version", help="Show Drakvuf and Drakvuf Sandbox version information")
+@click.command("version", help="Show DRAKVUF and CHIMERA version information")
 def version():
     drakvuf_version = get_drakvuf_version()
-    log.info("DRAKVUF Sandbox version: %s", __version__)
+    log.info("CHIMERA version: %s", __version__)
     log.info(
         "DRAKVUF version: %s.%s-%s",
         drakvuf_version.major,

@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.abspath('../drakrun'))
 
 # -- Project information -----------------------------------------------------
 
-project = 'DRAKVUF Sandbox'
+project = 'CHIMERA'
 copyright = '2025, CERT Polska'
 author = 'CERT Polska'
 

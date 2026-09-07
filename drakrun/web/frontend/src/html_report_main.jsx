@@ -5,6 +5,9 @@ import "bootstrap";
 import "bootstrap/dist/css/bootstrap.css";
 import "./App.css";
 import "startbootstrap-sb-admin/dist/css/styles.css";
+// CHIMERA cosmetic theme — imported last so it wins the cascade. The offline
+// report reuses AppHeader/AppFooter, so it picks up the same visual identity.
+import "./chimera-theme.css";
 
 import { HashRouter } from "react-router-dom";
 import { AppHeader, AppFooter } from "./App";

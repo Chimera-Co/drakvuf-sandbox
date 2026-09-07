@@ -9,7 +9,7 @@ from drakrun.version import __version__
 
 from .api import api
 
-info = Info(title="Drakvuf Sandbox", version=__version__)
+info = Info(title="CHIMERA", version=__version__)
 app = OpenAPI(__name__, info=info, static_folder="frontend/dist/assets")
 config = load_config()
 app.config.update(
