@@ -45,34 +45,10 @@ Nested virtualization:
 
 Feel free to contact us if you have any questions or comments.
 
-**General contact email: info@cert.pl** (fastest response)
-
-You can also chat with us about this project on Discord: [https://discord.gg/Q7eTsHnpn4](https://discord.gg/Q7eTsHnpn4)
-
 This project is authored by:
 
-* Michał Leszczyński ([@icedevml](https://github.com/icedevml))
-* Adam Kliś ([@BonusPlay](https://github.com/BonusPlay))
-* Hubert Jasudowicz ([@chivay](https://github.com/chivay))
-* Paweł Srokosz ([@psrok1](https://github.com/psrok1))
-* Konstanty Cieśliński ([@kscieslinski](https://github.com/kscieslinski))
-* Arkadiusz Wróbel ([@catsuryuu](https://github.com/catsuryuu))
-* Jarosław Jedynak ([@msm-cert](https://github.com/msm-cert))
+* Mantek Singh Burn ([@clustercoder](https://github.com/clustercoder))
+* Anusha Tiwari ([@anushatiwari27](https://github.com/anushatiwari27))
+* Shreyas Tekawade ([@ShreyasTek1](https://github.com/ShreyasTek1))
 
 If you have any questions about [DRAKVUF](https://drakvuf.com/) engine itself, contact tamas@tklengyel.com
-
-## Acknowledgements
-
-This project was created and/or upgraded thanks to the following organizations and initiatives:
-
-### Connecting Europe Facility of the European Union
-
-<a href="https://ec.europa.eu/inea/en/connecting-europe-facility"> <img style="border: 0.2px solid black" src=".github/screenshots/cef.png" alt="Co-financed by the Connecting Europe Facility of the European Union"> </a>
-
-### The Honeynet Project
-
-<a href="https://honeynet.org"> <img style="border: 0.2px solid black" src=".github/screenshots/honeynet.png" alt="Contributed by The Honeynet Project"> </a>
-
-### CERT Polska
-
-<a href="https://cert.pl"> <img style="border: 0.2px solid black" src=".github/screenshots/cert.png" alt="Maintained by CERT Polska"> </a>

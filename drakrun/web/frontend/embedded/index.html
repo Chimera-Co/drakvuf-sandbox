@@ -3,6 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Offline report is a single self-contained file, so the favicon is inlined
+      as a data URI (base64 of the final favicon-32x32.png) rather than an
+      external path, so the report stays self-contained when copied elsewhere.
+    -->
+    <link
+      rel="icon"
+      type="image/png"
+      href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAFaElEQVR4AexVfWhVZRh/nvecc3cudx9214zaZluxpDAlG0KWX/0RZQguSgpLpeiPwKy0CEphy0zRqAgzLYWQ/GeSxdSmUQwMEQk/m4OwnIVyLRx337v3fLxPv/fc3bWNUds/BbHL8zvv+3w/7/M+5x5F//FvsoDJDkx2YMIdaG9vd7u6uh7u7++vM/v8WywiDNlc8AyMmyZcQHV1dUZrfc227Q/Ky8svDAwMbPI8/70wDPc5jnOko6OjfNzZYTjhAuBDiURiFjNXMqtq23ZeVUq9JEIFfX19tyaTyT+MzXgx4QJMq5H8uVwCIWH6LQyDFbZtPVlSUtIJuW9ssI6LRhRgHHt6emZ4nrcarV1k+LGiiPAtRi5CF3DhbiwWazb8IOxMJrMim/W3ZDxvZzqdrhqUj7kMFYBklZ4XNMfj8dPE/Bbu8wCC7IQcOf7ybWhoQAPk55yEW6D8xvf97cBs4J4gCI7atv2hZfFrFqvluK6NkNejqDU5n5HPqAAkKfX94Cutg62B1msQ9BcE2iASbjHZ8i6w47Vr194AvpuIiVmeCENrG4p9+rzjnCailcACoMjYAopZLSPm9ZZlLTA8dCNIQciosEGT7HJdt6XAcXZduXJlHqw0+MtGj/0QYcr7tNaNRHIdxU1VKvgI/rNmBcEJ8C/CkIGIwMdh55BIM17R53Gtj6MTNZFy8KFSqVRcKfVI6urVvXAQg6qqqmxBQcHHgzbwl6GgFRUV9yrLWkXEhSLEWiQB/yNENBsYRTBgTgtRGYouhpJh+xmKmYN9RKq0tHQaAv2KpF4kGfUwBRnkO4H7PSFav42TxZhJ0OPZ0JWNcsuxzD1hGM4j4fbCwsLVJ0+e/IKZm3AdG+ETXb9C+/DqyE3wiE4JRbSCj8jwQBKBlmAuXof9HpxiH5TR9WG1gTEIYYTiOPnUMPTfQOu3Lly4MMQBdsA/g+uI/rAUpvR3DEmb53lvtra2xhAJnngSWT7RHJMQia9C8iXwDrNaiYKqsf8bYujQeJYMTrsNSS/iSt/v7e29cf/+/f1Q2njbQqyEDrJ0ptPPoqopd0yffhwnPYyE3wLHKAi2IuEqGBYAhhAVZHajgNYOU+S2OtSH4H83ESOPesp146m6urrjhJkArgEU3UNZWVkPqlx3/ty5uah4GfZLgPm4axjnguHUrcQcwMkIerBqYIgwRx4zX8oJTAfoBJG6JKJ3EFMLdMYe+fguET4FOxMnVwCYiGpra30YmuAD6MD9KOZlgjcxm2rXichZ6DNYm3CnN2N9QYTOQYZFzvhabzJ7wk+EL8di9gb8R6yzLeshDO2nEBtCDkmbjYEyD4O8YzabneH74R7wzUjgMtNl3/OWoiPfhSK7Rci8tp2Y6usI/gn0BwUBwiBY7zrOXvishywAlmF+aqEypHGYV0T0djBTiPg+ImLCT4kI59HY2Ggx80H8w1VgFp7BKWfim38nBuYH2JJFtAgn6UKwTYY3gG+KUAHs28BrFLoF3XsMdr3M1j7EmAa5oSzkn2PTIaJvw59dNFcjOrB48eIyVmoaXp1T+MAcKCoqaq2pqcmiKKQgQpLdCOAEgV7e3d19O/bkiZg5ESSeaXgDTPxhdHI+DoImOcfQUdP+kra2tjOZzMCDeBtmVlZWDhhbTCdLPgFeyYyXzS4NAvneKIfD2KATLQj8gOf5P0EHEcu7mze3ZsPwURQXy32ocvFwRT/Cdi5Ovdr3s034ylpmxsyhkslkF/wjGuqA4RCxE0UcTCTcr7GPTm3kwyAIfBb6Q/j2XzTy+vp6Xei6R+F3yOyNLA/IUq7rIl6iqbi4uCMvH76OKGC44t/aTxbw/+/AP83SnwAAAP///yIYjAAAAAZJREFUAwDUVLdfJLG31gAAAABJRU5ErkJggg=="
+    />
+    <meta name="theme-color" content="#002b36" />
     <title>CHIMERA</title>
   </head>
   <body>

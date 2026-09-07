@@ -1,0 +1,1068 @@
+/* ============================================================================
+   CHIMERA — Solarized visual identity
+   ----------------------------------------------------------------------------
+   Cosmetic layer only: colour, typography, spacing, borders and motion.
+   No layout structure, routing or behavioural changes live here.
+
+   Load order matters. This file is imported AFTER bootstrap.css and after
+   startbootstrap-sb-admin/dist/css/styles.css, so it wins the cascade at equal
+   specificity. Most of the theme is expressed by re-pointing Bootstrap's own
+   --bs-* custom properties rather than by overriding component rules, which
+   keeps the override surface small and survives Bootstrap patch upgrades.
+
+   Palette: Solarized, by Ethan Schoonover.
+   ========================================================================== */
+
+:root {
+    /* -- Solarized base tones ------------------------------------------- */
+    --chimera-base03: #002b36;
+    --chimera-base02: #073642;
+    --chimera-base01: #586e75;
+    --chimera-base00: #657b83;
+    --chimera-base0: #839496;
+    --chimera-base1: #93a1a1;
+    --chimera-base2: #eee8d5;
+    --chimera-base3: #fdf6e3;
+
+    /* -- Solarized accents ---------------------------------------------- */
+    --chimera-yellow: #b58900;
+    --chimera-orange: #cb4b16;
+    --chimera-red: #dc322f;
+    --chimera-magenta: #d33682;
+    --chimera-violet: #6c71c4;
+    --chimera-blue: #268bd2;
+    --chimera-cyan: #2aa198;
+    --chimera-green: #859900;
+
+    /* RGB triplets, for building low-alpha tints over unknown backgrounds. */
+    --chimera-yellow-rgb: 181, 137, 0;
+    --chimera-orange-rgb: 203, 75, 22;
+    --chimera-red-rgb: 220, 50, 47;
+    --chimera-violet-rgb: 108, 113, 196;
+    --chimera-blue-rgb: 38, 139, 210;
+    --chimera-cyan-rgb: 42, 161, 152;
+    --chimera-green-rgb: 133, 153, 0;
+
+    /* -- Accessible "ink" variants ---------------------------------------
+       The pure Solarized accents are tuned for syntax highlighting and sit
+       around 3:1 against the light background — short of WCAG AA for body
+       text. These darkened variants keep the same hue while clearing 4.5:1,
+       and are used wherever an accent carries actual words. The pure accents
+       stay in use for borders, dots, rules and focus rings, where the 3:1
+       non-text threshold applies. */
+    --chimera-blue-ink: #1e6fa8;
+    --chimera-cyan-ink: #1f7a73;
+    --chimera-green-ink: #5c6a00;
+    --chimera-yellow-ink: #7d5f00;
+    --chimera-orange-ink: #a93c12;
+    --chimera-red-ink: #c32b28;
+    --chimera-violet-ink: #565aa8;
+
+    /* -- Semantic surfaces ------------------------------------------------
+       Dark application shell (topnav + sidebar) against a light, calm content
+       canvas. Cards sit one step brighter than the canvas so they read as
+       lifted without needing heavy shadows. */
+    --chimera-shell: var(--chimera-base03);
+    --chimera-shell-raised: var(--chimera-base02);
+    --chimera-canvas: var(--chimera-base2);
+    --chimera-surface: var(--chimera-base3);
+
+    /* -- Semantic text ---------------------------------------------------- */
+    --chimera-heading: var(--chimera-base02);
+    --chimera-text: var(--chimera-base01);
+    --chimera-text-muted: var(--chimera-base00);
+
+    /* -- Lines and edges --------------------------------------------------- */
+    --chimera-border: #ded7c2;
+    --chimera-border-strong: #cdc5ad;
+
+    /* -- Type ------------------------------------------------------------- */
+    --chimera-font-sans:
+        system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+        "Noto Sans", Arial, sans-serif;
+    --chimera-font-mono:
+        ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+        "Liberation Mono", "Courier New", monospace;
+
+    /* -- Shape and motion -------------------------------------------------- */
+    --chimera-radius: 6px;
+    --chimera-radius-sm: 4px;
+    --chimera-shadow: 0 1px 2px rgba(0, 43, 54, 0.06);
+    --chimera-shadow-raised: 0 2px 8px rgba(0, 43, 54, 0.08);
+    --chimera-transition: 120ms ease;
+}
+
+/* ============================================================================
+   1. Bootstrap token remap
+   Re-pointing Bootstrap's own variables themes the great majority of the app
+   (buttons, links, cards, tables, forms, badges) without touching components.
+   ========================================================================== */
+
+:root {
+    --bs-font-sans-serif: var(--chimera-font-sans);
+    --bs-font-monospace: var(--chimera-font-mono);
+    --bs-body-font-family: var(--chimera-font-sans);
+    --bs-body-font-size: 0.9375rem; /* 15px — denser than 16 without strain */
+    --bs-body-line-height: 1.6;
+
+    --bs-body-bg: var(--chimera-canvas);
+    --bs-body-bg-rgb: 238, 232, 213;
+    --bs-body-color: var(--chimera-text);
+    --bs-body-color-rgb: 88, 110, 117;
+
+    --bs-emphasis-color: var(--chimera-base03);
+    --bs-emphasis-color-rgb: 0, 43, 54;
+    --bs-secondary-color: var(--chimera-text-muted);
+    --bs-secondary-bg: var(--chimera-base2);
+    --bs-tertiary-bg: var(--chimera-base2);
+
+    --bs-heading-color: var(--chimera-heading);
+
+    --bs-border-color: var(--chimera-border);
+    --bs-border-color-translucent: var(--chimera-border);
+    --bs-border-radius: var(--chimera-radius);
+    --bs-border-radius-sm: var(--chimera-radius-sm);
+    --bs-border-radius-lg: 8px;
+
+    --bs-link-color: var(--chimera-blue-ink);
+    --bs-link-color-rgb: 30, 111, 168;
+    --bs-link-hover-color: var(--chimera-base02);
+    --bs-link-hover-color-rgb: 7, 54, 66;
+
+    --bs-primary: var(--chimera-blue-ink);
+    --bs-primary-rgb: 30, 111, 168;
+    --bs-secondary: var(--chimera-base01);
+    --bs-secondary-rgb: 88, 110, 117;
+    --bs-success: var(--chimera-green-ink);
+    --bs-success-rgb: 92, 106, 0;
+    --bs-info: var(--chimera-cyan-ink);
+    --bs-info-rgb: 31, 122, 115;
+    --bs-warning: var(--chimera-yellow-ink);
+    --bs-warning-rgb: 125, 95, 0;
+    --bs-danger: var(--chimera-red-ink);
+    --bs-danger-rgb: 195, 43, 40;
+    --bs-light: var(--chimera-base2);
+    --bs-dark: var(--chimera-base03);
+
+    --bs-code-color: var(--chimera-magenta);
+    --bs-highlight-bg: rgba(var(--chimera-yellow-rgb), 0.2);
+}
+
+/* ============================================================================
+   2. Document and typography
+   ========================================================================== */
+
+body {
+    background-color: var(--chimera-canvas);
+    color: var(--chimera-text);
+    font-family: var(--chimera-font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    color: var(--chimera-heading);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+}
+
+/* The page titles are rendered as <h1 class="m-4 h4">. Give them a little more
+   presence and a hairline rule so each view has a clear masthead. */
+main > .container-fluid > h1,
+main > .container > h1 {
+    margin: 1.75rem 0 1.25rem !important;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--chimera-border);
+    font-size: 1.35rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+}
+
+.text-muted {
+    color: var(--chimera-text-muted) !important;
+}
+
+.small,
+small {
+    font-size: 0.8125rem;
+}
+
+/* Technical data — hashes, paths, process names, commands — must stay
+   unambiguous. Slightly tighter and tabular so columns line up. */
+.font-monospace,
+.text-hash,
+code,
+kbd,
+pre,
+samp {
+    font-family: var(--chimera-font-mono);
+    font-variant-ligatures: none;
+    font-feature-settings: "tnum" 1;
+}
+
+.font-monospace,
+.text-hash {
+    font-size: 0.8125rem;
+    letter-spacing: -0.01em;
+}
+
+a {
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.15em;
+    transition: color var(--chimera-transition);
+}
+
+/* Keyboard focus must stay obvious everywhere, including on dark chrome. */
+:focus-visible {
+    outline: 2px solid var(--chimera-blue);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+/* ============================================================================
+   3. Application shell — top navigation bar
+   ========================================================================== */
+
+.sb-topnav.navbar {
+    background-color: var(--chimera-shell) !important;
+    border-bottom: 1px solid rgba(147, 161, 161, 0.14);
+    box-shadow: 0 1px 3px rgba(0, 43, 54, 0.18);
+}
+
+.sb-topnav .navbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    height: 100%;
+    padding-left: 1rem !important;
+    color: var(--chimera-base2);
+    font-size: 1.0625rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    transition: color var(--chimera-transition);
+}
+
+.sb-topnav .navbar-brand:hover,
+.sb-topnav .navbar-brand:focus {
+    color: var(--chimera-base3);
+}
+
+/* ============================================================================
+   4. Application shell — sidebar
+   Structure, width and navigation order are untouched; only the skin changes.
+   ========================================================================== */
+
+.sb-sidenav.sb-sidenav-dark {
+    background-color: var(--chimera-shell-raised);
+    color: var(--chimera-base0);
+    border-right: 1px solid rgba(147, 161, 161, 0.1);
+}
+
+.sb-sidenav.sb-sidenav-dark .sb-sidenav-menu .sb-sidenav-menu-heading {
+    padding: 1.5rem 1.25rem 0.5rem;
+    color: var(--chimera-base0);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+}
+
+.sb-sidenav.sb-sidenav-dark .sb-sidenav-menu .nav-link {
+    position: relative;
+    margin: 1px 0.5rem;
+    padding: 0.5625rem 0.75rem;
+    border-radius: var(--chimera-radius-sm);
+    color: var(--chimera-base1);
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition:
+        background-color var(--chimera-transition),
+        color var(--chimera-transition);
+}
+
+.sb-sidenav.sb-sidenav-dark .sb-sidenav-menu .nav-link .sb-nav-link-icon {
+    width: 1.125rem;
+    margin-right: 0.75rem;
+    color: var(--chimera-base0);
+    text-align: center;
+    transition: color var(--chimera-transition);
+}
+
+.sb-sidenav.sb-sidenav-dark .sb-sidenav-menu .nav-link:hover {
+    background-color: rgba(147, 161, 161, 0.09);
+    color: var(--chimera-base3);
+}
+
+.sb-sidenav.sb-sidenav-dark .sb-sidenav-menu .nav-link:hover .sb-nav-link-icon {
+    color: var(--chimera-base1);
+}
+
+/* Active route: tinted bed plus a solid accent rail on the leading edge. */
+.sb-sidenav.sb-sidenav-dark .sb-sidenav-menu .nav-link.active {
+    background-color: rgba(var(--chimera-blue-rgb), 0.16);
+    color: var(--chimera-base3);
+    font-weight: 600;
+}
+
+.sb-sidenav.sb-sidenav-dark
+    .sb-sidenav-menu
+    .nav-link.active
+    .sb-nav-link-icon {
+    color: var(--chimera-blue);
+}
+
+.sb-sidenav.sb-sidenav-dark .sb-sidenav-menu .nav-link.active::before {
+    content: "";
+    position: absolute;
+    top: 0.375rem;
+    bottom: 0.375rem;
+    left: -0.5rem;
+    width: 3px;
+    border-radius: 0 2px 2px 0;
+    background-color: var(--chimera-blue);
+}
+
+.sb-sidenav.sb-sidenav-dark .sb-sidenav-footer {
+    background-color: var(--chimera-base03);
+    border-top: 1px solid rgba(147, 161, 161, 0.1);
+    padding: 0.875rem 1.25rem;
+    color: var(--chimera-base00);
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+}
+
+/* ============================================================================
+   5. Content canvas
+   ========================================================================== */
+
+#layoutSidenav_content {
+    background-color: var(--chimera-canvas);
+}
+
+/* ============================================================================
+   6. Cards and panels
+   ========================================================================== */
+
+.card {
+    --bs-card-bg: var(--chimera-surface);
+    --bs-card-border-color: var(--chimera-border);
+    --bs-card-border-radius: var(--chimera-radius);
+    --bs-card-inner-border-radius: var(--chimera-radius);
+    --bs-card-cap-bg: var(--chimera-base2);
+    box-shadow: var(--chimera-shadow);
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+.bg-light {
+    background-color: var(--chimera-base2) !important;
+}
+
+.bg-white {
+    background-color: var(--chimera-surface) !important;
+}
+
+.border,
+.border-bottom,
+.border-top,
+.border-start,
+.border-end {
+    border-color: var(--chimera-border) !important;
+}
+
+hr {
+    border-top: 1px solid var(--chimera-border);
+    opacity: 1;
+}
+
+.shadow {
+    box-shadow: var(--chimera-shadow-raised) !important;
+}
+
+/* ============================================================================
+   7. Tables
+   The analysis list uses .datatable-table; sb-admin styles it alongside .table,
+   so both are themed together here.
+   ========================================================================== */
+
+.table,
+.datatable-table {
+    --bs-table-bg: var(--chimera-surface);
+    --bs-table-color: var(--chimera-text);
+    --bs-table-border-color: var(--chimera-border);
+    --bs-table-hover-bg: rgba(var(--chimera-blue-rgb), 0.06);
+    --bs-table-hover-color: var(--chimera-base02);
+    --bs-table-striped-bg: rgba(0, 43, 54, 0.02);
+    margin-bottom: 0;
+    border-color: var(--chimera-border);
+}
+
+/* Give the list table a card-like container of its own. */
+.datatable-container {
+    background-color: var(--chimera-surface);
+    border: 1px solid var(--chimera-border);
+    border-radius: var(--chimera-radius);
+    box-shadow: var(--chimera-shadow);
+    overflow-x: auto;
+}
+
+.datatable-container > .datatable-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: 100%;
+}
+
+.table > thead th,
+.datatable-table > thead th {
+    background-color: var(--chimera-base2);
+    border-bottom: 1px solid var(--chimera-border-strong);
+    color: var(--chimera-base01);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    padding: 0.75rem 1rem;
+    vertical-align: middle;
+}
+
+.table > tbody > tr > td,
+.datatable-table > tbody > tr > td {
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid var(--chimera-border);
+    vertical-align: top;
+}
+
+.table > tbody > tr:last-child > td,
+.datatable-table > tbody > tr:last-child > td {
+    border-bottom: 0;
+}
+
+.table > tbody > tr:hover > *,
+.datatable-table > tbody > tr:hover > * {
+    background-color: rgba(var(--chimera-blue-rgb), 0.06);
+    color: var(--chimera-base02);
+}
+
+/* Timestamp columns read as secondary metadata, not primary content. */
+.datatable-table > tbody > tr > td:nth-child(3),
+.datatable-table > tbody > tr > td:nth-child(4) {
+    color: var(--chimera-text-muted);
+    font-family: var(--chimera-font-mono);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+}
+
+.table-borderless > :not(caption) > * > * {
+    border-bottom-width: 0;
+}
+
+.apicallTable td {
+    padding: 0.5rem 0.75rem;
+}
+
+/* ============================================================================
+   8. Buttons
+   Bootstrap 5.3 drives every variant from --bs-btn-*, so a token remap is
+   enough. Heights and padding are unified across variants.
+   ========================================================================== */
+
+.btn {
+    --bs-btn-padding-y: 0.4375rem;
+    --bs-btn-padding-x: 0.9375rem;
+    --bs-btn-font-size: 0.875rem;
+    --bs-btn-font-weight: 500;
+    --bs-btn-border-radius: var(--chimera-radius-sm);
+    letter-spacing: 0.01em;
+    transition:
+        background-color var(--chimera-transition),
+        border-color var(--chimera-transition),
+        color var(--chimera-transition),
+        box-shadow var(--chimera-transition);
+}
+
+.btn-sm {
+    --bs-btn-padding-y: 0.25rem;
+    --bs-btn-padding-x: 0.625rem;
+    --bs-btn-font-size: 0.8125rem;
+}
+
+.btn-primary {
+    --bs-btn-bg: var(--chimera-blue-ink);
+    --bs-btn-border-color: var(--chimera-blue-ink);
+    --bs-btn-color: var(--chimera-base3);
+    --bs-btn-hover-bg: #17567f;
+    --bs-btn-hover-border-color: #17567f;
+    --bs-btn-hover-color: #ffffff;
+    --bs-btn-active-bg: #124867;
+    --bs-btn-active-border-color: #124867;
+    --bs-btn-active-color: #ffffff;
+    --bs-btn-disabled-bg: #a8bcc9;
+    --bs-btn-disabled-border-color: #a8bcc9;
+    --bs-btn-disabled-color: var(--chimera-base3);
+    --bs-btn-focus-shadow-rgb: var(--chimera-blue-rgb);
+}
+
+.btn-secondary {
+    --bs-btn-bg: var(--chimera-base01);
+    --bs-btn-border-color: var(--chimera-base01);
+    --bs-btn-color: var(--chimera-base3);
+    --bs-btn-hover-bg: var(--chimera-base02);
+    --bs-btn-hover-border-color: var(--chimera-base02);
+    --bs-btn-hover-color: var(--chimera-base3);
+}
+
+.btn-danger {
+    --bs-btn-bg: var(--chimera-red-ink);
+    --bs-btn-border-color: var(--chimera-red-ink);
+    --bs-btn-color: var(--chimera-base3);
+    --bs-btn-hover-bg: #a52320;
+    --bs-btn-hover-border-color: #a52320;
+    --bs-btn-hover-color: #ffffff;
+}
+
+.btn-success {
+    --bs-btn-bg: var(--chimera-green-ink);
+    --bs-btn-border-color: var(--chimera-green-ink);
+    --bs-btn-color: var(--chimera-base3);
+    --bs-btn-hover-bg: #4a5500;
+    --bs-btn-hover-border-color: #4a5500;
+    --bs-btn-hover-color: #ffffff;
+}
+
+.btn-outline-primary {
+    --bs-btn-color: var(--chimera-blue-ink);
+    --bs-btn-border-color: var(--chimera-blue);
+    --bs-btn-hover-bg: var(--chimera-blue-ink);
+    --bs-btn-hover-border-color: var(--chimera-blue-ink);
+    --bs-btn-hover-color: var(--chimera-base3);
+}
+
+.btn-link {
+    --bs-btn-color: var(--chimera-blue-ink);
+    --bs-btn-hover-color: var(--chimera-base02);
+    --bs-btn-font-weight: 500;
+}
+
+.btn:disabled,
+.btn.disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+/* Existing inline-link affordance, re-tinted to the Solarized ramp. */
+.btn.btn-inline-link:hover {
+    color: var(--chimera-blue-ink);
+}
+
+/* ============================================================================
+   9. Forms
+   ========================================================================== */
+
+.form-label {
+    margin-bottom: 0.375rem;
+    color: var(--chimera-base02);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+.form-control,
+.form-select,
+.datatable-input,
+.datatable-selector {
+    background-color: var(--chimera-surface);
+    border: 1px solid var(--chimera-border-strong);
+    border-radius: var(--chimera-radius-sm);
+    color: var(--chimera-base02);
+    font-size: 0.875rem;
+    padding: 0.4375rem 0.75rem;
+    transition:
+        border-color var(--chimera-transition),
+        box-shadow var(--chimera-transition);
+}
+
+.form-control:focus,
+.form-select:focus,
+.datatable-input:focus,
+.datatable-selector:focus {
+    background-color: var(--chimera-surface);
+    border-color: var(--chimera-blue);
+    box-shadow: 0 0 0 3px rgba(var(--chimera-blue-rgb), 0.16);
+    color: var(--chimera-base03);
+    outline: none;
+}
+
+.form-control::placeholder {
+    color: #9aa79f;
+    opacity: 1;
+}
+
+.form-control:disabled,
+.form-select:disabled {
+    background-color: var(--chimera-base2);
+    color: var(--chimera-text-muted);
+}
+
+/* The file picker's inner button is a separate surface in Bootstrap. */
+.form-control[type="file"]::file-selector-button {
+    background-color: var(--chimera-base2);
+    border-right: 1px solid var(--chimera-border-strong);
+    color: var(--chimera-base01);
+    font-weight: 500;
+    transition: background-color var(--chimera-transition);
+}
+
+.form-control[type="file"]:hover:not(:disabled):not(
+        [readonly]
+    )::file-selector-button {
+    background-color: #e3dcc6;
+    color: var(--chimera-base02);
+}
+
+.form-check-input {
+    border-color: var(--chimera-border-strong);
+    background-color: var(--chimera-surface);
+}
+
+.form-check-input:checked {
+    background-color: var(--chimera-blue-ink);
+    border-color: var(--chimera-blue-ink);
+}
+
+.form-check-input:focus {
+    border-color: var(--chimera-blue);
+    box-shadow: 0 0 0 3px rgba(var(--chimera-blue-rgb), 0.16);
+}
+
+.form-check-label {
+    color: var(--chimera-text);
+    font-size: 0.875rem;
+}
+
+/* Analysis-time slider. */
+.form-range::-webkit-slider-thumb {
+    background-color: var(--chimera-blue-ink);
+}
+
+.form-range::-webkit-slider-thumb:active {
+    background-color: var(--chimera-blue);
+}
+
+.form-range::-moz-range-thumb {
+    background-color: var(--chimera-blue-ink);
+}
+
+.form-range::-webkit-slider-runnable-track {
+    background-color: var(--chimera-border-strong);
+    border-radius: 3px;
+}
+
+.form-range::-moz-range-track {
+    background-color: var(--chimera-border-strong);
+    border-radius: 3px;
+}
+
+.form-range:focus {
+    outline: none;
+}
+
+.form-range:focus::-webkit-slider-thumb {
+    box-shadow: 0 0 0 3px rgba(var(--chimera-blue-rgb), 0.22);
+}
+
+.text-danger {
+    color: var(--chimera-red-ink) !important;
+}
+
+/* ============================================================================
+   10. Badges — status and plugin chips
+   Soft tint + saturated ink + a leading dot. Calmer than solid saturated
+   fills and easier to scan down a column.
+   ========================================================================== */
+
+.badge {
+    --bs-badge-font-weight: 600;
+    --bs-badge-border-radius: 999px;
+    font-size: 0.75rem;
+    letter-spacing: 0.02em;
+    padding: 0.3125rem 0.625rem;
+}
+
+/* Semantic analysis status. Driven by data-status so the badge component keeps
+   its Bootstrap fallback classes and the status values themselves are
+   untouched — this is purely how they are painted. */
+.chimera-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    background-color: rgba(88, 110, 117, 0.12) !important;
+    border: 1px solid rgba(88, 110, 117, 0.3);
+    color: var(--chimera-base01) !important;
+    text-transform: capitalize;
+    vertical-align: middle;
+}
+
+.chimera-status::before {
+    content: "";
+    flex: none;
+    width: 0.45em;
+    height: 0.45em;
+    border-radius: 50%;
+    background-color: currentColor;
+}
+
+.chimera-status[data-status="finished"] {
+    background-color: rgba(var(--chimera-green-rgb), 0.14) !important;
+    border-color: rgba(var(--chimera-green-rgb), 0.4);
+    color: var(--chimera-green-ink) !important;
+}
+
+.chimera-status[data-status="failed"] {
+    background-color: rgba(var(--chimera-red-rgb), 0.12) !important;
+    border-color: rgba(var(--chimera-red-rgb), 0.4);
+    color: var(--chimera-red-ink) !important;
+}
+
+.chimera-status[data-status="queued"] {
+    background-color: rgba(var(--chimera-yellow-rgb), 0.16) !important;
+    border-color: rgba(var(--chimera-yellow-rgb), 0.42);
+    color: var(--chimera-yellow-ink) !important;
+}
+
+.chimera-status[data-status="started"] {
+    background-color: rgba(var(--chimera-orange-rgb), 0.13) !important;
+    border-color: rgba(var(--chimera-orange-rgb), 0.4);
+    color: var(--chimera-orange-ink) !important;
+}
+
+/* A running analysis is the one state worth drawing the eye to. */
+.chimera-status[data-status="started"]::before {
+    animation: chimera-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes chimera-pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.35;
+    }
+}
+
+/* Generic Bootstrap badge colours used elsewhere (process badges, plugin
+   chips) re-tinted onto the same ramp. */
+.badge.bg-primary {
+    background-color: rgba(var(--chimera-blue-rgb), 0.14) !important;
+    color: var(--chimera-blue-ink) !important;
+}
+
+.badge.bg-secondary {
+    background-color: rgba(88, 110, 117, 0.13) !important;
+    color: var(--chimera-base01) !important;
+}
+
+.badge.bg-info {
+    background-color: rgba(var(--chimera-cyan-rgb), 0.15) !important;
+    color: var(--chimera-cyan-ink) !important;
+}
+
+.badge.bg-success {
+    background-color: rgba(var(--chimera-green-rgb), 0.15) !important;
+    color: var(--chimera-green-ink) !important;
+}
+
+.badge.bg-danger {
+    background-color: rgba(var(--chimera-red-rgb), 0.13) !important;
+    color: var(--chimera-red-ink) !important;
+}
+
+.badge.bg-warning {
+    background-color: rgba(var(--chimera-yellow-rgb), 0.18) !important;
+    color: var(--chimera-yellow-ink) !important;
+}
+
+.badge.bg-dark {
+    background-color: rgba(0, 43, 54, 0.1) !important;
+    color: var(--chimera-base02) !important;
+}
+
+.plugin-badge {
+    border-radius: var(--chimera-radius-sm);
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+/* ============================================================================
+   11. Tabs
+   ========================================================================== */
+
+.nav-tabs {
+    --bs-nav-tabs-border-color: var(--chimera-border);
+    --bs-nav-tabs-link-active-bg: var(--chimera-surface);
+    --bs-nav-tabs-link-active-color: var(--chimera-base02);
+    --bs-nav-tabs-link-active-border-color: var(--chimera-border)
+        var(--chimera-border) var(--chimera-surface);
+    --bs-nav-link-color: var(--chimera-base00);
+    --bs-nav-link-hover-color: var(--chimera-blue-ink);
+    --bs-nav-link-font-size: 0.875rem;
+    --bs-nav-link-font-weight: 500;
+}
+
+.nav-tabs .nav-link {
+    border-radius: var(--chimera-radius-sm) var(--chimera-radius-sm) 0 0;
+    transition:
+        color var(--chimera-transition),
+        background-color var(--chimera-transition);
+}
+
+.nav-tabs .nav-link.active {
+    font-weight: 600;
+    box-shadow: inset 0 2px 0 var(--chimera-blue);
+}
+
+.nav-pills {
+    --bs-nav-pills-link-active-bg: var(--chimera-blue-ink);
+    --bs-nav-pills-link-active-color: var(--chimera-base3);
+    --bs-nav-pills-border-radius: var(--chimera-radius-sm);
+}
+
+/* ============================================================================
+   12. Selection list (multiselect override carried over from App.css)
+   ========================================================================== */
+
+li.selected {
+    background-color: rgba(var(--chimera-blue-rgb), 0.1);
+    border: 1px solid var(--chimera-blue);
+    border-radius: var(--chimera-radius-sm);
+}
+
+.optionListContainer > .optionContainer li:hover,
+.optionContainer .highlight {
+    background: rgba(var(--chimera-blue-rgb), 0.12);
+    color: var(--chimera-base02);
+}
+
+/* ============================================================================
+   13. Product footer
+   ========================================================================== */
+
+.chimera-footer {
+    background-color: var(--chimera-base3);
+    border-top: 1px solid var(--chimera-border);
+    padding: 1.25rem 0;
+}
+
+.chimera-footer__made {
+    color: var(--chimera-base01);
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.chimera-footer__heart {
+    color: var(--chimera-red);
+    font-style: normal;
+}
+
+.chimera-footer__team {
+    color: var(--chimera-text-muted);
+    font-size: 0.78125rem;
+}
+
+/* ============================================================================
+   14. Brand mark
+   ========================================================================== */
+
+.chimera-mark {
+    display: block;
+    flex: none;
+}
+
+/* ============================================================================
+   15. Landing / intro experience
+   Fixed overlay in front of the app: static logo splash, then the landing
+   video, then it unmounts. Runs once per page load (see ChimeraIntro.jsx).
+   The overlay is purely visual — it never touches the router, so the user
+   stays on whatever route they loaded.
+   ========================================================================== */
+
+.chimera-intro {
+    position: fixed;
+    inset: 0;
+    z-index: 20000;
+    background-color: var(--chimera-base03);
+    cursor: pointer;
+    opacity: 1;
+    transition: opacity 420ms ease;
+}
+
+/* Leaving: fade the whole overlay out, then the component unmounts. */
+.chimera-intro--exiting {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Phase 1 — static identity splash. */
+.chimera-intro__splash {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.25rem;
+    transition: opacity 320ms ease;
+}
+
+/* Phase 2 — cross-fade the splash away as the video comes up. */
+.chimera-intro--video .chimera-intro__splash {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* The landing video — full-bleed, cinematic. `cover` fills the whole viewport
+   with no bars/letterboxing/pillarboxing; the video keeps its natural
+   proportions (some cropping when the viewport aspect differs from 16:9, which
+   is acceptable — distortion is not). The base03 fill only shows for the
+   instant before the first frame paints. */
+.chimera-intro__video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center center;
+    background-color: var(--chimera-base03);
+    opacity: 0;
+    transition: opacity 380ms ease;
+}
+
+.chimera-intro--video .chimera-intro__video {
+    opacity: 1;
+}
+
+.chimera-intro__mark {
+    animation:
+        chimera-intro-mark-in 620ms cubic-bezier(0.22, 1, 0.36, 1) both,
+        chimera-intro-breathe 2.6s ease-in-out 620ms infinite;
+}
+
+.chimera-intro__wordmark {
+    color: var(--chimera-base2);
+    font-family: var(--chimera-font-sans);
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: 0.42em;
+    text-indent: 0.42em; /* offsets the trailing letter-space, keeps it centred */
+    text-transform: uppercase;
+    animation: chimera-intro-word-in 700ms ease-out 260ms both;
+}
+
+.chimera-intro__rule {
+    width: 0;
+    height: 1px;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        var(--chimera-blue),
+        transparent
+    );
+    animation: chimera-intro-rule 900ms ease-out 300ms forwards;
+}
+
+@keyframes chimera-intro-mark-in {
+    from {
+        opacity: 0;
+        transform: scale(0.86);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* The restrained "breathing" beat — a couple of percent, nothing theatrical. */
+@keyframes chimera-intro-breathe {
+    0%,
+    100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.025);
+    }
+}
+
+@keyframes chimera-intro-word-in {
+    from {
+        opacity: 0;
+        letter-spacing: 0.7em;
+    }
+    to {
+        opacity: 1;
+        letter-spacing: 0.42em;
+    }
+}
+
+@keyframes chimera-intro-rule {
+    from {
+        width: 0;
+        opacity: 0;
+    }
+    to {
+        width: 180px;
+        opacity: 1;
+    }
+}
+
+/* ============================================================================
+   16. Reduced motion
+   Honour the OS preference: hold the identity static, drop every non-essential
+   transition, and never animate a status indicator.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    /* Reduced motion: the video is never mounted by ChimeraIntro; hold the
+       identity static for a brief moment, then transition into the app. */
+    .chimera-intro,
+    .chimera-intro__splash,
+    .chimera-intro__mark,
+    .chimera-intro__wordmark,
+    .chimera-intro__rule,
+    .chimera-intro__video {
+        animation: none !important;
+        opacity: 1;
+    }
+
+    .chimera-intro--exiting {
+        opacity: 0;
+    }
+
+    .chimera-intro__rule {
+        width: 180px;
+    }
+
+    .chimera-status[data-status="started"]::before {
+        animation: none !important;
+    }
+}

@@ -3,9 +3,14 @@ import { Routes, Route, Link } from "react-router-dom";
 
 import "./App.css";
 import "startbootstrap-sb-admin/dist/css/styles.css";
+// CHIMERA cosmetic theme. Imported last so it wins the cascade over Bootstrap
+// and the sb-admin template at equal specificity.
+import "./chimera-theme.css";
 import AnalysisList from "./AnalysisList.jsx";
 import UploadView from "./UploadView.jsx";
 import AnalysisView from "./AnalysisView.jsx";
+import { ChimeraLogo } from "./ChimeraLogo.jsx";
+import { ChimeraIntro } from "./ChimeraIntro.jsx";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFolder, faUpload, faGear } from "@fortawesome/free-solid-svg-icons";
 
@@ -13,6 +18,12 @@ export function AppHeader() {
     return (
         <nav className="sb-topnav navbar navbar-expand navbar-dark bg-dark">
             <Link className="navbar-brand ps-3" to="/">
+                {/* Dark Solarized shell -> white ("light") creature variant. */}
+                <ChimeraLogo
+                    size={36}
+                    variant="light"
+                    className="chimera-brand-mark"
+                />
                 CHIMERA
             </Link>
         </nav>
@@ -66,28 +77,24 @@ function AppSidenav() {
 
 export function AppFooter() {
     return (
-        <footer className="py-4 bg-light mt-auto">
+        <footer className="chimera-footer mt-auto">
             <div className="container-fluid px-4">
-                <div className="d-flex flex-column small">
-                    <div className="text-muted">
-                        CHIMERA &copy; 2019-2025
-                        <a
-                            className="px-2 link-body-emphasis"
-                            href="https://cert.pl/"
-                        >
-                            CERT Polska
-                        </a>
-                    </div>
-                    <div className="text-muted">
-                        DRAKVUF &reg; 2014-2025
-                        <a
-                            className="px-2 link-body-emphasis"
-                            href="https://tklengyel.com/"
-                        >
-                            Tamas K Lengyel
-                        </a>
-                    </div>
+                <div className="chimera-footer__made">
+                    Made with{" "}
+                    <span className="chimera-footer__heart" aria-hidden="true">
+                        &hearts;
+                    </span>{" "}
+                    in India by Team CHIMERA
                 </div>
+                <div className="chimera-footer__team">
+                    Mantek Singh Burn &middot; Anusha Tiwari &middot; Shreyas
+                    Tekawade
+                </div>
+                {/*
+                  Upstream provenance / legal attribution intentionally NOT
+                  rendered in the product UI. It is preserved in LICENSE and
+                  COPYING at the repository root, which remain untouched.
+                */}
             </div>
         </footer>
     );
@@ -96,6 +103,7 @@ export function AppFooter() {
 export default function App() {
     return (
         <>
+            <ChimeraIntro />
             <AppHeader />
             <div id="layoutSidenav">
                 <AppSidenav />
