@@ -3,7 +3,6 @@ import { Routes, Route, Link } from "react-router-dom";
 
 import "./App.css";
 import "startbootstrap-sb-admin/dist/css/styles.css";
-import logo from "./assets/logo.png";
 import AnalysisList from "./AnalysisList.jsx";
 import UploadView from "./UploadView.jsx";
 import AnalysisView from "./AnalysisView.jsx";
@@ -14,7 +13,7 @@ export function AppHeader() {
     return (
         <nav className="sb-topnav navbar navbar-expand navbar-dark bg-dark">
             <Link className="navbar-brand ps-3" to="/">
-                <img alt="logo" src={logo} /> web
+                CHIMERA
             </Link>
         </nav>
     );
@@ -71,7 +70,7 @@ export function AppFooter() {
             <div className="container-fluid px-4">
                 <div className="d-flex flex-column small">
                     <div className="text-muted">
-                        DRAKVUF Sandbox &copy; 2019-2025
+                        CHIMERA &copy; 2019-2025
                         <a
                             className="px-2 link-body-emphasis"
                             href="https://cert.pl/"

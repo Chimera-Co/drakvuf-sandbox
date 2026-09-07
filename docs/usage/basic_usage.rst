@@ -2,7 +2,7 @@
 Basic usage
 ===========
 
-This chapter walks you through the core workflow of using the DRAKVUF Sandbox, from uploading a file to exploring results and using the API.
+This chapter walks you through the core workflow of using CHIMERA, from uploading a file to exploring results and using the API.
 
 .. image:: ../_static/analysis_report.png
   :alt: Analysis report
@@ -145,8 +145,8 @@ General logs
 
 "General logs" tab contains various logs collected during analysis:
 
-- **drakrun** - log from the DRAKVUF Sandbox worker. If something went wrong, the possible reason may be found here
-- **parse_errors** - log entries that DRAKVUF Sandbox was unable to parse during postprocessing
+- **drakrun** - log from the CHIMERA worker. If something went wrong, the possible reason may be found here
+- **parse_errors** - log entries that CHIMERA was unable to parse during postprocessing
 - **inject** - information about initial process creation
 - other logs are coming from plugins
 
@@ -193,4 +193,4 @@ Viewing recent analyses
 
 Your completed analyses will be available in the Analyses view.
 
-DRAKVUF Sandbox remembers only 100 recent analyses in this list (the list is stored in Redis), but all analyses are reachable by their ID.
+CHIMERA remembers only 100 recent analyses in this list (the list is stored in Redis), but all analyses are reachable by their ID.

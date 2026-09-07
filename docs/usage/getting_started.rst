@@ -5,7 +5,7 @@ Getting started
 Supported hardware & software
 =============================
 
-In order to run DRAKVUF Sandbox, your setup must fulfill all of the listed requirements:
+In order to run CHIMERA, your setup must fulfill all of the listed requirements:
 
 * Processor: Intel processor with VT-x and EPT features (:ref:`how to check <check-cpu>`).
 * Host system: Debian 12 Bookworm/Ubuntu 22.04 (Jammy Jellyfish) with at least 2 core CPU and 8 GB RAM, running GRUB as bootloader.
@@ -16,7 +16,7 @@ In order to run DRAKVUF Sandbox, your setup must fulfill all of the listed requi
 Nested virtualization:
 
 * KVM **does** work, however it is considered experimental. If you experience any bugs, please report them to us for further investigation.
-* Due to lack of exposed CPU features, hosting DRAKVUF Sandbox in the cloud is **not** supported (although it might change in the future).
+* Due to lack of exposed CPU features, hosting CHIMERA in the cloud is **not** supported (although it might change in the future).
 * Hyper-V does **not** work.
 * Xen **does** work out of the box.
 * VMware Workstation Player **does** work, but you need to check Virtualize EPT option for a VM; Intel processor with EPT still required.
@@ -39,8 +39,8 @@ It's recommended to build components from sources to include latest patches that
 * Xen 4.19.2 sources: `https://downloads.xenproject.org/release/xen/4.19.2/ <https://downloads.xenproject.org/release/xen/4.19.2/>`_
 * Drakvuf sources: `https://github.com/tklengyel/drakvuf <https://github.com/tklengyel/drakvuf>`_
 
-Perform the Xen and DRAKVUF installation without installing Windows domain and creating JSON profiles. DRAKVUF Sandbox toolkit will assist you in creating
-the snapshot and its VMI profile. DRAKVUF Sandbox requires the following LibVMI/DRAKVUF CLI commands to be available in your PATH:
+Perform the Xen and DRAKVUF installation without installing Windows domain and creating JSON profiles. The CHIMERA toolkit will assist you in creating
+the snapshot and its VMI profile. CHIMERA requires the following LibVMI/DRAKVUF CLI commands to be available in your PATH:
 
 * ``drakvuf``
 * ``injector``
@@ -134,7 +134,7 @@ Once you are booted into Xen, verify that everything works as such:
         ... or ...
         (XEN) Mitigating GDS by disabling AVX while virtualised - protections are best-effort
 
-    Some applications or guest OSes may crash without AVX support, although it doesn't seem to be a requirement to run DRAKVUF Sandbox with Windows 7 / 10.
+    Some applications or guest OSes may crash without AVX support, although it doesn't seem to be a requirement to run CHIMERA with Windows 7 / 10.
 
     If you want to disable this mitigation:
 
@@ -186,9 +186,9 @@ Check if ``drakvuf`` and ``injector`` commands load correctly:
     Required input:
       ... (truncated help message)
 
-**Step 2. Installation of DRAKVUF Sandbox**
+**Step 2. Installation of CHIMERA**
 
-1. Install additional DRAKVUF Sandbox dependencies
+1. Install additional CHIMERA dependencies
 
 .. code-block:: console
 
@@ -204,7 +204,7 @@ Check if ``drakvuf`` and ``injector`` commands load correctly:
     $ . venv/bin/activate
     $ pip install wheel
 
-3. Install DRAKVUF Sandbox package
+3. Install the CHIMERA package
 
 .. code-block:: console
 
@@ -405,7 +405,7 @@ Checking if Drakvuf works correctly
 To ensure that everything works, use ``drakrun vm-start`` command to start the vm-1. You can also connect via VNC to the
 port 5901 to check if the Windows is in correct state.
 
-Then, run drakvuf tool with "procmon" plugin. Drakvuf Sandbox will help you do that by generating a base command-line.
+Then, run the drakvuf tool with the "procmon" plugin. CHIMERA will help you do that by generating a base command-line.
 
 .. code-block::
 
@@ -476,7 +476,7 @@ Then create /etc/systemd/system/drakrun-worker@.service file
 .. code-block:: ini
 
     [Unit]
-    Description=Drakvuf-Sandbox worker service
+    Description=CHIMERA worker service
     After=network.target
 
     [Service]
@@ -519,7 +519,7 @@ depending on the available resources on your machine. Each worker will run analy
 Building from sources
 =====================
 
-1. Clone Drakvuf Sandbox repository including submodules
+1. Clone this repository including submodules
 
   .. code-block:: console
 
@@ -527,7 +527,7 @@ Building from sources
 
 2. Build and install DRAKVUF from sources just like in :ref:`Basic installation <basic_installation>` section.
 
-3. Install DRAKVUF Sandbox system dependencies
+3. Install CHIMERA system dependencies
 
   .. code-block:: console
 
@@ -539,7 +539,7 @@ Building from sources
 
     $ apt install nodejs npm
 
-5. Make and install DRAKVUF Sandbox Python wheel. It's highly recommended to use `virtualenv <https://docs.python.org/3/library/venv.html>`_.
+5. Make and install the CHIMERA Python wheel. It's highly recommended to use `virtualenv <https://docs.python.org/3/library/venv.html>`_.
 
   .. code-block:: console
 

@@ -1,11 +1,11 @@
-Contribute to DRAKVUF Sandbox
+Contribute to CHIMERA
 =============================
 
 ## Setup development environment
 
 ### Prerequisites
 
-Very first thing to consider is to setup and configure your local instance of DRAKVUF Sandbox. There are two basic options in that matter:
+Very first thing to consider is to setup and configure your local instance of CHIMERA. There are two basic options in that matter:
 
 * Develop on local machine: Install Debian Buster in [VMware Workstation 15 Player](https://www.vmware.com/products/workstation-player/workstation-player-evaluation.html).
 * Develop on a remote server: Just get some bare-metal or rent a dedicated server (e.g. [Kimsufi](https://www.kimsufi.com/us/en/servers.xml)) with Debian Buster.
@@ -22,18 +22,22 @@ DRAKVUF will not run on incompatible processors, as it directly relies on partic
 
 ### Clone the repository
 
-In order to obtain the source code of DRAKVUF Sandbox, you need to execute the following commands:
+In order to obtain the source code of CHIMERA, you need to execute the following commands:
 
 ```
-git clone --recurse-submodules https://github.com/CERT-Polska/drakvuf-sandbox.git
+git clone --recurse-submodules https://github.com/Chimera-Co/drakvuf-sandbox.git
 cd drakvuf-sandbox
 ```
+
+CHIMERA is built on the DRAKVUF Sandbox foundation and uses DRAKVUF as its
+underlying analysis engine. Preserve the upstream licenses and attribution
+when contributing changes.
 
 ### Build Debian packages
 
 #### On local computer
 
-The DRAKVUF Sandbox distribution packages are built using Docker, in order to make them more reproducible. In order to build the packages by yourself, perform the following steps:
+The CHIMERA distribution packages are built using Docker, in order to make them more reproducible. In order to build the packages by yourself, perform the following steps:
 
 1. Obtain and install [Docker](https://docs.docker.com/engine/install/debian/).
 2. Execute:
@@ -58,7 +62,7 @@ Now you can re-install Python packages from sources, using:
 /opt/venvs/drakrun/bin/pip3 install --editable ./drakrun/
 ```
 
-your changes to the DRAKVUF Sandbox services will be immediately visible after you restart them.
+your changes to the CHIMERA services will be immediately visible after you restart them.
 
 ### Test local changes
 

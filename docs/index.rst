@@ -1,8 +1,8 @@
 =============================
-DRAKVUF Sandbox documentation
+CHIMERA documentation
 =============================
 
-DRAKVUF Sandbox is an automated black-box malware analysis system with DRAKVUF engine under the hood, which does not require an agent on guest OS.
+CHIMERA is an automated black-box malware analysis platform powered by the DRAKVUF engine, which does not require an agent on the guest OS.
 
 This project provides you with a friendly web interface that allows you to upload suspicious files to be analyzed. Once the sandboxing job is finished, you can explore the analysis result through the mentioned interface and get insight whether the file is truly malicious or not.
 

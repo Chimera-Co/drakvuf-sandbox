@@ -1,12 +1,12 @@
-# DRAKVUF Sandbox
+# CHIMERA
 
 > [!WARNING]  
 > Here be dragons 🐉. Maintaining your own sandbox is a difficult task and this project uses technology that is not user-friendly.
 > Be prepared to brush up on your debugging skills as bugs may be reproducible only on your configuration.
 > On the other hand, it's not purely an R&D project and it is used in production! Source code and issues section on both
-> DRAKVUF Sandbox and [DRAKVUF engine](https://github.com/tklengyel/drakvuf) projects are your best friend.
+> CHIMERA and the [DRAKVUF engine](https://github.com/tklengyel/drakvuf) are your best friends.
 
-DRAKVUF Sandbox is an automated black-box malware analysis system with [DRAKVUF](https://drakvuf.com/) engine under the hood, which does not require an agent on guest OS.
+CHIMERA is an automated black-box malware analysis platform powered by the [DRAKVUF](https://drakvuf.com/) engine, which does not require an agent on the guest OS.
 
 This project provides you with a friendly web interface that allows you to upload suspicious files to be analyzed. Once the sandboxing job is finished, you can explore the analysis result through the mentioned interface and get an insight on whether the file is truly malicious or not.
 
@@ -17,11 +17,11 @@ Because it is usually pretty hard to set up a malware sandbox, this project also
 * [Latest releases](https://github.com/CERT-Polska/drakvuf-sandbox/releases)
 * [Latest docs](https://drakvuf-sandbox.readthedocs.io/en/latest/)
 
-![DRAKVUF Sandbox - Analysis view](.github/screenshots/sandbox.png)
+![CHIMERA - Analysis view](.github/screenshots/sandbox.png)
 
 ## Recommended hardware & software
 
-In order to run DRAKVUF Sandbox, your setup should fulfill all the listed requirements.
+In order to run CHIMERA, your setup should fulfill all the listed requirements.
 
 * Processor:
   * ✔️ Required Intel processor with Intel Virtualization Technology (VT-x) and Extended Page Tables (EPT) features
@@ -37,7 +37,7 @@ Nested virtualization:
 * ✔️ Xen - works out of the box.
 * ✔️ KVM - works, we often use it for development purposes. If you experience any bugs, please report them to us for further investigation.
 * ✔️ VMware Workstation Player - works, but you need to check Virtualize EPT option for a VM; Intel processor with EPT still required.
-* ❌ AWS, GCP, Azure - due to lack of exposed CPU features, hosting DRAKVUF Sandbox in the cloud is **not** supported (although it might change in the future).
+* ❌ AWS, GCP, Azure - due to lack of exposed CPU features, hosting CHIMERA in the cloud is **not** supported (although it might change in the future).
 * ❌ Hyper-V - doesn't work.
 * ❌ VMWare Fusion (Mac) - doesn't work.
 
