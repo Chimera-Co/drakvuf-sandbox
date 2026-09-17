@@ -24,3 +24,8 @@ msgpack==1.0.8
 boto3==1.35.81
 # Karton integration dependency
 karton-core>=5.9.0,<6.0.0
+# Sandbox Evasion verification dependencies
+# perdedor is a git submodule (see .gitmodules) rather than a PyPI package, so
+# it can be pinned to an auditable commit and its agents/windows/*.ps1 tree
+# stays on disk for injection into the guest during a scan.
+-e ./perdedor

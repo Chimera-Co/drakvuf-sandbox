@@ -109,6 +109,58 @@ class KartonConfigSection(BaseModel):
     poll_interval: int = 10
 
 
+class SandboxDefinitionSection(BaseModel):
+    """One entry in the sandbox registry, declared as a [sandbox.<id>] table.
+
+    The registry is deliberately configuration-driven rather than discovered
+    from the hypervisor: drakrun currently derives every vm-N from a single
+    golden image, so enumerating running domains would report concurrency
+    slots as if they were distinct environments.
+    """
+
+    display_name: Optional[str] = None
+    platform: str = "windows"
+    os_version: Optional[str] = None
+    firmware: Optional[str] = None
+    hypervisor: str = "xen"
+    lifecycle: str = "drakrun-vm"
+    # Verifier ids this sandbox opts into. The API intersects this with the
+    # platforms each adapter actually supports, so declaring an unsupported
+    # tool here is harmless - it simply won't be offered.
+    verifiers: List[str] = Field(default_factory=lambda: ["perdedor", "alkhaser"])
+    metadata: Dict[str, str] = Field(default_factory=dict)
+
+
+class AlKhaserConfigSection(BaseModel):
+    # Host-side path to al-khaser_x64.exe. The binary is copied into the
+    # disposable overlay per scan and dies with it, so the golden image stays
+    # clean and the tool can be upgraded without rebuilding the image.
+    host_binary_path: Optional[pathlib.Path] = None
+    # al-khaser defaults to --sleep 600 and TIMING_ATTACKS performs nine
+    # separate sleeps of that duration, so an unqualified full run sleeps for
+    # roughly 90 minutes. The adapter always passes an explicit value.
+    default_sleep_seconds: int = 30
+    timeout: int = 1800
+
+
+class PerdedorConfigSection(BaseModel):
+    # Checkout of the perdedor repository. The adapter needs the on-disk
+    # agents/windows/*.ps1 tree to inject into the guest, which a wheel
+    # install would not provide.
+    repo_path: Optional[pathlib.Path] = None
+    timeout: int = 900
+
+
+class EvasionConfigSection(BaseModel):
+    alkhaser: AlKhaserConfigSection = AlKhaserConfigSection()
+    perdedor: PerdedorConfigSection = PerdedorConfigSection()
+    # Default wall-clock budget for a whole verification scan, in seconds.
+    default_timeout: int = 2400
+    # CHIMERA evasion score thresholds (0-100, higher is better).
+    score_pass_threshold: float = 90.0
+    score_warn_threshold: float = 70.0
+
+
 class DrakrunConfig(BaseSettings):
     model_config = SettingsConfigDict(
         extra="allow",
@@ -125,6 +177,8 @@ class DrakrunConfig(BaseSettings):
     karton: KartonConfigSection = KartonConfigSection()
     s3: Optional[S3StorageConfigSection] = None
     preset: Dict[str, DrakrunDefaultsPresetSection] = Field(default_factory=dict)
+    sandbox: Dict[str, SandboxDefinitionSection] = Field(default_factory=dict)
+    evasion: EvasionConfigSection = EvasionConfigSection()
 
     def get_drakrun_defaults(
         self, preset_name: Optional[str] = None

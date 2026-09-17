@@ -9,10 +9,19 @@ import "./chimera-theme.css";
 import AnalysisList from "./AnalysisList.jsx";
 import UploadView from "./UploadView.jsx";
 import AnalysisView from "./AnalysisView.jsx";
+import SandboxEvasion from "./SandboxEvasion.jsx";
+import EvasionScanView from "./EvasionScanView.jsx";
+import VerificationRuns from "./VerificationRuns.jsx";
 import { ChimeraLogo } from "./ChimeraLogo.jsx";
 import { ChimeraIntro } from "./ChimeraIntro.jsx";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFolder, faUpload, faGear } from "@fortawesome/free-solid-svg-icons";
+import {
+    faFolder,
+    faUpload,
+    faGear,
+    faShieldHalved,
+    faClockRotateLeft,
+} from "@fortawesome/free-solid-svg-icons";
 
 export function AppHeader() {
     return (
@@ -51,6 +60,21 @@ function AppSidenav() {
                                 <FontAwesomeIcon icon={faUpload} />
                             </div>
                             Upload sample
+                        </Link>
+                        <div className="sb-sidenav-menu-heading">
+                            Verification
+                        </div>
+                        <Link className="nav-link" to="/evasion">
+                            <div className="sb-nav-link-icon">
+                                <FontAwesomeIcon icon={faShieldHalved} />
+                            </div>
+                            Sandbox Evasion
+                        </Link>
+                        <Link className="nav-link" to="/verification-runs">
+                            <div className="sb-nav-link-icon">
+                                <FontAwesomeIcon icon={faClockRotateLeft} />
+                            </div>
+                            Verification Runs
                         </Link>
                         <div className="sb-sidenav-menu-heading">Sandbox</div>
                         <a className="nav-link" href="/openapi/swagger">
@@ -115,6 +139,18 @@ export default function App() {
                             <Route
                                 path="/analysis/:jobid"
                                 element={<AnalysisView />}
+                            />
+                            <Route
+                                path="/evasion"
+                                element={<SandboxEvasion />}
+                            />
+                            <Route
+                                path="/evasion/:scanId"
+                                element={<EvasionScanView />}
+                            />
+                            <Route
+                                path="/verification-runs"
+                                element={<VerificationRuns />}
                             />
                         </Routes>
                     </main>

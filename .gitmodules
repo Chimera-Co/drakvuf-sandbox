@@ -4,3 +4,6 @@
 [submodule "drakrun/data/capa-rules"]
 	path = drakrun/data/capa-rules
 	url = https://github.com/mandiant/capa-rules.git
+[submodule "perdedor"]
+	path = perdedor
+	url = https://github.com/clustercoder/perdedor.git
