@@ -1,0 +1,54 @@
+"""
+Telemetry completeness summary stored in each analysis' metadata.
+
+An analysis can end with status "finished" while some telemetry is missing
+(DRAKVUF crashed or was killed, a plugin produced nothing). This records what
+was actually collected so reports and benchmarks don't treat "no log" as
+"no behaviour". Note: a "missing" plugin log can mean either that the plugin
+saw no events or that it failed; the log alone can't tell them apart, which
+is why the DRAKVUF return code and hard-timeout flag are recorded alongside.
+"""
+
+import pathlib
+from typing import Any, Dict, List, Optional
+
+# Artefacts that matter more than the plugin's log itself.
+EXTRA_ARTEFACTS = {
+    "memdump": ["dumps.zip"],
+    "tlsmon": ["wireshark_key_file.txt"],
+}
+
+
+def file_status(path: pathlib.Path) -> Dict[str, Any]:
+    if not path.exists():
+        return {"status": "missing", "bytes": 0}
+    size = path.stat().st_size
+    return {"status": "produced" if size > 0 else "empty", "bytes": size}
+
+
+def summarize_telemetry(
+    analysis_dir: pathlib.Path,
+    plugins: List[str],
+    drakvuf_returncode: Optional[int],
+    drakvuf_hard_timeout: bool,
+) -> Dict[str, Any]:
+    plugin_status = {}
+    for plugin in plugins:
+        entry = file_status(analysis_dir / f"{plugin}.log")
+        for artefact in EXTRA_ARTEFACTS.get(plugin, []):
+            entry[artefact] = file_status(analysis_dir / artefact)["status"]
+        plugin_status[plugin] = entry
+
+    screenshots_dir = analysis_dir / "screenshots"
+    screenshots = len(list(screenshots_dir.iterdir())) if screenshots_dir.is_dir() else 0
+
+    return {
+        "drakvuf_returncode": drakvuf_returncode,
+        "drakvuf_hard_timeout": drakvuf_hard_timeout,
+        "plugins": plugin_status,
+        "missing_plugins": sorted(
+            name for name, entry in plugin_status.items() if entry["status"] != "produced"
+        ),
+        "pcap": file_status(analysis_dir / "dump.pcap"),
+        "screenshots": screenshots,
+    }

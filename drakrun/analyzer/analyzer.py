@@ -25,6 +25,7 @@ from .analysis_options import AnalysisOptions, StartMethod
 from .post_restore import get_post_restore_command, prepare_ps_command
 from .postprocessing import postprocess_analysis_dir
 from .run_tools import run_drakvuf, run_screenshotter, run_tcpdump, run_vm
+from .telemetry import summarize_telemetry
 from .startup_command import (
     get_sample_filename_from_host_path,
     get_startup_method_and_argv,
@@ -216,6 +217,8 @@ def analyze_file(
                 "to know what to execute after unpacking archive."
             )
 
+    drakvuf_returncode = None
+    drakvuf_hard_timeout = False
     with run_vm(
         vm_id, install_info, network_conf, no_restore=options.no_vm_restore
     ) as vm:
@@ -401,8 +404,10 @@ def analyze_file(
                         drakvuf.wait()
                 except subprocess.TimeoutExpired:
                     log.info("Drakvuf hard timed out - hang?")
+                    drakvuf_hard_timeout = True
                     drakvuf.terminate()
                     drakvuf.wait(10)
+                drakvuf_returncode = drakvuf.returncode
         except KeyboardInterrupt:
             log.info("Interrupted with CTRL-C, analysis finished.")
 
@@ -410,6 +415,9 @@ def analyze_file(
         substatus_callback(AnalysisSubstatus.postprocessing)
 
     extra_metadata = postprocess_analysis_dir(output_dir, config, metadata)
+    extra_metadata["telemetry"] = summarize_telemetry(
+        output_dir, options.plugins, drakvuf_returncode, drakvuf_hard_timeout
+    )
 
     if substatus_callback is not None:
         substatus_callback(AnalysisSubstatus.done)

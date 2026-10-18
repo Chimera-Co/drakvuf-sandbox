@@ -30,14 +30,20 @@ def check_plugin_requirements(
 
 
 def run_postprocessing(context: PostprocessContext):
+    # Recorded in metadata so a report can't silently omit a failed step.
+    outcomes = {}
     for plugin in POSTPROCESS_PLUGINS:
         plugin_name = plugin.function.__name__
         if not check_plugin_requirements(context.analysis_dir, plugin):
+            outcomes[plugin_name] = "skipped"
             continue
         try:
             plugin.function(context)
-        except Exception:
+            outcomes[plugin_name] = "ok"
+        except Exception as e:
             logger.exception(f"{plugin_name} failed with uncaught exception")
+            outcomes[plugin_name] = f"failed: {type(e).__name__}"
+    context.update_metadata({"postprocess": outcomes})
 
 
 def postprocess_analysis_dir(
