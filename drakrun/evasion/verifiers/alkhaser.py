@@ -71,9 +71,11 @@ from drakrun.evasion.constants import Category, CheckStatus, Severity, ToolStatu
 from drakrun.evasion.models import NormalizedCheck, ToolResult
 from drakrun.evasion.verifiers.base import (
     GuestSession,
+    ReportTooLarge,
     VerifierAdapter,
     VerifierError,
     VerifierTimeout,
+    read_report_bytes,
 )
 
 TOOL_ID = "alkhaser"
@@ -1721,7 +1723,7 @@ def _diagnose_uploaded_binary(
     local_copy = raw_dir / f"_diag_readback_{label}.tmp"
     try:
         session.get_file(guest_binary_path, local_copy)
-        guest_bytes = local_copy.read_bytes()
+        guest_bytes = read_report_bytes(local_copy)
         diagnostic["guest_exists"] = True
         diagnostic["guest_size"] = len(guest_bytes)
         diagnostic["guest_sha256"] = hashlib.sha256(guest_bytes).hexdigest()
@@ -2034,9 +2036,8 @@ class AlKhaserAdapter(VerifierAdapter):
             _probe_guest_file_metadata(
                 session, guest_binary_path, guest_dir, raw_dir, "pre_run"
             )
-            exit_code, _stdout, _stderr = session.run(
-                command_txt, timeout=timeout, cwd=guest_dir
-            )
+            command_result = session.run(command_txt, timeout=timeout, cwd=guest_dir)
+            exit_code, _stdout, _stderr = command_result
         except VerifierTimeout:
             finished_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             return ToolResult(
@@ -2062,6 +2063,7 @@ class AlKhaserAdapter(VerifierAdapter):
 
         # Exit code is unconditionally 0 in this al-khaser version and is
         # never treated as a verdict; it is recorded purely for audit.
+        truncated = getattr(command_result, "truncated", False)
         raw_artifacts: List[str] = []
         for checkpoint in ("post_upload", "pre_run"):
             for prefix in ("diag", "probe", "read_probe"):
@@ -2070,26 +2072,46 @@ class AlKhaserAdapter(VerifierAdapter):
                     raw_artifacts.append(str(diag_path.relative_to(scan_dir)))
         stdout_text = ""
         log_text: Optional[str] = None
+        report_error: Optional[str] = None
 
         local_stdout = raw_dir / "stdout.txt"
         try:
             session.get_file(guest_stdout_path, local_stdout)
-            stdout_text = local_stdout.read_text(encoding="utf-8", errors="replace")
             raw_artifacts.append(str(local_stdout.relative_to(scan_dir)))
+            stdout_text = read_report_bytes(local_stdout).decode(
+                "utf-8", errors="replace"
+            )
+        except ReportTooLarge as exc:
+            report_error = str(exc)
         except Exception:  # noqa: BLE001 - retrieval failure is reported, not fatal
             pass
 
         local_log = raw_dir / "log.txt"
         try:
             session.get_file(guest_log_path, local_log)
-            log_text = local_log.read_text(encoding="utf-8", errors="replace")
             raw_artifacts.append(str(local_log.relative_to(scan_dir)))
+            log_text = read_report_bytes(local_log).decode("utf-8", errors="replace")
+        except ReportTooLarge as exc:
+            report_error = str(exc)
         except (
             Exception
         ):  # noqa: BLE001 - al-khaser may not have written a log.txt at all
             pass
 
         finished_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+        if report_error:
+            return ToolResult(
+                tool=TOOL_ID,
+                status=ToolStatus.error,
+                started_at=started_at,
+                finished_at=finished_at,
+                exit_code=exit_code,
+                truncated=truncated,
+                command=" ".join(command_txt),
+                raw_artifacts=raw_artifacts,
+                error=report_error,
+            )
 
         if log_text is not None:
             parsed = self._parse_log_lines(log_text)
@@ -2105,6 +2127,7 @@ class AlKhaserAdapter(VerifierAdapter):
                 command=" ".join(command_txt),
                 raw_artifacts=raw_artifacts,
                 error="Neither log.txt nor stdout could be retrieved from the guest.",
+                truncated=truncated,
             )
 
         checks = self._normalize(validated["checks"], parsed)
@@ -2118,6 +2141,7 @@ class AlKhaserAdapter(VerifierAdapter):
             command=" ".join(command_txt),
             checks=checks,
             raw_artifacts=raw_artifacts,
+            truncated=truncated,
         )
 
 

@@ -38,6 +38,52 @@ from drakrun.evasion.verifiers.base import VerifierTimeout
 from drakrun.lib.drakshell import ProcessStartError
 
 
+@pytest.mark.parametrize(
+    "stdout_size,stderr_size", [(64, 64), (65, 3), (3, 65), (4096, 4096)]
+)
+def test_guest_stream_caps_are_independent(monkeypatch, stdout_size, stderr_size):
+    monkeypatch.setattr(
+        "drakrun.evasion.guest_runner.MAX_STREAM_BYTES", 64, raising=False
+    )
+    session = GuestSession(
+        FakeInjector(),
+        FakeDrakshell(
+            [FakeProcess()],
+            stdout_bytes=b"o" * stdout_size,
+            stderr_bytes=b"e" * stderr_size,
+        ),
+    )
+    result = session.run(["whoami"], timeout=5)
+    exit_code, stdout, stderr = result
+    assert exit_code == 0
+    assert len(stdout) <= 64
+    assert len(stderr) <= 64
+    for size, output, letter in [
+        (stdout_size, stdout, b"o"),
+        (stderr_size, stderr, b"e"),
+    ]:
+        if size > 64:
+            assert b"[output truncated]" in output
+        else:
+            assert output == letter * size
+    assert result.truncated is (stdout_size > 64 or stderr_size > 64)
+
+
+def test_stream_cap_across_many_writes(monkeypatch):
+    from drakrun.evasion.guest_runner import _BufferWriter
+
+    monkeypatch.setattr(
+        "drakrun.evasion.guest_runner.MAX_STREAM_BYTES", 64, raising=False
+    )
+    writer = _BufferWriter()
+    for _ in range(100):
+        assert writer.write(b"abcdefghij") == 10
+    output = writer.getvalue()
+    assert len(output) <= 64
+    assert output.count(b"[output truncated]") == 1
+    assert writer.truncated is True
+
+
 def _decode_ps_command(argv):
     """Undo drakrun.analyzer.post_restore.prepare_ps_command's -EncodedCommand
     base64/UTF-16LE encoding, so tests can assert on the plaintext script."""

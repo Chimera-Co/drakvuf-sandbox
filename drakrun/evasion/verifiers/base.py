@@ -26,9 +26,25 @@ from __future__ import annotations
 
 import abc
 import pathlib
-from typing import Any, Dict, List, Optional, Protocol, Tuple
+from dataclasses import dataclass
+from typing import Any, Dict, Iterator, List, Optional, Protocol, Tuple, Union
 
 from drakrun.evasion.models import ToolResult
+
+MAX_REPORT_BYTES = 16 * 1024 * 1024
+
+
+@dataclass(frozen=True)
+class GuestCommandResult:
+    """Bounded command output; retains three-value unpacking for callers."""
+
+    exit_code: int
+    stdout: bytes
+    stderr: bytes
+    truncated: bool = False
+
+    def __iter__(self) -> Iterator[Union[int, bytes]]:
+        return iter((self.exit_code, self.stdout, self.stderr))
 
 
 class VerifierError(Exception):
@@ -48,6 +64,25 @@ class VerifierTimeout(Exception):
     """Raised internally when a guest-side run exceeds its deadline. Adapters
     catch this themselves and translate it into ToolResult(status=timeout);
     it should never escape run()."""
+
+
+class ReportTooLarge(VerifierError):
+    """Guest-controlled report exceeds the host's read budget."""
+
+
+def read_report_bytes(path: pathlib.Path) -> bytes:
+    """Reject oversized files before opening; bound reads if a file grows."""
+    if path.stat().st_size > MAX_REPORT_BYTES:
+        raise ReportTooLarge(
+            f"Report too large: {path.name} (limit {MAX_REPORT_BYTES} bytes)"
+        )
+    with path.open("rb") as report_file:
+        data = report_file.read(MAX_REPORT_BYTES + 1)
+    if len(data) > MAX_REPORT_BYTES:
+        raise ReportTooLarge(
+            f"Report too large: {path.name} (limit {MAX_REPORT_BYTES} bytes)"
+        )
+    return data
 
 
 class GuestSession(Protocol):
@@ -83,8 +118,9 @@ class GuestSession(Protocol):
         argv: List[str],
         timeout: float,
         cwd: Optional[str] = None,
-    ) -> Tuple[int, bytes, bytes]:
+    ) -> GuestCommandResult:
         """Execute argv in the guest and return (exit_code, stdout, stderr).
+        The result's truncated flag records whether either stream was capped.
         Raises VerifierTimeout if the run exceeds timeout."""
         ...
 
@@ -133,6 +169,9 @@ class VerifierAdapter(abc.ABC):
 
 
 __all__ = [
+    "GuestCommandResult",
+    "ReportTooLarge",
+    "read_report_bytes",
     "VerifierError",
     "VerifierTimeout",
     "GuestSession",

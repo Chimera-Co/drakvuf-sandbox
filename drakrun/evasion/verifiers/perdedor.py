@@ -44,6 +44,7 @@ back to the upstream report.
 from __future__ import annotations
 
 import json
+import math
 import pathlib
 import time
 from typing import Any, Dict, List
@@ -52,9 +53,11 @@ from drakrun.evasion.constants import Category, CheckStatus, Severity, ToolStatu
 from drakrun.evasion.models import NormalizedCheck, ToolResult
 from drakrun.evasion.verifiers.base import (
     GuestSession,
+    ReportTooLarge,
     VerifierAdapter,
     VerifierError,
     VerifierTimeout,
+    read_report_bytes,
 )
 
 TOOL_ID = "perdedor"
@@ -188,9 +191,8 @@ class PerdedorAdapter(VerifierAdapter):
         try:
             session.put_tree_as_zip(agent_dir, guest_dir)
             timeout = max(0.0, deadline - time.time())
-            exit_code, stdout, stderr = session.run(
-                command_txt, timeout=timeout, cwd=guest_dir
-            )
+            command_result = session.run(command_txt, timeout=timeout, cwd=guest_dir)
+            exit_code, stdout, stderr = command_result
         except VerifierTimeout:
             finished_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             return ToolResult(
@@ -214,6 +216,7 @@ class PerdedorAdapter(VerifierAdapter):
                 error=f"Failed to launch the PERDEDOR Windows agent in the guest: {exc}",
             )
 
+        truncated = getattr(command_result, "truncated", False)
         raw_artifacts: List[str] = []
         if stderr:
             stderr_path = raw_dir / "agent-stderr.txt"
@@ -238,6 +241,7 @@ class PerdedorAdapter(VerifierAdapter):
                 started_at=started_at,
                 finished_at=finished_at,
                 exit_code=exit_code,
+                truncated=truncated,
                 command=" ".join(command_txt),
                 raw_artifacts=raw_artifacts,
                 error=f"Could not retrieve the report the agent wrote in-guest: {exc}",
@@ -245,15 +249,21 @@ class PerdedorAdapter(VerifierAdapter):
         raw_artifacts.append(str(local_report.relative_to(scan_dir)))
 
         try:
-            report_text = local_report.read_text(encoding="utf-8")
+            report_text = read_report_bytes(local_report).decode("utf-8")
             report = json.loads(report_text)
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        except (
+            OSError,
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+            ReportTooLarge,
+        ) as exc:
             return ToolResult(
                 tool=TOOL_ID,
                 status=ToolStatus.error,
                 started_at=started_at,
                 finished_at=finished_at,
                 exit_code=exit_code,
+                truncated=truncated,
                 command=" ".join(command_txt),
                 raw_artifacts=raw_artifacts,
                 error=f"PERDEDOR report was not valid JSON: {exc}",
@@ -262,30 +272,46 @@ class PerdedorAdapter(VerifierAdapter):
         validate_report, ValidationError = _load_perdedor_common()
         try:
             validate_report(report, source="perdedor-guest-report")
-        except ValidationError as exc:
+            weighted_score = report["summary"]["weighted_score"]
+            if (
+                isinstance(weighted_score, bool)
+                or not isinstance(weighted_score, (int, float))
+                or not math.isfinite(weighted_score)
+            ):
+                raise ValueError("summary.weighted_score must be a finite number")
+            checks = self._normalize(report)
+            ids = [check.id for check in checks]
+            if len(ids) != len(set(ids)):
+                raise ValueError("duplicate check ids")
+        except (ValidationError, ValueError, TypeError, KeyError, OverflowError) as exc:
             return ToolResult(
                 tool=TOOL_ID,
                 status=ToolStatus.error,
                 started_at=started_at,
                 finished_at=finished_at,
                 exit_code=exit_code,
+                truncated=truncated,
                 command=" ".join(command_txt),
                 raw_artifacts=raw_artifacts,
                 error=f"PERDEDOR report failed schema validation: {exc}",
             )
 
-        checks = self._normalize(report)
-
         return ToolResult(
             tool=TOOL_ID,
             tool_version=report.get("perdedor_version"),
-            status=ToolStatus.ok,
+            status=ToolStatus.ok if exit_code == 0 else ToolStatus.error,
             started_at=started_at,
             finished_at=finished_at,
             exit_code=exit_code,
+            truncated=truncated,
             command=" ".join(command_txt),
             checks=checks,
             raw_artifacts=raw_artifacts,
+            error=(
+                f"PERDEDOR agent exited with exit code {exit_code}."
+                if exit_code
+                else None
+            ),
         )
 
     def _normalize(self, report: Dict[str, Any]) -> List[NormalizedCheck]:

@@ -70,7 +70,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import mslex
 
 from drakrun.analyzer.post_restore import prepare_ps_command
-from drakrun.evasion.verifiers.base import VerifierTimeout
+from drakrun.evasion.verifiers.base import GuestCommandResult, VerifierTimeout
 from drakrun.lib.drakshell import Drakshell, ProcessStartError
 from drakrun.lib.injector import Injector
 
@@ -82,6 +82,8 @@ _TERMINATE_GRACE_SECONDS = 15.0
 # Fixed budget for setup commands (Expand-Archive) that are not part of a
 # verifier's own timeout budget.
 _SETUP_COMMAND_TIMEOUT_SECONDS = 60.0
+MAX_STREAM_BYTES = 8 * 1024 * 1024
+_TRUNCATION_MARKER = b"\n[output truncated]\n"
 
 # Mirrors the hard ceiling in drakrun.lib.drakshell.Drakshell._start_process():
 #
@@ -240,18 +242,25 @@ class _BufferWriter:
     fix, not a workaround."""
 
     def __init__(self) -> None:
-        self._chunks: List[bytes] = []
+        self._data = bytearray()
+        self.truncated = False
         self.buffer = self
 
     def write(self, data: bytes) -> int:
-        self._chunks.append(data)
+        if not self.truncated:
+            remaining = MAX_STREAM_BYTES - len(self._data)
+            self._data.extend(data[:remaining])
+            if len(data) > remaining:
+                self.truncated = True
+                del self._data[MAX_STREAM_BYTES - len(_TRUNCATION_MARKER) :]
+                self._data.extend(_TRUNCATION_MARKER)
         return len(data)
 
     def flush(self) -> None:
         pass
 
     def getvalue(self) -> bytes:
-        return b"".join(self._chunks)
+        return bytes(self._data)
 
 
 class GuestSession:
@@ -311,7 +320,7 @@ class GuestSession:
 
     def _run_with_timeout(
         self, argv: List[str], timeout: float, cwd: Optional[str] = None
-    ) -> Tuple[int, bytes, bytes]:
+    ) -> GuestCommandResult:
         # final_argv is a List[str] when cwd is not supplied (passed through
         # unchanged to Drakshell, which quotes it via mslex.join(for_cmd=False)
         # exactly as before) or a plain str when cwd is supplied (see
@@ -401,10 +410,11 @@ class GuestSession:
             self._broken_reason = f"guest command failed: {process._fatal_error}"
             raise process._fatal_error
 
-        return (
+        return GuestCommandResult(
             process._exit_code,
             stdout_writer.getvalue(),
             stderr_writer.getvalue(),
+            truncated=stdout_writer.truncated or stderr_writer.truncated,
         )
 
     def probe_command(self, argv: List[str], timeout: float) -> Tuple[bool, str]:
@@ -494,7 +504,7 @@ class GuestSession:
 
     def run(
         self, argv: List[str], timeout: float, cwd: Optional[str] = None
-    ) -> Tuple[int, bytes, bytes]:
+    ) -> GuestCommandResult:
         return self._run_with_timeout(argv, timeout, cwd=cwd)
 
     def get_file(self, remote_path: str, local_path: pathlib.Path) -> None:

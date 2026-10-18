@@ -305,7 +305,6 @@ def worker_verify(options: EvasionScanOptions) -> None:
                 metadata.score = score
 
                 substatus_callback(EvasionSubstatus.reporting.value)
-                write_evasion_json(scan_dir, metadata)
                 write_html_report(scan_dir, metadata)
 
                 substatus_callback(EvasionSubstatus.cleanup.value)
@@ -323,7 +322,6 @@ def worker_verify(options: EvasionScanOptions) -> None:
             metadata.tool_results = tool_results
             metadata.score = score
             substatus_callback(EvasionSubstatus.reporting.value)
-            write_evasion_json(scan_dir, metadata)
             write_html_report(scan_dir, metadata)
     except BaseException as exc:
         job_success = False
@@ -336,21 +334,29 @@ def worker_verify(options: EvasionScanOptions) -> None:
 
         metadata.status = "finished" if job_success else "failed"
         metadata.substatus = (
-            EvasionSubstatus.done.value if job_success else metadata.substatus
+            EvasionSubstatus.done.value if job_success else job.meta.get("substatus")
         )
         metadata.time_finished = datetime.datetime.now(
             datetime.timezone.utc
         ).isoformat()
-        job.meta["time_finished"] = metadata.time_finished
-        job.meta["substatus"] = metadata.substatus
-        job.save_meta()
-        # The very last disk write - evasion.json (inside the try block
-        # above) already reflects the full result when this scan actually
-        # ran tools; metadata.json is updated here too so the API layer's
-        # fallback path (evasion.json missing or unreadable) still shows an
-        # accurate terminal status for a scan that failed before it could
-        # write evasion.json at all.
-        metadata.store_to_file(metadata_file)
+        try:
+            # Finalize both durable records after VM cleanup, including
+            # failures before the first result/report could be written.
+            write_evasion_json(scan_dir, metadata)
+        except BaseException as exc:
+            if job_success:
+                metadata.status = "failed"
+                metadata.substatus = job.meta.get("substatus")
+                metadata.error = str(exc)
+                raise
+            logger.exception("Could not persist failed verification result")
+        finally:
+            # Even if result persistence fails, retain terminal metadata
+            # and preserve the original scan exception for RQ.
+            metadata.store_to_file(metadata_file)
+            job.meta["time_finished"] = metadata.time_finished
+            job.meta["substatus"] = metadata.substatus
+            job.save_meta()
 
 
 def scan_job_to_metadata(job: Job) -> EvasionScanMetadata:

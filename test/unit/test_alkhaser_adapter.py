@@ -58,6 +58,64 @@ def alkhaser_binary(tmp_path):
     return binary
 
 
+@pytest.mark.parametrize("filename", ["log.txt", "stdout.txt"])
+def test_oversized_report_is_error_even_with_other_valid_output(
+    tmp_path, alkhaser_binary, monkeypatch, filename
+):
+    monkeypatch.setattr(
+        "drakrun.evasion.verifiers.base.MAX_REPORT_BYTES", 256, raising=False
+    )
+    files = {
+        r"C:\Users\Public\alkhaser\log.txt": b"[*] TLS process attach callback  -> 0\n",
+        r"C:\Users\Public\alkhaser\stdout.txt": b"[*] TLS process attach callback  -> 0\n",
+    }
+    files["C:\\Users\\Public\\alkhaser\\" + filename] = b" " * 257
+    session = FakeGuestSession(files=files)
+    original_open = pathlib.Path.open
+
+    def guarded_open(path, *args, **kwargs):
+        mode = args[0] if args else kwargs.get("mode", "r")
+        if (
+            path.name == filename
+            and path.exists()
+            and path.stat().st_size > 256
+            and "r" in mode
+        ):
+            pytest.fail("oversized report opened for reading")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(pathlib.Path, "open", guarded_open)
+    result = AlKhaserAdapter().run(
+        session,
+        {"host_binary_path": str(alkhaser_binary), "checks": ["TLS"]},
+        tmp_path,
+        time.time() + 60,
+    )
+    assert result.status == ToolStatus.error
+    assert "report too large" in result.error.lower()
+    assert result.checks == []
+    assert "raw/alkhaser/" + filename in result.raw_artifacts
+
+
+def test_truncation_flag_survives_adapter(tmp_path, alkhaser_binary):
+    from drakrun.evasion.verifiers.base import GuestCommandResult
+
+    session = FakeGuestSession(
+        run_result=GuestCommandResult(0, b"[output truncated]", b"", truncated=True),
+        files={
+            r"C:\Users\Public\alkhaser\log.txt": b"[*] TLS process attach callback  -> 0\n"
+        },
+    )
+    result = AlKhaserAdapter().run(
+        session,
+        {"host_binary_path": str(alkhaser_binary), "checks": ["TLS"]},
+        tmp_path,
+        time.time() + 60,
+    )
+    assert result.status == ToolStatus.ok
+    assert result.to_dict()["truncated"] is True
+
+
 def test_unsupported_when_no_host_binary_configured(tmp_path):
     adapter = AlKhaserAdapter()
     session = FakeGuestSession()

@@ -31,6 +31,25 @@ from drakrun.evasion.report import (
 from drakrun.evasion.scoring import compute_score
 from drakrun.evasion.storage import build_artifacts_zip, list_scan_files
 
+
+def test_native_renderer_does_not_read_oversized_guest_report(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "drakrun.evasion.verifiers.base.MAX_REPORT_BYTES", 256, raising=False
+    )
+    raw_report = tmp_path / "raw" / "perdedor" / "windows-report.json"
+    raw_report.parent.mkdir(parents=True)
+    raw_report.write_bytes(b" " * 257)
+    original_open = type(raw_report).open
+
+    def guarded_open(path, *args, **kwargs):
+        if path == raw_report:
+            raise AssertionError("oversized report opened for reading")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(type(raw_report), "open", guarded_open)
+    assert write_perdedor_native_report(tmp_path) is None
+
+
 _RAW_PERDEDOR_REPORT = {
     "perdedor_version": "0.1.0",
     "platform": "windows",

@@ -22,9 +22,6 @@ from drakrun.evasion.constants import CheckStatus, ToolStatus  # noqa: E402
 from drakrun.evasion.verifiers.base import VerifierError, VerifierTimeout  # noqa: E402
 from drakrun.evasion.verifiers.perdedor import PerdedorAdapter  # noqa: E402
 
-# test/unit/ -> test/ -> chimera-console/ -> perdedor/ (the submodule checkout)
-REPO_ROOT = _THIS_DIR.parent.parent
-
 
 def _valid_report(detected=False):
     return {
@@ -62,8 +59,12 @@ def _valid_report(detected=False):
 
 
 @pytest.fixture
-def repo_path():
-    return str(REPO_ROOT / "perdedor")
+def repo_path(tmp_path):
+    # Only delivery is faked; validation uses installed perdedor_common.
+    agent_dir = tmp_path / "agent-repo" / "agents" / "windows"
+    agent_dir.mkdir(parents=True)
+    (agent_dir / "Invoke-Perdedor.ps1").write_text("# test agent")
+    return str(agent_dir.parent.parent)
 
 
 def test_unsupported_when_no_repo_configured(tmp_path):
@@ -195,3 +196,151 @@ def test_options_schema_declares_full_suite_only():
     schema = adapter.options_schema()
     assert schema["full_suite_only"] is True
     assert schema["options"] == []
+
+
+@pytest.mark.parametrize("exit_code", [1, -1, 255])
+def test_nonzero_exit_cannot_produce_ok(tmp_path, repo_path, exit_code):
+    session = FakeGuestSession(
+        run_result=(exit_code, b"partial output", b"agent failed"),
+        files={
+            r"C:\Users\Public\perdedor\windows-report.json": json.dumps(
+                _valid_report()
+            ).encode(),
+        },
+    )
+    result = PerdedorAdapter().run(
+        session, {"repo_path": repo_path}, tmp_path, time.time() + 60
+    )
+    assert result.status == ToolStatus.error
+    assert result.exit_code == exit_code
+    assert "exit" in result.error.lower()
+    assert result.checks  # Partial findings remain auditable, but cannot score.
+    assert "raw/perdedor/windows-report.json" in result.raw_artifacts
+
+
+@pytest.mark.parametrize(
+    "weighted_score",
+    [float("nan"), float("inf"), -float("inf"), True, "100", None],
+)
+def test_rejects_nonfinite_or_nonnumeric_summary(tmp_path, repo_path, weighted_score):
+    report = _valid_report()
+    report["summary"]["weighted_score"] = weighted_score
+    session = FakeGuestSession(
+        files={
+            r"C:\Users\Public\perdedor\windows-report.json": json.dumps(report).encode()
+        }
+    )
+    result = PerdedorAdapter().run(
+        session, {"repo_path": repo_path}, tmp_path, time.time() + 60
+    )
+    assert result.status == ToolStatus.error
+    assert result.checks == []
+
+
+def test_rejects_duplicate_check_ids(tmp_path, repo_path):
+    report = _valid_report()
+    report["findings"].append(dict(report["findings"][0]))
+    report["summary"].update(total=2, clean=2, raw_score="2/2")
+    session = FakeGuestSession(
+        files={
+            r"C:\Users\Public\perdedor\windows-report.json": json.dumps(report).encode()
+        }
+    )
+    result = PerdedorAdapter().run(
+        session, {"repo_path": repo_path}, tmp_path, time.time() + 60
+    )
+    assert result.status == ToolStatus.error
+    assert "duplicate" in result.error.lower()
+    assert result.checks == []
+
+
+@pytest.mark.parametrize("check_id", [[], {}, None])
+def test_malformed_check_id_is_an_error_not_an_exception(tmp_path, repo_path, check_id):
+    report = _valid_report()
+    report["findings"][0]["id"] = check_id
+    session = FakeGuestSession(
+        files={
+            r"C:\Users\Public\perdedor\windows-report.json": json.dumps(report).encode()
+        }
+    )
+    result = PerdedorAdapter().run(
+        session, {"repo_path": repo_path}, tmp_path, time.time() + 60
+    )
+    assert result.status == ToolStatus.error
+    assert result.checks == []
+
+
+def test_report_too_large_is_rejected_before_read(tmp_path, repo_path, monkeypatch):
+    monkeypatch.setattr(
+        "drakrun.evasion.verifiers.base.MAX_REPORT_BYTES", 256, raising=False
+    )
+    session = FakeGuestSession(
+        files={r"C:\Users\Public\perdedor\windows-report.json": b" " * 257}
+    )
+    original_open = pathlib.Path.open
+
+    def guarded_open(path, *args, **kwargs):
+        mode = args[0] if args else kwargs.get("mode", "r")
+        if path.name == "windows-report.json" and "r" in mode:
+            pytest.fail("oversized report opened for reading")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(pathlib.Path, "open", guarded_open)
+    result = PerdedorAdapter().run(
+        session, {"repo_path": repo_path}, tmp_path, time.time() + 60
+    )
+    assert result.status == ToolStatus.error
+    assert "report too large" in result.error.lower()
+    assert "raw/perdedor/windows-report.json" in result.raw_artifacts
+
+
+def test_truncation_flag_survives_adapter_and_serialization(tmp_path, repo_path):
+    from drakrun.evasion.verifiers.base import GuestCommandResult
+
+    session = FakeGuestSession(
+        run_result=GuestCommandResult(0, b"[output truncated]", b"", truncated=True),
+        files={
+            r"C:\Users\Public\perdedor\windows-report.json": json.dumps(
+                _valid_report()
+            ).encode()
+        },
+    )
+    result = PerdedorAdapter().run(
+        session, {"repo_path": repo_path}, tmp_path, time.time() + 60
+    )
+    assert result.status == ToolStatus.ok
+    assert result.truncated is True
+    assert result.to_dict()["truncated"] is True
+
+
+def test_report_exactly_at_size_limit_is_accepted(tmp_path, repo_path, monkeypatch):
+    data = json.dumps(_valid_report()).encode()
+    monkeypatch.setattr("drakrun.evasion.verifiers.base.MAX_REPORT_BYTES", len(data))
+    session = FakeGuestSession(
+        files={r"C:\Users\Public\perdedor\windows-report.json": data}
+    )
+    result = PerdedorAdapter().run(
+        session, {"repo_path": repo_path}, tmp_path, time.time() + 60
+    )
+    assert result.status == ToolStatus.ok
+
+
+def test_report_growth_after_stat_still_has_a_bounded_read(tmp_path, monkeypatch):
+    from io import BytesIO
+    from types import SimpleNamespace
+
+    from drakrun.evasion.verifiers.base import ReportTooLarge, read_report_bytes
+
+    monkeypatch.setattr("drakrun.evasion.verifiers.base.MAX_REPORT_BYTES", 256)
+    monkeypatch.setattr(pathlib.Path, "stat", lambda *args: SimpleNamespace(st_size=1))
+    read_sizes = []
+
+    class GrowingReport(BytesIO):
+        def read(self, size=-1):
+            read_sizes.append(size)
+            return super().read(size)
+
+    monkeypatch.setattr(pathlib.Path, "open", lambda *args: GrowingReport(b"x" * 4096))
+    with pytest.raises(ReportTooLarge, match="Report too large"):
+        read_report_bytes(tmp_path / "windows-report.json")
+    assert read_sizes == [257]

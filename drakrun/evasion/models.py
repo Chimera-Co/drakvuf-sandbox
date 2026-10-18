@@ -64,6 +64,7 @@ class ToolResult(BaseModel):
     duration_s: Optional[float] = None
     exit_code: Optional[int] = None
     command: Optional[str] = None
+    truncated: bool = False
     checks: List[NormalizedCheck] = Field(default_factory=list)
     # Raw artifact paths, relative to the scan directory - never discarded,
     # even when status is "error", so a malformed report is still auditable.

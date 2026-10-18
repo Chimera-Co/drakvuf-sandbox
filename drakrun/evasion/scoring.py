@@ -17,7 +17,7 @@ the CHIMERA score, with an explicit note that they are not incorporated
 into it. This keeps "tool-native result" and "CHIMERA normalized score"
 visibly distinct, per the subsystem's design requirement.
 
-Three situations must never be silently reported as a passing (or any)
+These situations must never be silently reported as a passing (or any)
 numeric score:
   - the primary tool (PERDEDOR) did not run at all for this scan,
   - it ran but did not complete successfully (unsupported/error/timeout),
@@ -25,8 +25,10 @@ numeric score:
     leaving nothing applicable to score (PERDEDOR's own formula would call
     this 100.0 - "nothing detected because nothing was checked" - which
     reads exactly like a clean, fully-verified sandbox; this module refuses
-    to make that conflation).
-In all three cases ``chimera_score`` is ``None`` and ``state`` is
+    to make that conflation),
+  - fewer than half of its checks were applicable, leaving insufficient
+    coverage to support a headline score.
+In these cases ``chimera_score`` is ``None`` and ``state`` is
 ``ScoreState.incomplete`` - never a number, and never coerced to "pass".
 """
 
@@ -53,6 +55,7 @@ PRIMARY_TOOL_ID = "perdedor"
 
 DEFAULT_PASS_THRESHOLD = 90.0
 DEFAULT_WARN_THRESHOLD = 70.0
+MIN_APPLICABLE_FRACTION = 0.5
 
 
 def _tool_native_summary(result: ToolResult) -> Dict[str, Any]:
@@ -173,14 +176,20 @@ def compute_score(
             f"is available.{detail}"
         )
     else:
-        chimera_score = _weighted_score(primary_result.checks)
         summary = tool_scores[PRIMARY_TOOL_ID]
-        if chimera_score is None:
+        if not summary["applicable"]:
             rationale.append(
                 f"{PRIMARY_TOOL_ID} completed, but every one of its checks was "
                 "errored or skipped, so there is nothing applicable to score."
             )
+        elif summary["applicable"] < MIN_APPLICABLE_FRACTION * summary["total"]:
+            rationale.append(
+                f"{PRIMARY_TOOL_ID} coverage is insufficient: "
+                f"{summary['applicable']}/{summary['total']} checks applicable; "
+                f"at least {MIN_APPLICABLE_FRACTION:.0%} is required for a score."
+            )
         else:
+            chimera_score = _weighted_score(primary_result.checks)
             summary["weighted_score"] = chimera_score
             rationale.append(
                 f"CHIMERA score is {PRIMARY_TOOL_ID}'s own severity-weighted "

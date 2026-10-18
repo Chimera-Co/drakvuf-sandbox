@@ -46,6 +46,29 @@ def test_no_tools_ran_is_incomplete():
     assert score.rationale
 
 
+@pytest.mark.parametrize("status", [CheckStatus.error, CheckStatus.skipped])
+def test_low_coverage_has_no_headline_score(status):
+    checks = [_check("clean", CheckStatus.clean)] + [
+        _check(str(i), status) for i in range(9)
+    ]
+    score = compute_score(
+        [ToolResult(tool=PRIMARY_TOOL_ID, status=ToolStatus.ok, checks=checks)]
+    )
+    assert score.state == ScoreState.incomplete
+    assert score.chimera_score is None
+    assert "weighted_score" not in score.tool_scores[PRIMARY_TOOL_ID]
+    assert any("coverage" in reason.lower() for reason in score.rationale)
+
+
+def test_coverage_at_half_is_scoreable():
+    checks = [_check("clean", CheckStatus.clean), _check("error", CheckStatus.error)]
+    score = compute_score(
+        [ToolResult(tool=PRIMARY_TOOL_ID, status=ToolStatus.ok, checks=checks)]
+    )
+    assert score.state == ScoreState.passed
+    assert score.chimera_score == 100.0
+
+
 @pytest.mark.parametrize(
     "status,error",
     [
@@ -115,15 +138,16 @@ def test_errored_and_skipped_checks_excluded_from_scoring_not_counted_as_clean()
             _check("a", CheckStatus.clean),
             _check("b", CheckStatus.error),
             _check("c", CheckStatus.skipped),
+            _check("d", CheckStatus.clean),
         ],
     )
     score = compute_score([result])
 
-    # Only "a" is applicable -> a clean-only score of 100, not diluted or
-    # penalized by the errored/skipped entries.
+    # Two clean checks meet the coverage floor; errors/skips don't dilute
+    # their weighted score or inflate the applicable count.
     assert score.chimera_score == 100.0
     summary = score.tool_scores[PRIMARY_TOOL_ID]
-    assert summary["applicable"] == 1
+    assert summary["applicable"] == 2
     assert summary["errored"] == 1
     assert summary["skipped"] == 1
 

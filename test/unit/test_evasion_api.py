@@ -135,6 +135,29 @@ def _write_evasion_json(scan_dir, scan_id, metadata: EvasionScanMetadata):
     metadata.store_to_file(scan_path / "evasion.json")
 
 
+@pytest.mark.parametrize("status", [JobStatus.FINISHED, JobStatus.FAILED])
+@pytest.mark.parametrize("job_present", [True, False])
+def test_terminal_api_views_agree_without_metadata_file(
+    client, evasion_api_module, monkeypatch, scan_dir, status, job_present
+):
+    scan_id = "11111111-1111-4111-8111-111111111111"
+    metadata = _finished_metadata(scan_id, [], status=status.value)
+    metadata.substatus = "done" if status == JobStatus.FINISHED else "reporting"
+    _write_evasion_json(scan_dir, scan_id, metadata)
+    job = FakeJob(scan_id, status)
+    registry = FakeJobRegistry({scan_id: job} if job_present else {})
+    monkeypatch.setattr(evasion_api_module.Job, "fetch", registry.fetch)
+    monkeypatch.setattr(evasion_api_module, "get_scans_list", lambda **kwargs: [job])
+    responses = [
+        client.get("/api/evasion/scans").json[0],
+        client.get(f"/api/evasion/scans/{scan_id}").json,
+        client.get(f"/api/evasion/scans/{scan_id}/status").json,
+    ]
+    for response in responses:
+        for field in ("status", "substatus", "time_finished"):
+            assert response[field] == metadata.store_to_dict()[field]
+
+
 def _finished_metadata(scan_id, tool_results, status="finished") -> EvasionScanMetadata:
     score = compute_score(tool_results)
     return EvasionScanMetadata(

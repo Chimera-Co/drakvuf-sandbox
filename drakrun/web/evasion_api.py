@@ -300,7 +300,13 @@ def scan_status(path: EvasionScanPath):
         )
 
     try:
-        metadata_dict = _read_scan_json(scan_id, METADATA_FILENAME)
+        if job is not None:
+            metadata_dict = _metadata_for_job(job).store_to_dict()
+        else:
+            try:
+                metadata_dict = _read_scan_json(scan_id, RESULT_FILENAME)
+            except FileNotFoundError:
+                metadata_dict = _read_scan_json(scan_id, METADATA_FILENAME)
         return jsonify(
             {
                 "id": metadata_dict.get("id", scan_id),

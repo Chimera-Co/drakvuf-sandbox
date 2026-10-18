@@ -41,6 +41,7 @@ from typing import Any, List, Optional
 from drakrun.evasion.constants import REPORT_FILENAME, RESULT_FILENAME
 from drakrun.evasion.models import EvasionScanMetadata, NormalizedCheck, ToolResult
 from drakrun.evasion.scoring import PRIMARY_TOOL_ID
+from drakrun.evasion.verifiers.base import ReportTooLarge, read_report_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -78,10 +79,16 @@ def write_perdedor_native_report(scan_dir: pathlib.Path) -> Optional[pathlib.Pat
         return None
 
     try:
-        raw_report = json.loads(raw_report_path.read_text(encoding="utf-8"))
+        raw_report = json.loads(read_report_bytes(raw_report_path).decode("utf-8"))
         aggregate = aggregate_reports([raw_report])
         native_html = render_html(aggregate)
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValidationError) as exc:
+    except (
+        OSError,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        ValidationError,
+        ReportTooLarge,
+    ) as exc:
         logger.warning("Could not render PERDEDOR's native report: %s", exc)
         return None
 

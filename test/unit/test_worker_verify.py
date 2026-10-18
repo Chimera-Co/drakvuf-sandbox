@@ -309,3 +309,74 @@ def test_worker_verify_marks_job_failed_and_still_writes_metadata_on_report_fail
     metadata = json.loads((scan_dir / "metadata.json").read_text())
     assert metadata["status"] == "failed"
     assert "disk full" in metadata["error"]
+
+
+@pytest.mark.parametrize("failure_stage", [None, "booting", "reporting", "cleanup"])
+def test_terminal_artifacts_agree(
+    worker_module, app_config, monkeypatch, tmp_path, failure_stage
+):
+    _patch_load_config(monkeypatch, app_config)
+    job = FakeJob()
+    monkeypatch.setattr("rq.get_current_job", lambda: job)
+    monkeypatch.setattr(
+        "drakrun.evasion.guest_runner.connect_guest_session",
+        lambda *args: FakeGuestSession(),
+    )
+    if failure_stage == "reporting":
+
+        def fail_report(*args):
+            raise RuntimeError("report failed")
+
+        monkeypatch.setattr("drakrun.evasion.report.write_html_report", fail_report)
+    elif failure_stage:
+
+        @contextlib.contextmanager
+        def fail_vm(*args):
+            if failure_stage == "booting":
+                raise RuntimeError("boot failed")
+            yield FakeVm()
+            raise RuntimeError("cleanup failed")
+
+        monkeypatch.setattr(
+            sys.modules["drakrun.analyzer.run_tools"], "run_vm", fail_vm
+        )
+
+    options = EvasionScanOptions(sandbox_id="win10", tools=["perdedor"])
+    if failure_stage:
+        with pytest.raises(RuntimeError, match="failed"):
+            worker_module.worker_verify(options)
+    else:
+        worker_module.worker_verify(options)
+
+    metadata = json.loads((tmp_path / job.id / "metadata.json").read_text())
+    result = json.loads((tmp_path / job.id / "evasion.json").read_text())
+    assert result == metadata
+    assert metadata["status"] == ("failed" if failure_stage else "finished")
+    assert metadata["substatus"] == (failure_stage or "done")
+    assert metadata["time_finished"] == job.meta["time_finished"]
+
+
+def test_result_is_only_published_after_vm_cleanup(
+    worker_module, app_config, monkeypatch, tmp_path
+):
+    _patch_load_config(monkeypatch, app_config)
+    job = FakeJob()
+    monkeypatch.setattr("rq.get_current_job", lambda: job)
+    monkeypatch.setattr(
+        "drakrun.evasion.guest_runner.connect_guest_session",
+        lambda *args: FakeGuestSession(),
+    )
+
+    @contextlib.contextmanager
+    def checked_run_vm(*args):
+        yield FakeVm()
+        assert not (tmp_path / job.id / "evasion.json").exists()
+
+    monkeypatch.setattr(
+        sys.modules["drakrun.analyzer.run_tools"], "run_vm", checked_run_vm
+    )
+    worker_module.worker_verify(
+        EvasionScanOptions(sandbox_id="win10", tools=["perdedor"])
+    )
+    result = json.loads((tmp_path / job.id / "evasion.json").read_text())
+    assert result["status"] == "finished"
