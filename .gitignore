@@ -8,3 +8,7 @@ __pycache__/
 build/
 dist/
 drakrun/tools/get-explorer-pid
+
+# local dev
+.venv/
+graphify-out/

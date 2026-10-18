@@ -5,6 +5,8 @@ import click
 from .analyze import analyze
 from .drakshell import drakshell
 from .drakvuf_cmdline import drakvuf_cmdline
+from .evasion_smoke_test import evasion_smoke_test
+from .evasion_worker import evasion_worker
 from .injector import injector
 from .install import install
 from .make_profile import make_profile
@@ -37,6 +39,8 @@ main.add_command(postinstall)
 main.add_command(vm_start)
 main.add_command(vm_stop)
 main.add_command(worker)
+main.add_command(evasion_worker)
+main.add_command(evasion_smoke_test)
 main.add_command(modify_vm0)
 main.add_command(injector)
 main.add_command(drakshell)

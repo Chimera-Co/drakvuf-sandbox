@@ -20,10 +20,11 @@ invoked by a real RQ worker process on the Debian/Xen box.
 
 from __future__ import annotations
 
+import socket
 from typing import List, Optional
 
 from redis import Redis
-from rq import Queue
+from rq import Queue, Worker
 from rq.job import Job
 
 from drakrun.evasion.constants import (
@@ -35,7 +36,7 @@ from drakrun.evasion.constants import (
 )
 from drakrun.evasion.models import EvasionScanMetadata, EvasionScanOptions, ToolResult
 from drakrun.evasion.sandbox_registry import SandboxDefinition, resolve_sandbox
-from drakrun.lib.config import DrakrunConfig, RedisConfigSection
+from drakrun.lib.config import DrakrunConfig, RedisConfigSection, load_config
 
 _WORKER_VM_ID: Optional[int] = None
 
@@ -80,6 +81,29 @@ def get_redis_connection(config: RedisConfigSection) -> Redis:
         username=config.username,
         password=config.password,
     )
+
+
+def evasion_worker_main(vm_id: int, burst: bool = False) -> None:
+    """Start an RQ worker listening on EVASION_QUEUE_NAME only.
+
+    Mirrors drakrun.analyzer.worker.worker_main exactly (same vm_id global
+    assignment, same config/connection loading, same Worker construction),
+    but against this module's own _WORKER_VM_ID and EVASION_QUEUE_NAME so it
+    never touches or competes with the analysis worker's queue. burst=True
+    processes whatever is already queued and returns instead of blocking
+    forever, for one-shot Phase-G smoke testing.
+    """
+    global _WORKER_VM_ID
+    _WORKER_VM_ID = vm_id
+    config = load_config()
+    hostname = config.drakrun.worker_hostname or socket.gethostname()
+
+    worker = Worker(
+        queues=[EVASION_QUEUE_NAME],
+        name=f"drakrun-evasion-worker@{hostname}:vm-{vm_id}",
+        connection=get_redis_connection(config.redis),
+    )
+    worker.work(burst=burst)
 
 
 def worker_verify(options: EvasionScanOptions) -> None:
@@ -399,6 +423,7 @@ def get_scans_list(connection: Redis) -> List[Job]:
 
 __all__ = [
     "get_redis_connection",
+    "evasion_worker_main",
     "worker_verify",
     "scan_job_to_metadata",
     "enqueue_verification",

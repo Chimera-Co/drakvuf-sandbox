@@ -169,8 +169,23 @@ def test_worker_verify_runs_real_adapters_against_a_fake_guest_session(
     assert (scan_dir / "report.html").exists()
     assert (scan_dir / "metadata.json").exists()
 
-    assert len(fake_session.put_file_calls) == 1
-    assert len(fake_session.run_calls) == 1
+    # The al-khaser binary is uploaded exactly once. The user-mode read/hash
+    # diagnostic also uses put_file() to deliver its .ps1 probe script (once
+    # per checkpoint), so select the binary rather than asserting a bare
+    # call count.
+    binary_uploads = [
+        c
+        for c in fake_session.put_file_calls
+        if c[1] == r"C:\Users\Public\alkhaser\al-khaser_x64.exe"
+    ]
+    assert len(binary_uploads) == 1
+    # Exactly one real al-khaser launch. The upload/pre-run metadata probe
+    # diagnostics also go through run(), so filter to the launch itself
+    # rather than asserting it is the only guest command in the scan.
+    launches = [
+        argv for (argv, _t, _c) in fake_session.run_calls if "--sleep" in " ".join(argv)
+    ]
+    assert len(launches) == 1
 
     assert "preparing" in job.substatus_history
     assert "booting" in job.substatus_history

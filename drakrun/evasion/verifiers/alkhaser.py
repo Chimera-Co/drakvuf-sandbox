@@ -57,9 +57,13 @@ drive this adapter's design; each is load-bearing, not incidental:
 
 from __future__ import annotations
 
+import codecs
+import hashlib
+import json
 import pathlib
 import re
-import shlex
+import subprocess
+import tempfile
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -1083,11 +1087,685 @@ def build_argv(
         inner += ["--check", check]
     inner += ["--sleep", str(int(sleep_seconds))]
 
-    # quoted for guest cmd.exe, not POSIX shlex, but shlex.quote's
-    # conservative double-quoting is compatible with cmd.exe's parsing for
-    # the plain paths/tokens this adapter ever produces (no embedded quotes).
-    inner_str = " ".join(shlex.quote(part) for part in inner)
-    return ["cmd", "/c", f"{inner_str} < NUL > {shlex.quote(guest_stdout_path)} 2>&1"]
+    # Quoted for guest cmd.exe/CreateProcess argv parsing - NOT POSIX shlex.
+    # shlex.quote() wraps unsafe strings (e.g. any path containing a
+    # backslash) in single quotes, which cmd.exe has no concept of at all: a
+    # real Xen run confirmed this sends the literal token
+    # 'C:\Users\Public\alkhaser\al-khaser_x64.exe' (apostrophes included) to
+    # cmd.exe, which cannot find that file and fails before al-khaser ever
+    # launches. subprocess.list2cmdline() is the correct Windows command-line
+    # quoting for this - the same primitive drakrun.evasion.guest_runner.
+    # GuestSession._build_final_argv() already uses to wrap a cwd-qualified
+    # guest command - and only adds quotes when a token actually needs them
+    # (a space, an empty string, or an embedded quote), leaving the plain
+    # backslash-only guest paths this adapter ever produces unquoted.
+    inner_str = subprocess.list2cmdline(inner)
+    redirect_target = subprocess.list2cmdline([guest_stdout_path])
+    return ["cmd", "/c", f"{inner_str} < NUL > {redirect_target} 2>&1"]
+
+
+_PROBE_EXISTS_MARKER = "CHIMERA_PROBE_EXISTS:"
+_PROBE_SIZE_MARKER = "CHIMERA_PROBE_SIZE:"
+_PROBE_ATTR_MARKER = "CHIMERA_PROBE_ATTR:"
+# Fixed budget for the metadata probe, which is a cmd.exe builtin with no
+# stdin and no I/O wait - it cannot legitimately take longer than this.
+_METADATA_PROBE_TIMEOUT_SECONDS = 60.0
+
+
+def _build_metadata_probe_argv(guest_path: str) -> List[str]:
+    """Build the metadata-only existence/size probe for `guest_path`.
+
+    This asks Windows itself - through the guest's own cmd.exe, over the
+    drakshell channel GuestSession.run() already uses to launch al-khaser -
+    whether the file is in the filesystem namespace and what size Windows
+    reports for it. Deliberately metadata-only: `if exist` is a
+    GetFileAttributes-class lookup and the `%~z`/`%~a` FOR modifiers are
+    FindFirstFile-class lookups, so nothing here ever opens the file's data
+    stream. That is precisely what makes it independent of
+    Injector.read_file(), whose CreateFileW(GENERIC_READ, FILE_SHARE_READ,
+    OPEN_EXISTING) DOES open the data stream and therefore cannot tell "the
+    file is not there" apart from "the file is there but cannot be opened
+    right now" - both surface as DRAKVUF's single "Couldn't open guest file"
+    string, with the underlying GetLastError() captured into
+    injector->error_code but never printed by the injector CLI.
+
+    `if exist` is used rather than a bare `dir` because a plain `dir` does
+    not list hidden/system-marked files at all, while `if exist` finds them;
+    `%~aI` then reports the attributes a `dir /a` would have shown, without
+    `dir`'s locale-dependent output ("File Not Found", date formats).
+
+    The caller MUST pass cwd to GuestSession.run() for this argv. That takes
+    _build_final_argv()'s "already a self-contained cmd /c script" splice
+    branch, which forwards the script to drakshell as one plain str, left
+    untouched on the wire. Without cwd the list would instead go through
+    mslex.join(), which backslash-escapes the inner quotes into a form
+    cmd.exe does not understand - the same class of quoting corruption a
+    previous real-Xen scan already hit.
+    """
+    quoted = f'"{guest_path}"'
+    # The previous formulation was
+    #     if exist X (echo EXISTS:1) else (echo EXISTS:0) & for ... do (...)
+    # which is silently wrong: cmd.exe binds a trailing `& <cmd>` to the ELSE
+    # branch of an IF/ELSE, so the FOR only ran when the file was MISSING.
+    # Real-Xen scan a1e7c574-cbe1-4dfc-8692-d8c0875c9b06 shows exactly that
+    # symptom - stdout was precisely "CHIMERA_PROBE_EXISTS:1\r\n" and no size
+    # or attribute line was ever emitted, because the file did exist.
+    #
+    # The replacement is built so it produces the same output under EITHER
+    # of cmd.exe's two possible readings of `&`, rather than relying on
+    # getting the precedence right:
+    #
+    #   * `IF ... (...) ELSE (...)` is LAST, with nothing after it. The
+    #     ELSE-swallows-the-next-command bug needs a following `&` to
+    #     happen, and there is none.
+    #   * Both FOR statements come first and use DISTINCT variable letters
+    #     (%I, %J). If cmd.exe extends a FOR's DO body across `&` (so the
+    #     statements nest), distinct letters mean no shadowing; if it does
+    #     not (so they stay siblings), they simply run in sequence. Either
+    #     way each FOR iterates EXACTLY ONCE - the set is a single literal
+    #     token with no `*`/`?`, so it is never filesystem-expanded - and
+    #     each marker line is emitted exactly once.
+    #   * `@echo off` up front suppresses cmd.exe's echoing of statements it
+    #     would otherwise print under the nested reading, so stdout carries
+    #     only marker lines.
+    #
+    # `%~zI`/`%~aI` expand to the empty string for a file that does not
+    # exist, which _parse_metadata_probe_output() records as None - never
+    # misread as a zero size.
+    script = (
+        f"@echo off"
+        f" & for %I in ({quoted}) do echo {_PROBE_SIZE_MARKER}%~zI"
+        f" & for %J in ({quoted}) do echo {_PROBE_ATTR_MARKER}%~aJ"
+        f" & if exist {quoted} (echo {_PROBE_EXISTS_MARKER}1)"
+        f" else (echo {_PROBE_EXISTS_MARKER}0)"
+    )
+    return ["cmd", "/c", script]
+
+
+def _parse_metadata_probe_output(stdout_text: str) -> Dict[str, Any]:
+    """Parse the probe's marker lines into structured fields.
+
+    Every field stays None when its marker is absent or unparseable, so a
+    garbled or empty probe is never silently reported as a definitive "file
+    is missing" - that distinction is the whole point of the probe."""
+    parsed: Dict[str, Any] = {
+        "exists": None,
+        "reported_size": None,
+        "attributes": None,
+    }
+    for raw_line in stdout_text.splitlines():
+        line = raw_line.strip()
+        if line.startswith(_PROBE_EXISTS_MARKER):
+            value = line[len(_PROBE_EXISTS_MARKER) :].strip()
+            if value in ("0", "1"):
+                parsed["exists"] = value == "1"
+        elif line.startswith(_PROBE_SIZE_MARKER):
+            value = line[len(_PROBE_SIZE_MARKER) :].strip()
+            # A missing file yields an empty %~zI expansion, not a zero.
+            if value.isdigit():
+                parsed["reported_size"] = int(value)
+        elif line.startswith(_PROBE_ATTR_MARKER):
+            value = line[len(_PROBE_ATTR_MARKER) :].strip()
+            if value:
+                parsed["attributes"] = value
+    return parsed
+
+
+def _probe_guest_file_metadata(
+    session: GuestSession,
+    guest_path: str,
+    guest_dir: str,
+    raw_dir: pathlib.Path,
+    checkpoint: str,
+) -> Dict[str, Any]:
+    """Run the metadata probe at one checkpoint and persist the raw result.
+
+    Never raises: a probe failure is recorded as `probe_error` and the
+    verifier's own control flow continues untouched, so al-khaser can never
+    fail merely because this diagnostic failed."""
+    probe_argv = _build_metadata_probe_argv(guest_path)
+    probe: Dict[str, Any] = {
+        "checkpoint": checkpoint,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "guest_path": guest_path,
+        "cwd": guest_dir,
+        "command": " ".join(probe_argv),
+        "mechanism": (
+            "guest cmd.exe via GuestSession.run()/drakshell; metadata-only "
+            "(if exist + FOR %~z/%~a), never opens the file's data stream"
+        ),
+        "exists": None,
+        "reported_size": None,
+        "attributes": None,
+    }
+
+    try:
+        exit_code, stdout, stderr = session.run(
+            probe_argv,
+            timeout=_METADATA_PROBE_TIMEOUT_SECONDS,
+            cwd=guest_dir,
+        )
+        stdout_text = stdout.decode("utf-8", errors="replace")
+        probe["exit_code"] = exit_code
+        probe["stdout"] = stdout_text
+        probe["stderr"] = stderr.decode("utf-8", errors="replace")
+        probe.update(_parse_metadata_probe_output(stdout_text))
+    except Exception as exc:  # noqa: BLE001 - diagnostic-only, must not raise
+        probe["probe_error"] = str(exc)
+
+    try:
+        probe_path = raw_dir / f"probe_{checkpoint}.json"
+        probe_path.write_text(json.dumps(probe, indent=2), encoding="utf-8")
+    except Exception:  # noqa: BLE001 - diagnostic-only, must not raise
+        pass
+
+    return probe
+
+
+_READ_TESTPATH_MARKER = "CHIMERA_READ_TESTPATH:"
+_READ_LENGTH_MARKER = "CHIMERA_READ_LENGTH:"
+_READ_ATTRS_MARKER = "CHIMERA_READ_ATTRS:"
+_READ_LASTWRITE_MARKER = "CHIMERA_READ_LASTWRITE:"
+_READ_STATERROR_MARKER = "CHIMERA_READ_STATERROR:"
+_READ_OPEN_MARKER = "CHIMERA_READ_OPEN:"
+_READ_BYTES_MARKER = "CHIMERA_READ_BYTES:"
+_READ_SHA256_MARKER = "CHIMERA_READ_SHA256:"
+_READ_EXCTYPE_MARKER = "CHIMERA_READ_EXCTYPE:"
+_READ_HRESULT_MARKER = "CHIMERA_READ_HRESULT:"
+_READ_EXCMSG_MARKER = "CHIMERA_READ_EXCMSG:"
+_READ_EXPECTED_MARKER = "CHIMERA_READ_EXPECTED:"
+_READ_HASHMATCH_MARKER = "CHIMERA_READ_HASHMATCH:"
+
+# The four outcomes this probe exists to tell apart, plus the "file is not
+# in the namespace at all" case and an explicit inconclusive value. These
+# are recorded verbatim in read_probe_<checkpoint>.json so the artifact says
+# what it proves rather than leaving that to be re-derived by eye.
+READ_PROBE_CLASS_MISSING = "E_file_not_found"
+READ_PROBE_CLASS_UNOPENABLE = "A_exists_but_cannot_be_opened"
+READ_PROBE_CLASS_OPENED = "B_opened_and_read_but_host_hash_unknown"
+READ_PROBE_CLASS_HASH_MATCHES = "C_opened_and_sha256_matches_host"
+READ_PROBE_CLASS_HASH_DIFFERS = "D_opened_but_sha256_differs_from_host"
+READ_PROBE_CLASS_INCONCLUSIVE = "inconclusive"
+
+# PowerShell start-up dominates this probe's cost; hashing ~280 KB is
+# instantaneous. Generous enough that a slow cold start is never mistaken
+# for a hang, small enough to stay a rounding error against al-khaser's own
+# multi-minute budget.
+_READ_PROBE_TIMEOUT_SECONDS = 120.0
+
+
+def _build_read_probe_script(
+    guest_path: str, expected_sha256: Optional[str] = None
+) -> str:
+    """The Windows PowerShell 5.1 script body for the user-mode read probe.
+
+    This is UPLOADED INTO THE GUEST as a .ps1 file and invoked by path - it
+    is never passed on the command line. Real-Xen scan
+    34ae2d08-dcf0-471b-88c8-5bead0cf40eb is why: as an inline
+    `-EncodedCommand` payload this script produced a 7792-byte UTF-16LE
+    command line against drakshell's 2048-byte ceiling, so it was rejected
+    host-side and never executed at all. Shipping the body as a file removes
+    the size constraint entirely instead of forcing the diagnostic to be
+    shrunk until it fits.
+
+    Every line it prints is a `MARKER:value` pair so the host-side parser
+    never has to interpret locale-dependent prose. Design notes, all
+    load-bearing:
+
+    * `[System.IO.File]::Open(..., FileAccess::Read, FileShare::ReadWrite
+      -bor FileShare::Delete)` rather than `Get-FileHash`/`OpenRead`. We
+      choose the share mode deliberately: our request must be compatible
+      with any handle another process already holds. Asking for the MOST
+      permissive sharing maximises the chance of succeeding when some other
+      opener merely holds the file, so an ERROR_SHARING_VIOLATION here means
+      an existing handle denies read sharing outright - a much stronger
+      statement than the default `OpenRead` (FileShare.Read) could make.
+    * Read-only throughout. Nothing here creates, writes, moves, deletes or
+      even touches the file's timestamps, and nothing here starts a process
+      - in particular there is NO Process.Start()/CreateProcess of any kind,
+      so this probe can never accidentally launch al-khaser itself.
+    * The catch blocks walk `.InnerException` to the innermost exception.
+      PowerShell wraps a throwing .NET method call in a
+      MethodInvocationException, so the naive `$_.Exception.GetType()` would
+      report the wrapper rather than the real UnauthorizedAccessException /
+      IOException / FileNotFoundException we actually need.
+    * `$_.Exception.HResult` is the numeric failure reason. For a Win32-
+      facility HRESULT (0x8007xxxx) the low 16 bits ARE the Win32 error
+      code, which is what makes this directly comparable with the
+      ErrorCode DRAKVUF's own injector reports (see
+      drakrun.evasion.guest_runner.parse_injector_error_json). The
+      derivation itself is done host-side in _parse_read_probe_output().
+    * Windows PowerShell 5.1 only - `[System.IO.File]`,
+      `[System.Security.Cryptography.SHA256]` and `Exception.HResult` are
+      all plain .NET Framework surface. Nothing here needs PowerShell 7 or
+      `pwsh`, which matters because `powershell.exe -EncodedCommand` is
+      already demonstrably working on this exact image (every put_file()
+      runs one via GuestSession._ensure_remote_parent_dir()).
+    """
+    hex_digest = (
+        "([System.BitConverter]::ToString($digest) -replace '-','')"
+        ".ToLowerInvariant()"
+    )
+    open_call = (
+        "[System.IO.File]::Open($p, [System.IO.FileMode]::Open, "
+        "[System.IO.FileAccess]::Read, "
+        "([System.IO.FileShare]::ReadWrite -bor [System.IO.FileShare]::Delete))"
+    )
+    flatten_msg = '(($e.Message -split "\\r?\\n") -join " ")'
+    unwrap = "$e = $_.Exception; while ($e.InnerException) { $e = $e.InnerException }"
+    lines = [
+        "$ErrorActionPreference = 'Stop'",
+        f"$p = '{guest_path}'",
+        f"$expected = '{expected_sha256 or ''}'",
+        f'Write-Output ("{_READ_TESTPATH_MARKER}" + '
+        "(Test-Path -LiteralPath $p -PathType Leaf))",
+        "try {",
+        "  $i = Get-Item -LiteralPath $p -Force",
+        f'  Write-Output ("{_READ_LENGTH_MARKER}" + $i.Length)',
+        f'  Write-Output ("{_READ_ATTRS_MARKER}" + $i.Attributes)',
+        f'  Write-Output ("{_READ_LASTWRITE_MARKER}" + '
+        '$i.LastWriteTimeUtc.ToString("o"))',
+        "} catch {",
+        f"  {unwrap}",
+        f'  Write-Output ("{_READ_STATERROR_MARKER}" + '
+        f"$e.GetType().FullName + ' ' + {flatten_msg})",
+        "}",
+        "try {",
+        f"  $fs = {open_call}",
+        "  try {",
+        "    $sha = [System.Security.Cryptography.SHA256]::Create()",
+        "    $digest = $sha.ComputeHash($fs)",
+        f"    $hex = {hex_digest}",
+        f'    Write-Output ("{_READ_OPEN_MARKER}OK")',
+        f'    Write-Output ("{_READ_BYTES_MARKER}" + $fs.Length)',
+        f'    Write-Output ("{_READ_SHA256_MARKER}" + $hex)',
+        # In-guest comparison against the host's own hash, so the artifact
+        # states the verdict rather than leaving it to be recomputed. The
+        # host-side classifier remains the authority (_classify_read_probe).
+        "    if ($expected) {",
+        f'      Write-Output ("{_READ_EXPECTED_MARKER}" + $expected)',
+        f'      Write-Output ("{_READ_HASHMATCH_MARKER}" + ($hex -eq $expected))',
+        "    }",
+        "  } finally { $fs.Dispose() }",
+        "} catch {",
+        f"  {unwrap}",
+        f'  Write-Output ("{_READ_OPEN_MARKER}FAIL")',
+        f'  Write-Output ("{_READ_EXCTYPE_MARKER}" + $e.GetType().FullName)',
+        f'  Write-Output ("{_READ_HRESULT_MARKER}" + $e.HResult)',
+        f'  Write-Output ("{_READ_EXCMSG_MARKER}" + {flatten_msg})',
+        "}",
+        # Explicit, so a non-zero exit code means "the probe itself broke",
+        # never "the file could not be opened" - that is reported in-band.
+        "exit 0",
+    ]
+    # CRLF: .ps1 files are read by Windows PowerShell, not by this host.
+    return "\r\n".join(lines) + "\r\n"
+
+
+def _build_read_probe_argv(guest_script_path: str) -> List[str]:
+    """`powershell.exe -NoProfile -ExecutionPolicy Bypass -File <script>`.
+
+    Short by construction - the payload lives in the uploaded .ps1, so this
+    command line stays a few hundred bytes regardless of how much the
+    diagnostic grows. That is the whole point of the file-based design; see
+    _build_read_probe_script().
+
+    `-ExecutionPolicy Bypass` is required, not decorative: Windows 10's
+    default policy for a client SKU is Restricted, which refuses to run a
+    .ps1 from disk at all. `-NoProfile` keeps a machine/user profile from
+    injecting output ahead of our markers (the parser is marker-anchored, so
+    stray output is tolerated, but not emitting it is better).
+
+    Deliberately NOT prepare_ps_command(): -EncodedCommand is what made this
+    probe too long to send in the first place. The four tokens here are
+    plain, space-free ASCII, so mslex.join(for_cmd=False) passes them
+    through unquoted, and the caller passes no cwd - the same path
+    GuestSession._ensure_remote_parent_dir() already uses successfully on
+    this image.
+    """
+    return [
+        "powershell.exe",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        guest_script_path,
+    ]
+
+
+def read_probe_script_guest_path(guest_dir: str, checkpoint: str) -> str:
+    """Where this checkpoint's probe script lives inside the guest.
+
+    One path PER CHECKPOINT, not one shared path: the injector's writefile
+    opens its destination with CREATE_NEW (confirmed in /opt/drakvuf's
+    win_write_file.c), which fails outright if the file already exists - so
+    re-uploading the same name for the second checkpoint would error. Per-
+    checkpoint names also keep the two checkpoints independent of each
+    other's ordering and failure state.
+
+    The `__` prefix follows the existing convention for adapter-owned guest
+    scratch files (GuestSession.put_tree_as_zip's __put_tree_as_zip.zip).
+    """
+    return f"{guest_dir.rstrip(chr(92))}\\__chimera_read_probe_{checkpoint}.ps1"
+
+
+def _win32_error_from_hresult(hresult: Optional[int]) -> Optional[int]:
+    """Low 16 bits of a FACILITY_WIN32 HRESULT (0x8007xxxx) - i.e. the
+    original Win32 error code, directly comparable with the ErrorCode
+    DRAKVUF's injector prints. Returns None for any other facility rather
+    than inventing a code that does not mean what it appears to."""
+    if hresult is None:
+        return None
+    unsigned = hresult & 0xFFFFFFFF
+    if (unsigned >> 16) & 0xFFFF != 0x8007:
+        return None
+    return unsigned & 0xFFFF
+
+
+def _parse_read_probe_output(stdout_text: str) -> Dict[str, Any]:
+    """Parse the read probe's marker lines into structured fields.
+
+    As with the metadata probe, a field whose marker is absent or
+    unparseable stays None: a garbled probe must never be readable as a
+    definitive negative result."""
+    parsed: Dict[str, Any] = {
+        "test_path": None,
+        "length": None,
+        "attributes": None,
+        "last_write_utc": None,
+        "stat_error": None,
+        "open_result": None,
+        "read_bytes": None,
+        "guest_sha256": None,
+        "exception_type": None,
+        "hresult": None,
+        "win32_error": None,
+        "exception_message": None,
+        "expected_sha256": None,
+        "guest_hash_match": None,
+    }
+
+    def _tail(line: str, marker: str) -> str:
+        return line[len(marker) :].strip()
+
+    for raw_line in stdout_text.splitlines():
+        line = raw_line.strip()
+        if line.startswith(_READ_TESTPATH_MARKER):
+            value = _tail(line, _READ_TESTPATH_MARKER).lower()
+            if value in ("true", "false"):
+                parsed["test_path"] = value == "true"
+        elif line.startswith(_READ_LENGTH_MARKER):
+            value = _tail(line, _READ_LENGTH_MARKER)
+            if value.isdigit():
+                parsed["length"] = int(value)
+        elif line.startswith(_READ_ATTRS_MARKER):
+            parsed["attributes"] = _tail(line, _READ_ATTRS_MARKER) or None
+        elif line.startswith(_READ_LASTWRITE_MARKER):
+            parsed["last_write_utc"] = _tail(line, _READ_LASTWRITE_MARKER) or None
+        elif line.startswith(_READ_STATERROR_MARKER):
+            parsed["stat_error"] = _tail(line, _READ_STATERROR_MARKER) or None
+        elif line.startswith(_READ_OPEN_MARKER):
+            value = _tail(line, _READ_OPEN_MARKER).upper()
+            if value in ("OK", "FAIL"):
+                parsed["open_result"] = value
+        elif line.startswith(_READ_BYTES_MARKER):
+            value = _tail(line, _READ_BYTES_MARKER)
+            if value.isdigit():
+                parsed["read_bytes"] = int(value)
+        elif line.startswith(_READ_SHA256_MARKER):
+            value = _tail(line, _READ_SHA256_MARKER).lower()
+            if len(value) == 64 and all(c in "0123456789abcdef" for c in value):
+                parsed["guest_sha256"] = value
+        elif line.startswith(_READ_EXCTYPE_MARKER):
+            parsed["exception_type"] = _tail(line, _READ_EXCTYPE_MARKER) or None
+        elif line.startswith(_READ_HRESULT_MARKER):
+            value = _tail(line, _READ_HRESULT_MARKER)
+            try:
+                parsed["hresult"] = int(value, 0)
+            except ValueError:
+                pass
+        elif line.startswith(_READ_EXCMSG_MARKER):
+            parsed["exception_message"] = _tail(line, _READ_EXCMSG_MARKER) or None
+        elif line.startswith(_READ_EXPECTED_MARKER):
+            value = _tail(line, _READ_EXPECTED_MARKER).lower()
+            if len(value) == 64 and all(c in "0123456789abcdef" for c in value):
+                parsed["expected_sha256"] = value
+        elif line.startswith(_READ_HASHMATCH_MARKER):
+            value = _tail(line, _READ_HASHMATCH_MARKER).lower()
+            if value in ("true", "false"):
+                parsed["guest_hash_match"] = value == "true"
+
+    parsed["win32_error"] = _win32_error_from_hresult(parsed["hresult"])
+    return parsed
+
+
+def _classify_read_probe(parsed: Dict[str, Any], host_sha256: Optional[str]) -> str:
+    """Map a parsed read probe onto the A/B/C/D outcomes this experiment was
+    designed to separate. Anything the probe did not actually establish is
+    'inconclusive' - never one of the substantive verdicts."""
+    open_result = parsed.get("open_result")
+    if open_result == "OK":
+        guest_sha256 = parsed.get("guest_sha256")
+        if not guest_sha256 or not host_sha256:
+            return READ_PROBE_CLASS_OPENED
+        if guest_sha256 == host_sha256:
+            return READ_PROBE_CLASS_HASH_MATCHES
+        return READ_PROBE_CLASS_HASH_DIFFERS
+    if open_result == "FAIL":
+        if parsed.get("test_path") is False:
+            return READ_PROBE_CLASS_MISSING
+        return READ_PROBE_CLASS_UNOPENABLE
+    return READ_PROBE_CLASS_INCONCLUSIVE
+
+
+def _upload_read_probe_script(
+    session: GuestSession, script_text: str, guest_script_path: str
+) -> None:
+    """Write the probe script to a host temp file and put_file() it into the
+    guest. UTF-8 with a BOM, because Windows PowerShell 5.1 falls back to the
+    system ANSI codepage for a BOM-less .ps1 - the script is pure ASCII
+    today, so this is belt-and-braces rather than a live problem."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        local_script = pathlib.Path(tmp_dir) / "read_probe.ps1"
+        local_script.write_bytes(codecs.BOM_UTF8 + script_text.encode("utf-8"))
+        session.put_file(local_script, guest_script_path)
+
+
+def _probe_guest_file_read(
+    session: GuestSession,
+    host_binary_path: str,
+    guest_path: str,
+    guest_dir: str,
+    raw_dir: pathlib.Path,
+    checkpoint: str,
+) -> Dict[str, Any]:
+    """Ask an ORDINARY Windows user-mode process whether it can open and read
+    the uploaded executable, and persist the raw result.
+
+    This is the independent signal the injector-based diagnostic cannot
+    give. Injector.read_file() opens the file from DRAKVUF's injected
+    context with CreateFileW(GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING);
+    this probe opens it from a plain powershell.exe started by drakshell -
+    the same mechanism that starts al-khaser itself. If the two disagree,
+    the access condition is specific to the injector's context; if they
+    agree, one condition explains both, and comparing this probe's
+    Win32-facility HRESULT with the injector's own ErrorCode says which.
+
+    Two guest round trips: upload the .ps1, then invoke it by path. The
+    upload is what keeps the invocation command line small enough for
+    drakshell to accept (see _build_read_probe_script). An upload failure is
+    recorded as `upload_error` and the invocation is then skipped, so the
+    artifact distinguishes "could not deliver the probe" from "the probe ran
+    and reported something".
+
+    Never raises: every failure becomes a field in the artifact and
+    al-khaser's own control flow continues untouched."""
+    guest_script_path = read_probe_script_guest_path(guest_dir, checkpoint)
+    probe: Dict[str, Any] = {
+        "checkpoint": checkpoint,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "guest_path": guest_path,
+        "guest_script_path": guest_script_path,
+        "mechanism": (
+            "probe script uploaded via GuestSession.put_file(), then run as "
+            "powershell.exe -NoProfile -ExecutionPolicy Bypass -File <script> "
+            "via GuestSession.run()/drakshell; read-only "
+            "[System.IO.File]::Open(FileAccess.Read, FileShare.ReadWrite|"
+            "Delete) + SHA-256; never starts a process and never modifies "
+            "the target file"
+        ),
+        "host_sha256": None,
+    }
+    # Every parsed field present as None up front, so the artifact's schema
+    # is identical whether the probe ran, ran and was garbled, or could not
+    # run at all - an absent key must never have to be read as a result.
+    probe.update(_parse_read_probe_output(""))
+
+    try:
+        probe["host_sha256"] = hashlib.sha256(
+            pathlib.Path(host_binary_path).read_bytes()
+        ).hexdigest()
+    except Exception as exc:  # noqa: BLE001 - diagnostic-only, must not raise
+        probe["host_error"] = str(exc)
+
+    script_text = _build_read_probe_script(guest_path, probe["host_sha256"])
+    probe_argv = _build_read_probe_argv(guest_script_path)
+    probe["script"] = script_text
+    probe["command"] = " ".join(probe_argv)
+    # Imported at function scope, not module scope: guest_runner imports
+    # drakrun.evasion.verifiers.base, whose package __init__ registers this
+    # very adapter, so a module-level import here closes an import cycle
+    # whenever guest_runner happens to be imported first. This mirrors the
+    # deferred-import convention drakrun.evasion.worker already follows.
+    from drakrun.evasion.guest_runner import (
+        DRAKSHELL_MAX_CMDLINE_BYTES,
+        encoded_cmdline_size,
+    )
+
+    # Recorded so the artifact itself shows the invocation stayed inside
+    # drakshell's ceiling - the exact thing that silently failed last time.
+    probe["cmdline_bytes"] = encoded_cmdline_size(probe_argv)
+    probe["cmdline_limit_bytes"] = DRAKSHELL_MAX_CMDLINE_BYTES
+
+    parsed: Dict[str, Any] = {}
+    try:
+        _upload_read_probe_script(session, script_text, guest_script_path)
+    except Exception as exc:  # noqa: BLE001 - diagnostic-only, must not raise
+        probe["upload_error"] = str(exc)
+    else:
+        try:
+            # No cwd on purpose - see _build_read_probe_argv().
+            exit_code, stdout, stderr = session.run(
+                probe_argv, timeout=_READ_PROBE_TIMEOUT_SECONDS
+            )
+            stdout_text = stdout.decode("utf-8", errors="replace")
+            probe["exit_code"] = exit_code
+            probe["stdout"] = stdout_text
+            probe["stderr"] = stderr.decode("utf-8", errors="replace")
+            parsed = _parse_read_probe_output(stdout_text)
+            probe.update(parsed)
+        except Exception as exc:  # noqa: BLE001 - diagnostic-only, must not raise
+            probe["probe_error"] = str(exc)
+
+    probe["classification"] = _classify_read_probe(parsed, probe.get("host_sha256"))
+
+    try:
+        probe_path = raw_dir / f"read_probe_{checkpoint}.json"
+        probe_path.write_text(json.dumps(probe, indent=2), encoding="utf-8")
+    except Exception:  # noqa: BLE001 - diagnostic-only, must not raise
+        pass
+
+    return probe
+
+
+def _diagnose_uploaded_binary(
+    session: GuestSession,
+    host_binary_path: str,
+    guest_binary_path: str,
+    raw_dir: pathlib.Path,
+    label: str,
+) -> Dict[str, Any]:
+    """Best-effort, read-only diagnostic for the confirmed combined-scan
+    al-khaser launch failure ("The system cannot execute the specified
+    program.", scan d21be3bc-f39f-42d4-a34f-0642149fd6f4): retrieves the
+    just-uploaded guest binary via GuestSession.get_file() (the same
+    Injector.read_file() primitive get_file() already uses for stdout.txt/
+    log.txt - this reads the actual guest-disk bytes directly, it does not
+    depend on cmd.exe/pwsh or execute anything in the guest) and hashes it
+    against the host original, so a future real-Xen run can show whether the
+    uploaded bytes were ever wrong (upload/write corruption) or were correct
+    immediately after upload but had changed by the time al-khaser was about
+    to be launched (something else acting on the file in between). Called
+    twice from AlKhaserAdapter.run() - once right after put_file(), once
+    right before run() - so the two snapshots can be diffed against each
+    other, not just against the host original.
+
+    Deliberately never raises and never alters al-khaser's own control flow:
+    every failure mode (host file unreadable, guest file missing/unreadable)
+    is captured as a field in the returned/written diagnostic instead, so a
+    diagnostic-retrieval problem cannot itself change ToolStatus or hide the
+    launch failure being investigated."""
+    diagnostic: Dict[str, Any] = {
+        "label": label,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "guest_path": guest_binary_path,
+    }
+
+    try:
+        host_bytes = pathlib.Path(host_binary_path).read_bytes()
+        diagnostic["host_size"] = len(host_bytes)
+        diagnostic["host_sha256"] = hashlib.sha256(host_bytes).hexdigest()
+    except Exception as exc:  # noqa: BLE001 - diagnostic-only, must not raise
+        diagnostic["host_error"] = str(exc)
+
+    local_copy = raw_dir / f"_diag_readback_{label}.tmp"
+    try:
+        session.get_file(guest_binary_path, local_copy)
+        guest_bytes = local_copy.read_bytes()
+        diagnostic["guest_exists"] = True
+        diagnostic["guest_size"] = len(guest_bytes)
+        diagnostic["guest_sha256"] = hashlib.sha256(guest_bytes).hexdigest()
+    except Exception as exc:  # noqa: BLE001 - diagnostic-only, must not raise
+        diagnostic["guest_exists"] = False
+        diagnostic["guest_error"] = str(exc)
+        # GuestSession.get_file() raises InjectorReadError - a RuntimeError
+        # SUBCLASS, so nothing about this except-clause or any other caller
+        # changed - carrying the injector's raw stdout and DRAKVUF's own
+        # {"Status": "Error", "ErrorCode": N, "Error": "<SYMBOLIC>"} record
+        # (src/libinjector/injector_utils.c, printed on stdout under the
+        # `-o json` drakrun already passes). That is the precise Win32
+        # reason CreateFileW failed, which DRAKVUF's single opaque
+        # "Couldn't open guest file" stderr string does not carry.
+        #
+        # Detected structurally via hasattr rather than by importing
+        # guest_runner: the adapter must keep working against any
+        # GuestSession Protocol implementation (the unit-test fakes raise
+        # plain FileNotFoundError), and an import of guest_runner from a
+        # verifier module would close an import cycle through
+        # drakrun.evasion.verifiers.__init__.
+        if hasattr(exc, "injector_json"):
+            diagnostic["injector_returncode"] = getattr(exc, "returncode", None)
+            diagnostic["injector_stdout"] = getattr(exc, "stdout", None)
+            diagnostic["injector_stderr"] = getattr(exc, "stderr", None)
+            diagnostic["injector_error_json"] = getattr(exc, "injector_json", None)
+            diagnostic["injector_error_code"] = getattr(exc, "error_code", None)
+            diagnostic["injector_error_name"] = getattr(exc, "error_name", None)
+    finally:
+        # Only the hash/size diagnostic is kept as an artifact, not the
+        # binary itself - al-khaser is not redistributed by this project
+        # (see the "No al-khaser binary configured" error message above).
+        try:
+            local_copy.unlink(missing_ok=True)
+        except Exception:  # noqa: BLE001 - best-effort cleanup only
+            pass
+
+    try:
+        diag_path = raw_dir / f"diag_{label}.json"
+        diag_path.write_text(json.dumps(diagnostic, indent=2), encoding="utf-8")
+    except Exception:  # noqa: BLE001 - diagnostic-only, must not raise
+        pass
+
+    return diagnostic
 
 
 class AlKhaserAdapter(VerifierAdapter):
@@ -1308,7 +1986,54 @@ class AlKhaserAdapter(VerifierAdapter):
 
         try:
             session.put_file(pathlib.Path(host_binary_path), guest_binary_path)
+            # ---- POST_UPLOAD checkpoint -------------------------------
+            # The three diagnostics are ordered so that the cheapest and
+            # least perturbing observation sits CLOSEST to the event being
+            # observed, and the heaviest sits furthest from it. Mirrored
+            # around the launch (see PRE_RUN below), this brackets the whole
+            # window: a metadata probe immediately after put_file() and
+            # another immediately before run(), with the two injector
+            # read-backs adjacent in the middle where they can least distort
+            # what they measure.
+            #
+            # 1. metadata only - GetFileAttributes/FindFirstFile class, never
+            #    opens the data stream at all.
+            # 2. ordinary user-mode open+read+SHA-256 from powershell.exe -
+            #    opens the data stream, but from a normal guest process.
+            # 3. DRAKVUF injector readfile - opens the data stream from the
+            #    injected context, and now reports its own Win32 ErrorCode.
+            _probe_guest_file_metadata(
+                session, guest_binary_path, guest_dir, raw_dir, "post_upload"
+            )
+            _probe_guest_file_read(
+                session,
+                host_binary_path,
+                guest_binary_path,
+                guest_dir,
+                raw_dir,
+                "post_upload",
+            )
+            _diagnose_uploaded_binary(
+                session, host_binary_path, guest_binary_path, raw_dir, "post_upload"
+            )
             timeout = max(0.0, deadline - time.time())
+            # ---- PRE_RUN checkpoint (reverse order) -------------------
+            _diagnose_uploaded_binary(
+                session, host_binary_path, guest_binary_path, raw_dir, "pre_run"
+            )
+            _probe_guest_file_read(
+                session,
+                host_binary_path,
+                guest_binary_path,
+                guest_dir,
+                raw_dir,
+                "pre_run",
+            )
+            # Last observation before launch, through the same guest-side
+            # mechanism (drakshell -> cmd.exe) the launch itself uses.
+            _probe_guest_file_metadata(
+                session, guest_binary_path, guest_dir, raw_dir, "pre_run"
+            )
             exit_code, _stdout, _stderr = session.run(
                 command_txt, timeout=timeout, cwd=guest_dir
             )
@@ -1338,6 +2063,11 @@ class AlKhaserAdapter(VerifierAdapter):
         # Exit code is unconditionally 0 in this al-khaser version and is
         # never treated as a verdict; it is recorded purely for audit.
         raw_artifacts: List[str] = []
+        for checkpoint in ("post_upload", "pre_run"):
+            for prefix in ("diag", "probe", "read_probe"):
+                diag_path = raw_dir / f"{prefix}_{checkpoint}.json"
+                if diag_path.exists():
+                    raw_artifacts.append(str(diag_path.relative_to(scan_dir)))
         stdout_text = ""
         log_text: Optional[str] = None
 
