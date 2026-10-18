@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+"""
+Run a provisioning PowerShell script inside vm-0 during a `drakrun modify-vm0`
+session (after `begin --cold-boot`, before `commit`).
+
+A cold-booted vm-0 has different kernel offsets and explorer PID than the
+stored snapshot, so this computes fresh VMI info first (the same call
+`drakrun modify-vm0 commit` makes), which also ensures drakshell is running.
+
+  sudo /opt/chimera/venv/bin/python scripts/chimera/arms/provision_guest.py \
+      scripts/chimera/arms/H1/realism.ps1
+"""
+
+import argparse
+import pathlib
+import sys
+
+from drakrun.lib.config import load_config
+from drakrun.lib.drakshell import Drakshell
+from drakrun.lib.injector import Injector
+from drakrun.lib.install_info import InstallInfo
+from drakrun.lib.paths import INSTALL_INFO_PATH, VMI_KERNEL_PROFILE_PATH
+from drakrun.lib.vm import VirtualMachine
+from drakrun.lib.vmi_profile import create_vmi_info
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("script", type=pathlib.Path)
+    parser.add_argument("--guest-path", default=r"C:\Users\Public\chimera-provision.ps1")
+    args = parser.parse_args()
+
+    config = load_config()
+    install_info = InstallInfo.load(INSTALL_INFO_PATH)
+    vm = VirtualMachine(0, install_info, config.network)
+    vmi_info = create_vmi_info(vm)
+    injector = Injector(vm.vm_name, vmi_info, VMI_KERNEL_PROFILE_PATH.as_posix())
+    injector.write_file(str(args.script.resolve()), args.guest_path)
+
+    shell = Drakshell(vm.vm_name)
+    shell.connect(timeout=10)
+    process = shell.run_interactive(
+        ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", args.guest_path],
+        None,
+        sys.stdout,
+        sys.stderr,
+    )
+    exit_code = process.join()
+    print(f"provision exit code: {exit_code}", file=sys.stderr)
+    return exit_code if isinstance(exit_code, int) else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
