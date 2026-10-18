@@ -212,6 +212,28 @@ def _fast_grace_period(monkeypatch):
     monkeypatch.setattr(guest_runner_module, "_TERMINATE_GRACE_SECONDS", 0.3)
 
 
+@pytest.mark.parametrize("operation", ["put_file", "put_tree_as_zip", "get_file"])
+def test_injector_transfers_are_forbidden_while_drakvuf_attached(tmp_path, operation):
+    injector = FakeInjector()
+    drakshell = FakeDrakshell([FakeProcess()])
+    session = GuestSession(injector, drakshell)
+    session.drakvuf_attached = True
+    args = (
+        (r"C:\report.txt", tmp_path / "report.txt")
+        if operation == "get_file"
+        else (tmp_path / "missing", r"C:\Public\tool")
+    )
+    with pytest.raises(RuntimeError, match="forbidden while DRAKVUF is attached"):
+        getattr(session, operation)(*args)
+    assert injector.write_calls == injector.read_calls == []
+    assert drakshell.run_interactive_calls == []
+    # Serial commands still work while observation is active.
+    assert session.run(["whoami"], timeout=5).exit_code == 0
+    session.drakvuf_attached = False
+    session.get_file(r"C:\report.txt", tmp_path / "report.txt")
+    assert (tmp_path / "report.txt").read_bytes() == injector.read_content
+
+
 def test_run_returns_exit_code_and_captured_output():
     drakshell = FakeDrakshell(
         [FakeProcess(exit_code=0)], stdout_bytes=b"ok", stderr_bytes=b""

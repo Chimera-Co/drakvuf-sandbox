@@ -77,6 +77,42 @@ def test_unsupported_when_no_repo_configured(tmp_path):
     assert session.run_calls == []
 
 
+def test_instrumented_phases_separate_upload_probe_execution_and_collection(
+    tmp_path, repo_path
+):
+    session = FakeGuestSession(
+        files={
+            r"C:\Users\Public\perdedor\windows-report.json": json.dumps(
+                _valid_report()
+            ).encode()
+        }
+    )
+    probes = []
+
+    def probe(argv, timeout):
+        probes.append(argv)
+        return True, "pwsh 7.4.1"
+
+    session.probe_command = probe
+    adapter = PerdedorAdapter()
+    state = adapter.stage(
+        session,
+        {"repo_path": repo_path},
+        tmp_path,
+        deadline=time.time() + 60,
+        instrumented=True,
+    )
+    assert len(session.put_tree_calls) == 1
+    assert session.run_calls == session.get_file_calls == probes == []
+    adapter.execute(state)
+    assert len(probes) == len(session.run_calls) == 1
+    assert len(session.put_tree_calls) == 1
+    assert session.get_file_calls == []
+    result = adapter.collect(state)
+    assert result.status == ToolStatus.ok
+    assert len(session.get_file_calls) == 1
+
+
 def test_unsupported_when_agent_tree_missing(tmp_path):
     adapter = PerdedorAdapter()
     session = FakeGuestSession()

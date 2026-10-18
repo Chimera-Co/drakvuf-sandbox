@@ -65,7 +65,7 @@ import re
 import subprocess
 import tempfile
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Generator, List, Optional, Tuple
 
 from drakrun.evasion.constants import Category, CheckStatus, Severity, ToolStatus
 from drakrun.evasion.models import NormalizedCheck, ToolResult
@@ -1936,13 +1936,15 @@ class AlKhaserAdapter(VerifierAdapter):
                 )
         return results
 
-    def run(
+    def _run_phases(
         self,
         session: GuestSession,
         options: Dict[str, Any],
         scan_dir: pathlib.Path,
         deadline: float,
-    ) -> ToolResult:
+        *,
+        instrumented: bool = False,
+    ) -> Generator[None, None, ToolResult]:
         started_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         raw_dir = scan_dir / "raw" / TOOL_ID
         raw_dir.mkdir(parents=True, exist_ok=True)
@@ -2015,14 +2017,16 @@ class AlKhaserAdapter(VerifierAdapter):
                 raw_dir,
                 "post_upload",
             )
-            _diagnose_uploaded_binary(
-                session, host_binary_path, guest_binary_path, raw_dir, "post_upload"
-            )
+            if not instrumented:
+                _diagnose_uploaded_binary(
+                    session, host_binary_path, guest_binary_path, raw_dir, "post_upload"
+                )
             timeout = max(0.0, deadline - time.time())
             # ---- PRE_RUN checkpoint (reverse order) -------------------
-            _diagnose_uploaded_binary(
-                session, host_binary_path, guest_binary_path, raw_dir, "pre_run"
-            )
+            if not instrumented:
+                _diagnose_uploaded_binary(
+                    session, host_binary_path, guest_binary_path, raw_dir, "pre_run"
+                )
             _probe_guest_file_read(
                 session,
                 host_binary_path,
@@ -2031,11 +2035,17 @@ class AlKhaserAdapter(VerifierAdapter):
                 raw_dir,
                 "pre_run",
             )
+            # Both read-probe scripts have now been uploaded. No transfer
+            # (including diagnostic injector read-backs) may follow until
+            # collection on an instrumented run.
+            yield
             # Last observation before launch, through the same guest-side
             # mechanism (drakshell -> cmd.exe) the launch itself uses.
             _probe_guest_file_metadata(
                 session, guest_binary_path, guest_dir, raw_dir, "pre_run"
             )
+            if instrumented:
+                timeout = max(0.0, deadline - time.time())
             command_result = session.run(command_txt, timeout=timeout, cwd=guest_dir)
             exit_code, _stdout, _stderr = command_result
         except VerifierTimeout:
@@ -2061,11 +2071,22 @@ class AlKhaserAdapter(VerifierAdapter):
                 error=f"Failed to launch al-khaser in the guest: {exc}",
             )
 
+        yield
+        if instrumented:
+            # This is a post-execution observation, not evidence about the
+            # binary's state immediately before launch.
+            _diagnose_uploaded_binary(
+                session, host_binary_path, guest_binary_path, raw_dir, "post_execute"
+            )
+
         # Exit code is unconditionally 0 in this al-khaser version and is
         # never treated as a verdict; it is recorded purely for audit.
         truncated = getattr(command_result, "truncated", False)
         raw_artifacts: List[str] = []
-        for checkpoint in ("post_upload", "pre_run"):
+        checkpoints = ("post_upload", "pre_run")
+        if instrumented:
+            checkpoints += ("post_execute",)
+        for checkpoint in checkpoints:
             for prefix in ("diag", "probe", "read_probe"):
                 diag_path = raw_dir / f"{prefix}_{checkpoint}.json"
                 if diag_path.exists():

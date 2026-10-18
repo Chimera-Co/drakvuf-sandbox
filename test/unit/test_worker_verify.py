@@ -32,6 +32,7 @@ import contextlib
 import datetime
 import json
 import pathlib
+import subprocess
 import sys
 import types
 
@@ -41,6 +42,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from fake_guest_session import FakeGuestSession  # noqa: E402
 
 from drakrun.evasion.models import EvasionScanOptions  # noqa: E402
+from drakrun.evasion.models import NormalizedCheck, ToolResult  # noqa: E402
+from drakrun.evasion.verifiers.base import VerifierAdapter  # noqa: E402
 
 _SANDBOX_TOML = """
 [sandbox.win10]
@@ -380,3 +383,319 @@ def test_result_is_only_published_after_vm_cleanup(
     )
     result = json.loads((tmp_path / job.id / "evasion.json").read_text())
     assert result["status"] == "finished"
+
+
+@pytest.fixture
+def instrumented_scan(worker_module, app_config, monkeypatch, tmp_path):
+    """Fake the instrumentation boundary and track both guest/process lifetimes."""
+    _patch_load_config(monkeypatch, app_config)
+    job = FakeJob()
+    monkeypatch.setattr("rq.get_current_job", lambda: job)
+    events = []
+    captured = {}
+
+    class Process:
+        returncode = None
+
+        def poll(self):
+            return self.returncode
+
+        def wait(self, timeout=None):
+            if self.returncode is None:
+                raise subprocess.TimeoutExpired("drakvuf", timeout)
+            return self.returncode
+
+    process = Process()
+
+    @contextlib.contextmanager
+    def run_vm(*args):
+        events.append("restore")
+        try:
+            yield FakeVm()
+        finally:
+            events.append("destroy")
+
+    def check_call(command):
+        events.append(command)
+
+    def finish():
+        pytest.fail("drakshell must remain alive during verification")
+
+    session = types.SimpleNamespace(
+        drakshell=types.SimpleNamespace(check_call=check_call, finish=finish)
+    )
+
+    def connect(*args):
+        events.append("connect")
+        return session
+
+    monkeypatch.setattr("drakrun.evasion.guest_runner.connect_guest_session", connect)
+    app_config.drakrun.no_post_restore = False
+    monkeypatch.setattr(
+        "drakrun.analyzer.post_restore.get_post_restore_command",
+        lambda net_enable: "post-restore",
+    )
+    fake_run_tools = sys.modules["drakrun.analyzer.run_tools"]
+    monkeypatch.setattr(fake_run_tools, "run_vm", run_vm)
+
+    @contextlib.contextmanager
+    def run_drakvuf(**kwargs):
+        assert session.drakvuf_attached is True
+        captured.update(kwargs)
+        events.append("drakvuf-start")
+        kwargs["output_file"].write_bytes(captured.get("log_bytes", b"{}\n"))
+        kwargs["output_err_file"].write_text("")
+        if captured.get("start_error"):
+            raise OSError("cannot execute drakvuf")
+        try:
+            yield process
+        finally:
+            assert session.drakvuf_attached is True
+            events.append("drakvuf-stop")
+            if process.returncode is None:
+                process.returncode = -15
+            if captured.get("teardown_error"):
+                raise OSError("DRAKVUF teardown failed")
+
+    monkeypatch.setattr(fake_run_tools, "run_drakvuf", run_drakvuf, raising=False)
+    fake_analyzer = types.ModuleType("drakrun.analyzer.analyzer")
+
+    def prepare_args(output_dir, options):
+        captured["prepared_dir"] = output_dir
+        captured["prepared_options"] = options
+        return ["-a", "procmon"]
+
+    fake_analyzer.prepare_drakvuf_args = prepare_args
+    monkeypatch.setitem(sys.modules, "drakrun.analyzer.analyzer", fake_analyzer)
+    version = object()
+    monkeypatch.setattr(
+        "drakrun.lib.version_detection.get_drakvuf_version", lambda: version
+    )
+
+    def adapter(tool_id):
+        def phases(self, guest, options, scan_dir, deadline, *, instrumented=False):
+            assert guest is session
+            assert not getattr(guest, "drakvuf_attached", False)
+            events.append(f"stage-{tool_id}")
+            if captured.get("stage_error") == tool_id:
+                raise ValueError("stage bug")
+            if tool_id == "alkhaser" and "clock" in captured:
+                captured["clock"]["now"] += 10000
+            yield
+            assert getattr(guest, "drakvuf_attached", False) is instrumented
+            assert process.returncode is None
+            guest.drakshell.check_call(f"run-{tool_id}")
+            if captured.get("exit_during_tool"):
+                process.returncode = 2
+            if captured.get("adapter_error"):
+                raise ValueError("adapter bug")
+            yield
+            assert not getattr(guest, "drakvuf_attached", False)
+            events.append(f"collect-{tool_id}")
+            if captured.get("collect_error") == tool_id:
+                raise ValueError("collect bug")
+            return ToolResult(
+                tool=tool_id,
+                status="ok",
+                raw_artifacts=[f"raw/{tool_id}/report.json"],
+                checks=[
+                    NormalizedCheck(
+                        id="clean",
+                        category="timing",
+                        name="clean",
+                        description="d",
+                        status="clean",
+                        severity="low",
+                        tool=tool_id,
+                    )
+                ],
+            )
+
+        class Adapter(VerifierAdapter):
+            id = tool_id
+            options_schema = lambda self: {}
+            validate_options = lambda self, opts: {}
+            _run_phases = phases
+
+        return Adapter()
+
+    monkeypatch.setattr(
+        "drakrun.evasion.verifiers.get_adapters_for_platform",
+        lambda platform: [adapter("perdedor"), adapter("alkhaser")],
+    )
+
+    def execute(**kwargs):
+        worker_module.worker_verify(
+            EvasionScanOptions(
+                sandbox_id="win10", tools=["perdedor", "alkhaser"], **kwargs
+            )
+        )
+        scan_dir = tmp_path / job.id
+        metadata = json.loads((scan_dir / "metadata.json").read_text())
+        assert metadata == json.loads((scan_dir / "evasion.json").read_text())
+        return metadata
+
+    return types.SimpleNamespace(
+        execute=execute,
+        events=events,
+        captured=captured,
+        process=process,
+        scan_dir=tmp_path / job.id,
+        config=app_config,
+        version=version,
+        session=session,
+    )
+
+
+@pytest.mark.parametrize("log_bytes", [b"{}\n", b""])
+def test_drakvuf_wraps_tool_runs_after_post_restore(instrumented_scan, log_bytes):
+    scan = instrumented_scan
+    scan.captured["log_bytes"] = log_bytes
+    scan.config.drakrun.plugins = ["procmon", "memdump"]
+    metadata = scan.execute(with_drakvuf=True)
+    assert scan.events == [
+        "restore",
+        "connect",
+        "post-restore",
+        "stage-perdedor",
+        "stage-alkhaser",
+        "drakvuf-start",
+        "run-perdedor",
+        "run-alkhaser",
+        "drakvuf-stop",
+        "collect-perdedor",
+        "collect-alkhaser",
+        "destroy",
+    ]
+    assert metadata["drakvuf_attached"] is True
+    assert metadata["drakvuf_returncode"] == -15
+    assert metadata["drakmon_log_nonempty"] is bool(log_bytes)
+    assert "drakvuf_error" not in metadata
+    assert metadata["score"]["state"] == "pass"
+    args = scan.captured
+    assert args["vm_name"] == "vm-1"
+    assert args["exec_parameters"] is None
+    assert args["drakvuf_version_info"] is scan.version
+    assert args["output_file"] == scan.scan_dir / "drakvuf" / "drakmon.log"
+    assert args["output_err_file"] == scan.scan_dir / "drakvuf" / "drakvuf_stderr.log"
+    assert args["drakvuf_cwd"] == args["prepared_dir"] == scan.scan_dir / "drakvuf"
+    assert args["drakvuf_args"] == ["-a", "procmon"]
+    options = args["prepared_options"]
+    assert options.plugins == scan.config.drakrun.plugins
+    assert options.host_sample_path is None
+    assert options.start_command is None
+    assert options.timeout is None
+    assert (scan.scan_dir / "drakvuf" / "dumps").is_dir()
+
+
+@pytest.mark.parametrize("options", [{}, {"with_drakvuf": False}])
+def test_drakvuf_disabled_preserves_default_scan(instrumented_scan, options):
+    scan = instrumented_scan
+    metadata = scan.execute(**options)
+    assert scan.events == [
+        "restore",
+        "connect",
+        "post-restore",
+        "stage-perdedor",
+        "run-perdedor",
+        "collect-perdedor",
+        "stage-alkhaser",
+        "run-alkhaser",
+        "collect-alkhaser",
+        "destroy",
+    ]
+    assert scan.captured == {}
+    assert not (scan.scan_dir / "drakvuf").exists()
+    assert "with_drakvuf" not in metadata["options"]
+    assert not any(key.startswith("drakvuf_") for key in metadata)
+    assert "drakmon_log_nonempty" not in metadata
+    assert metadata["score"]["state"] == "pass"
+
+
+@pytest.mark.parametrize("startup_failure", ["spawn", "exit", "clean-exit"])
+def test_drakvuf_start_failure_prevents_uninstrumented_results(
+    instrumented_scan, startup_failure
+):
+    scan = instrumented_scan
+    if startup_failure == "spawn":
+        scan.captured["start_error"] = True
+    else:
+        scan.process.returncode = 0 if startup_failure == "clean-exit" else 1
+    metadata = scan.execute(with_drakvuf=True)
+    assert metadata["drakvuf_attached"] is False
+    assert "failed to start" in metadata["drakvuf_error"]
+    assert all(result["status"] == "error" for result in metadata["tool_results"])
+    assert all("DRAKVUF" in result["error"] for result in metadata["tool_results"])
+    assert metadata["score"]["state"] == "incomplete"
+    assert "chimera_score" not in metadata["score"]
+    assert not any(event.startswith("run-") for event in scan.events)
+    assert scan.events[-1] == "destroy"
+    if startup_failure != "spawn":
+        assert metadata["drakvuf_returncode"] == scan.process.returncode
+        assert scan.events[-2] == "drakvuf-stop"
+
+
+def test_drakvuf_early_exit_invalidates_results_and_stops_further_tools(
+    instrumented_scan,
+):
+    scan = instrumented_scan
+    scan.captured["exit_during_tool"] = True
+    metadata = scan.execute(with_drakvuf=True)
+    assert metadata["drakvuf_attached"] is False
+    assert metadata["drakvuf_returncode"] == 2
+    assert "exited before" in metadata["drakvuf_error"]
+    assert all(result["status"] == "error" for result in metadata["tool_results"])
+    assert metadata["tool_results"][0]["raw_artifacts"] == ["raw/perdedor/report.json"]
+    assert metadata["score"]["state"] == "incomplete"
+    assert "run-alkhaser" not in scan.events
+    assert scan.events[-3:] == ["drakvuf-stop", "collect-perdedor", "destroy"]
+
+
+def test_drakvuf_stops_even_when_adapters_raise(instrumented_scan):
+    scan = instrumented_scan
+    scan.captured["adapter_error"] = True
+    metadata = scan.execute(with_drakvuf=True)
+    assert metadata["drakvuf_attached"] is True
+    assert metadata["drakvuf_returncode"] == -15
+    assert all("adapter bug" in result["error"] for result in metadata["tool_results"])
+    assert scan.events[-2:] == ["drakvuf-stop", "destroy"]
+
+
+@pytest.mark.parametrize("phase", ["stage", "collect"])
+def test_drakvuf_isolates_phase_failures(instrumented_scan, phase):
+    scan = instrumented_scan
+    scan.captured[f"{phase}_error"] = "perdedor"
+    metadata = scan.execute(with_drakvuf=True)
+    first, second = metadata["tool_results"]
+    assert first["status"] == "error"
+    assert f"{phase} bug" in first["error"]
+    assert second["status"] == "ok"
+    assert metadata["score"]["state"] == "incomplete"
+    assert scan.events.index("drakvuf-stop") < scan.events.index("collect-alkhaser")
+    assert scan.events[-1] == "destroy"
+
+
+def test_drakvuf_does_not_reset_tool_deadlines(instrumented_scan, monkeypatch):
+    scan = instrumented_scan
+    clock = {"now": 100.0}
+    scan.captured["clock"] = clock
+    monkeypatch.setattr("time.time", lambda: clock["now"])
+    metadata = scan.execute(with_drakvuf=True)
+    assert metadata["drakvuf_attached"] is True
+    assert all(result["status"] == "timeout" for result in metadata["tool_results"])
+    assert not any(event.startswith("run-") for event in scan.events)
+    assert metadata["score"]["state"] == "incomplete"
+    assert scan.events[-2:] == ["drakvuf-stop", "destroy"]
+
+
+def test_drakvuf_teardown_failure_never_collects(instrumented_scan):
+    scan = instrumented_scan
+    scan.captured["teardown_error"] = True
+    with pytest.raises(OSError, match="teardown failed"):
+        scan.execute(with_drakvuf=True)
+    assert scan.session.drakvuf_attached is True
+    assert not any(event.startswith("collect-") for event in scan.events)
+    assert scan.events[-1] == "destroy"
+    metadata = json.loads((scan.scan_dir / "metadata.json").read_text())
+    assert metadata["status"] == "failed"
+    assert "teardown failed" in metadata["error"]

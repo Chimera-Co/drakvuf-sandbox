@@ -274,6 +274,17 @@ class GuestSession:
         self.injector = injector
         self.drakshell = drakshell
         self._broken_reason: Optional[str] = None
+        # The worker sets this before attachment and clears it only after
+        # DRAKVUF's context has finished teardown. Both clients use Xen's
+        # exclusive vm_event monitor subscription.
+        self.drakvuf_attached = False
+
+    def _check_injector_available(self) -> None:
+        if self.drakvuf_attached:
+            raise RuntimeError(
+                "Injector file transfer is forbidden while DRAKVUF is attached "
+                "(execute phase); use stage or collect instead."
+            )
 
     def _check_not_broken(self) -> None:
         if self._broken_reason is not None:
@@ -462,6 +473,7 @@ class GuestSession:
             )
 
     def put_file(self, local_path: pathlib.Path, remote_path: str) -> None:
+        self._check_injector_available()
         self._check_not_broken()
         self._ensure_remote_parent_dir(remote_path)
         result = self.injector.write_file(str(local_path), remote_path)
@@ -472,6 +484,7 @@ class GuestSession:
             )
 
     def put_tree_as_zip(self, local_dir: pathlib.Path, remote_dir: str) -> None:
+        self._check_injector_available()
         self._check_not_broken()
         guest_zip_path = remote_dir.rstrip("\\") + "\\__put_tree_as_zip.zip"
         self._ensure_remote_parent_dir(guest_zip_path)
@@ -508,6 +521,7 @@ class GuestSession:
         return self._run_with_timeout(argv, timeout, cwd=cwd)
 
     def get_file(self, remote_path: str, local_path: pathlib.Path) -> None:
+        self._check_injector_available()
         self._check_not_broken()
         local_path.parent.mkdir(parents=True, exist_ok=True)
         result = self.injector.read_file(remote_path, str(local_path))

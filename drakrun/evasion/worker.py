@@ -127,6 +127,7 @@ def worker_verify(options: EvasionScanOptions) -> None:
 
     from drakrun.analyzer.post_restore import get_post_restore_command
     from drakrun.analyzer.run_tools import run_vm
+    from drakrun.evasion.drakvuf import verification_drakvuf
     from drakrun.evasion.guest_runner import connect_guest_session
     from drakrun.evasion.report import write_evasion_json, write_html_report
     from drakrun.evasion.scoring import compute_score
@@ -199,6 +200,8 @@ def worker_verify(options: EvasionScanOptions) -> None:
             else datetime.datetime.now(datetime.timezone.utc).isoformat()
         ),
     )
+    if options.with_drakvuf:
+        metadata.drakvuf_attached = False
     metadata_file = scan_dir / METADATA_FILENAME
     metadata.store_to_file(metadata_file)
 
@@ -279,23 +282,115 @@ def worker_verify(options: EvasionScanOptions) -> None:
 
                 substatus_callback(EvasionSubstatus.probing.value, current_tool=None)
 
-                for tool_id, adapter, run_options in runnable_tools:
-                    substatus_callback(f"running_{tool_id}", current_tool=tool_id)
-                    deadline = time.time() + _timeout_seconds_for_tool(tool_id, config)
+                def invoke(tool_id, action):
                     try:
-                        result = adapter.run(session, run_options, scan_dir, deadline)
+                        return action()
                     except (
                         Exception
-                    ) as exc:  # noqa: BLE001 - adapters are documented to never raise, but a guest-session bug must still degrade to an error result rather than abort the whole scan
+                    ) as exc:  # noqa: BLE001 - isolate adapter/transport bugs
                         logger.exception("Verifier '%s' raised unexpectedly", tool_id)
-                        result = ToolResult(
+                        return ToolResult(
                             tool=tool_id,
                             status=ToolStatus.error,
                             error=f"Verifier raised an unexpected error: {exc}",
                         )
-                    tool_results.append(result)
 
-                substatus_callback(EvasionSubstatus.collecting.value, current_tool=None)
+                first_run_result = len(tool_results)
+                if not options.with_drakvuf:
+                    for tool_id, adapter, run_options in runnable_tools:
+                        substatus_callback(f"running_{tool_id}", current_tool=tool_id)
+                        deadline = time.time() + _timeout_seconds_for_tool(
+                            tool_id, config
+                        )
+                        tool_results.append(
+                            invoke(
+                                tool_id,
+                                lambda: adapter.run(
+                                    session, run_options, scan_dir, deadline
+                                ),
+                            )
+                        )
+                else:
+                    staged = []
+                    for tool_id, adapter, run_options in runnable_tools:
+                        substatus_callback(f"running_{tool_id}", current_tool=tool_id)
+                        deadline = time.time() + _timeout_seconds_for_tool(
+                            tool_id, config
+                        )
+                        state = invoke(
+                            tool_id,
+                            lambda: adapter.stage(
+                                session,
+                                run_options,
+                                scan_dir,
+                                deadline,
+                                instrumented=True,
+                            ),
+                        )
+                        staged.append((tool_id, adapter, state))
+
+                    # Block every transfer before attachment starts, including
+                    # startup grace and teardown. Drakshell uses serial, so it
+                    # remains available throughout the observation window.
+                    session.drakvuf_attached = True
+                    with verification_drakvuf(
+                        scan_dir,
+                        config,
+                        vm.vm_name,
+                        vmi_info,
+                        kernel_profile_path,
+                        metadata,
+                    ) as drakvuf:
+                        for tool_id, adapter, state in staged:
+                            if isinstance(state, ToolResult):
+                                continue
+                            substatus_callback(
+                                f"running_{tool_id}", current_tool=tool_id
+                            )
+                            if drakvuf is None or drakvuf.poll() is not None:
+                                state.finish(
+                                    ToolResult(
+                                        tool=tool_id,
+                                        status=ToolStatus.error,
+                                        error=metadata.drakvuf_error
+                                        or "DRAKVUF is no longer running",
+                                    )
+                                )
+                                continue
+                            error = invoke(tool_id, lambda: adapter.execute(state))
+                            if isinstance(error, ToolResult):
+                                state.finish(error)
+                    # A teardown exception skips collection and leaves the
+                    # guard set: transfers must fail closed if detach fails.
+                    session.drakvuf_attached = False
+
+                    substatus_callback(
+                        EvasionSubstatus.collecting.value, current_tool=None
+                    )
+                    for tool_id, adapter, state in staged:
+                        result = (
+                            state
+                            if isinstance(state, ToolResult)
+                            else invoke(tool_id, lambda: adapter.collect(state))
+                        )
+                        tool_results.append(result)
+
+                    if not metadata.drakvuf_attached:
+                        # Preserve artifacts collected after teardown, but never
+                        # score any result as instrumented after attach failure.
+                        for result in tool_results[first_run_result:]:
+                            result.status = ToolStatus.error
+                            if result.error and result.error != metadata.drakvuf_error:
+                                result.error = (
+                                    f"{result.error}; {metadata.drakvuf_error}"
+                                )
+                            else:
+                                result.error = metadata.drakvuf_error
+
+                if not options.with_drakvuf:
+                    substatus_callback(
+                        EvasionSubstatus.collecting.value, current_tool=None
+                    )
                 score = compute_score(
                     tool_results,
                     pass_threshold=config.evasion.score_pass_threshold,

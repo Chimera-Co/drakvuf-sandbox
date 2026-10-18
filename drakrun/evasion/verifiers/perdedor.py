@@ -47,7 +47,7 @@ import json
 import math
 import pathlib
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, Generator, List, Optional
 
 from drakrun.evasion.constants import Category, CheckStatus, Severity, ToolStatus
 from drakrun.evasion.models import NormalizedCheck, ToolResult
@@ -120,13 +120,15 @@ class PerdedorAdapter(VerifierAdapter):
             )
         return {}
 
-    def run(
+    def _run_phases(
         self,
         session: GuestSession,
         options: Dict[str, Any],
         scan_dir: pathlib.Path,
         deadline: float,
-    ) -> ToolResult:
+        *,
+        instrumented: bool = False,
+    ) -> Generator[None, None, ToolResult]:
         started_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         raw_dir = scan_dir / "raw" / TOOL_ID
         raw_dir.mkdir(parents=True, exist_ok=True)
@@ -158,23 +160,10 @@ class PerdedorAdapter(VerifierAdapter):
                 ),
             )
 
-        timeout = max(0.0, deadline - time.time())
-        available, detail = session.probe_command(
-            PWSH_PROBE_ARGV, timeout=min(30.0, timeout)
-        )
-        if not available:
-            return ToolResult(
-                tool=TOOL_ID,
-                status=ToolStatus.unsupported,
-                started_at=started_at,
-                finished_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                error=(
-                    "PowerShell 7 (pwsh) is not available in the guest. "
-                    "PERDEDOR's Windows agent requires it to read CPUID via "
-                    "the .NET X86Base intrinsic, which Windows PowerShell "
-                    f"5.1 cannot do. Probe detail: {detail}"
-                ),
-            )
+        if not instrumented:
+            unavailable = self._probe_pwsh(session, deadline, started_at)
+            if unavailable is not None:
+                return unavailable
 
         guest_dir = r"C:\Users\Public\perdedor"
         guest_output_path = guest_dir + r"\windows-report.json"
@@ -190,6 +179,11 @@ class PerdedorAdapter(VerifierAdapter):
 
         try:
             session.put_tree_as_zip(agent_dir, guest_dir)
+            yield
+            if instrumented:
+                unavailable = self._probe_pwsh(session, deadline, started_at)
+                if unavailable is not None:
+                    return unavailable
             timeout = max(0.0, deadline - time.time())
             command_result = session.run(command_txt, timeout=timeout, cwd=guest_dir)
             exit_code, stdout, stderr = command_result
@@ -216,6 +210,7 @@ class PerdedorAdapter(VerifierAdapter):
                 error=f"Failed to launch the PERDEDOR Windows agent in the guest: {exc}",
             )
 
+        yield
         truncated = getattr(command_result, "truncated", False)
         raw_artifacts: List[str] = []
         if stderr:
@@ -313,6 +308,29 @@ class PerdedorAdapter(VerifierAdapter):
                 else None
             ),
         )
+
+    def _probe_pwsh(
+        self, session: GuestSession, deadline: float, started_at: str
+    ) -> Optional[ToolResult]:
+        timeout = max(0.0, deadline - time.time())
+        available, detail = session.probe_command(
+            PWSH_PROBE_ARGV, timeout=min(30.0, timeout)
+        )
+        if not available:
+            return ToolResult(
+                tool=TOOL_ID,
+                status=ToolStatus.unsupported,
+                started_at=started_at,
+                finished_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                error=(
+                    "PowerShell 7 (pwsh) is not available in the guest. "
+                    "PERDEDOR's Windows agent requires it to read CPUID via "
+                    "the .NET X86Base intrinsic, which Windows PowerShell "
+                    f"5.1 cannot do. Probe detail: {detail}"
+                ),
+            )
+
+        return None
 
     def _normalize(self, report: Dict[str, Any]) -> List[NormalizedCheck]:
         """Map every PERDEDOR finding onto NormalizedCheck 1:1. Field names

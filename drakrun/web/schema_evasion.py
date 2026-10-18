@@ -80,6 +80,7 @@ class CreateScanRequest(BaseModel):
     profile: str = "full"
     tool_options: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     timeout: Optional[int] = None
+    with_drakvuf: bool = False
 
 
 class CreateScanResponse(BaseModel):

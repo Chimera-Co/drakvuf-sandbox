@@ -58,6 +58,43 @@ def alkhaser_binary(tmp_path):
     return binary
 
 
+def test_instrumented_phases_defer_all_injector_readbacks(tmp_path, alkhaser_binary):
+    session = FakeGuestSession(
+        files={
+            r"C:\Users\Public\alkhaser\log.txt": (
+                b"[2024-01-01 00:00:00] [*] TLS process attach callback  -> 0\n"
+            )
+        }
+    )
+    adapter = AlKhaserAdapter()
+    state = adapter.stage(
+        session,
+        {
+            "host_binary_path": str(alkhaser_binary),
+            "checks": ["TLS"],
+            "sleep_seconds": 1,
+        },
+        tmp_path,
+        deadline=time.time() + 60,
+        instrumented=True,
+    )
+    # Binary plus both diagnostic scripts; no injector read-backs in stage.
+    uploads = list(session.put_file_calls)
+    assert len(uploads) == 3
+    assert session.get_file_calls == []
+    assert not any("--sleep" in " ".join(argv) for argv, _, _ in session.run_calls)
+    adapter.execute(state)
+    assert session.put_file_calls == uploads
+    assert session.get_file_calls == []
+    launches = [argv for argv, _, _ in session.run_calls if "--sleep" in " ".join(argv)]
+    assert len(launches) == 1
+    result = adapter.collect(state)
+    assert result.status == ToolStatus.ok
+    assert len(session.get_file_calls) == 3  # diagnostic, stdout, log
+    assert "raw/alkhaser/diag_post_execute.json" in result.raw_artifacts
+    assert not any("diag_pre_run" in path for path in result.raw_artifacts)
+
+
 @pytest.mark.parametrize("filename", ["log.txt", "stdout.txt"])
 def test_oversized_report_is_error_even_with_other_valid_output(
     tmp_path, alkhaser_binary, monkeypatch, filename

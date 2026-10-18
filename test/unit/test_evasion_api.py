@@ -227,10 +227,79 @@ def test_create_scan_success(client, evasion_api_module, monkeypatch):
     scan_id = resp.json["scan_id"]
     assert captured["sandbox"].id == "win10"
     assert captured["options"].tools == ["perdedor"]
+    assert captured["options"].with_drakvuf is False
     assert (
         captured["options"].timeout == evasion_api_module.config.evasion.default_timeout
     )
     assert captured["job_id"] == scan_id
+
+
+@pytest.mark.parametrize("with_drakvuf", [True, False])
+def test_create_scan_passes_instrumentation_option(
+    client, evasion_api_module, monkeypatch, with_drakvuf
+):
+    captured = {}
+    monkeypatch.setattr(
+        evasion_api_module,
+        "enqueue_verification",
+        lambda **kwargs: captured.update(kwargs),
+    )
+    response = client.post(
+        "/api/evasion/scans",
+        json={
+            "sandbox_id": "win10",
+            "tools": ["perdedor"],
+            "with_drakvuf": with_drakvuf,
+        },
+    )
+    assert response.status_code == 200
+    options = captured["options"]
+    assert options.with_drakvuf is with_drakvuf
+    serialized = options.to_dict(exclude_none=True)
+    assert ("with_drakvuf" in serialized) is with_drakvuf
+    assert EvasionScanOptions.model_validate(serialized).with_drakvuf is with_drakvuf
+
+
+@pytest.mark.parametrize("job_present", [True, False])
+@pytest.mark.parametrize("attached", [True, False])
+def test_get_scan_exposes_instrumentation_outcome(
+    client, evasion_api_module, monkeypatch, scan_dir, job_present, attached
+):
+    scan_id = "11111111-1111-4111-8111-111111111111"
+    error = None if attached else "DRAKVUF failed to start: executable missing"
+    metadata = _finished_metadata(
+        scan_id,
+        [
+            ToolResult(
+                tool="perdedor",
+                status="unsupported" if attached else "error",
+                error=error,
+            )
+        ],
+    )
+    metadata.options.with_drakvuf = True
+    metadata.drakvuf_attached = attached
+    metadata.drakmon_log_nonempty = attached
+    metadata.drakvuf_returncode = -15 if attached else None
+    metadata.drakvuf_error = error
+    _write_evasion_json(scan_dir, scan_id, metadata)
+    job = FakeJob(scan_id, JobStatus.FINISHED)
+    monkeypatch.setattr(
+        evasion_api_module,
+        "Job",
+        FakeJobRegistry({scan_id: job} if job_present else {}),
+    )
+    response = client.get(f"/api/evasion/scans/{scan_id}")
+    assert response.status_code == 200
+    assert response.json["options"]["with_drakvuf"] is True
+    assert response.json["drakvuf_attached"] is attached
+    assert response.json["drakmon_log_nonempty"] is attached
+    if attached:
+        assert response.json["drakvuf_returncode"] == -15
+    else:
+        assert response.json["drakvuf_error"] == error
+        assert response.json["tool_results"][0]["error"] == error
+        assert response.json["score"]["state"] == "incomplete"
 
 
 def test_create_scan_unknown_sandbox_is_404(client):

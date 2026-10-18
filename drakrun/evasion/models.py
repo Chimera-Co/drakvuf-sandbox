@@ -86,6 +86,8 @@ class EvasionScanOptions(BaseModel):
     # {"alkhaser": {"checks": ["DEBUG", "VBOX"], "sleep_seconds": 30}}.
     tool_options: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     timeout: Optional[int] = None
+    # Omit the disabled option to preserve historical scan/job serialization.
+    with_drakvuf: bool = Field(default=False, exclude_if=lambda value: not value)
 
     def to_dict(self, exclude_none: bool = False) -> dict:
         return self.model_dump(mode="json", exclude_none=exclude_none)
@@ -129,6 +131,12 @@ class EvasionScanMetadata(BaseModel):
     tool_results: List[ToolResult] = Field(default_factory=list)
     score: Optional[EvasionScore] = None
     error: Optional[str] = None
+
+    # Only populated for scans that explicitly request instrumentation.
+    drakvuf_attached: Optional[bool] = None
+    drakvuf_returncode: Optional[int] = None
+    drakmon_log_nonempty: Optional[bool] = None
+    drakvuf_error: Optional[str] = None
 
     @classmethod
     def load_from_dict(cls, obj: Dict[str, Any]) -> "EvasionScanMetadata":

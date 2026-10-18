@@ -167,6 +167,7 @@ def create_scan(body: CreateScanRequest):
         profile=body.profile,
         tool_options=validated_tool_options,
         timeout=timeout,
+        with_drakvuf=body.with_drakvuf,
     )
 
     scan_id = str(uuid.uuid4())

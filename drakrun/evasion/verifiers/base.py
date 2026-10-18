@@ -26,9 +26,21 @@ from __future__ import annotations
 
 import abc
 import pathlib
+import time
 from dataclasses import dataclass
-from typing import Any, Dict, Iterator, List, Optional, Protocol, Tuple, Union
+from typing import (
+    Any,
+    Dict,
+    Generator,
+    Iterator,
+    List,
+    Optional,
+    Protocol,
+    Tuple,
+    Union,
+)
 
+from drakrun.evasion.constants import ToolStatus
 from drakrun.evasion.models import ToolResult
 
 MAX_REPORT_BYTES = 16 * 1024 * 1024
@@ -95,6 +107,8 @@ class GuestSession(Protocol):
     fixture bytes with no Xen dependency.
     """
 
+    drakvuf_attached: bool
+
     def probe_command(self, argv: List[str], timeout: float) -> Tuple[bool, str]:
         """Best-effort check that a command is runnable in the guest, e.g.
         `pwsh -NoProfile -Command $PSVersionTable.PSVersion.Major`. Returns
@@ -129,6 +143,33 @@ class GuestSession(Protocol):
         ...
 
 
+@dataclass
+class VerifierRun:
+    """Per-run continuation and result; never shared between verifier runs.
+
+    The adapter yields after staging and execution, retaining its local
+    command/output/error handling across the two boundaries. Returning a
+    ToolResult ends the run early; later hooks then become no-ops.
+    """
+
+    phases: Generator[None, None, ToolResult]
+    deadline: float
+    instrumented: bool = False
+    result: Optional[ToolResult] = None
+
+    def advance(self) -> None:
+        if self.result is None:
+            try:
+                next(self.phases)
+            except StopIteration as completed:
+                self.result = completed.value
+
+    def finish(self, result: ToolResult) -> None:
+        """End a pending run without resuming any guest commands."""
+        self.phases.close()
+        self.result = result
+
+
 class VerifierAdapter(abc.ABC):
     id: str
     display_name: str
@@ -153,7 +194,6 @@ class VerifierAdapter(abc.ABC):
         --check TYPO bug, where EnableChecks() silently no-ops an unrecognized
         name while still suppressing the default set: we refuse instead.)"""
 
-    @abc.abstractmethod
     def run(
         self,
         session: GuestSession,
@@ -166,6 +206,67 @@ class VerifierAdapter(abc.ABC):
         failure mode becomes ToolResult(status=error/timeout/unsupported)
         with raw artifacts preserved under scan_dir wherever any were
         captured before the failure."""
+        run = self.stage(session, options, scan_dir, deadline)
+        self.execute(run)
+        return self.collect(run)
+
+    def stage(
+        self,
+        session: GuestSession,
+        options: Dict[str, Any],
+        scan_dir: pathlib.Path,
+        deadline: float,
+        *,
+        instrumented: bool = False,
+    ) -> VerifierRun:
+        """Upload everything before attaching DRAKVUF; return per-run state.
+
+        Ordinary run() preserves the historical diagnostic and probe order.
+        Instrumented runs defer injector diagnostics to collection. The
+        absolute deadline includes staging and time waiting for other tools;
+        attaching DRAKVUF never restarts a tool's timeout budget.
+        """
+        run = VerifierRun(
+            self._run_phases(
+                session, options, scan_dir, deadline, instrumented=instrumented
+            ),
+            deadline,
+            instrumented,
+        )
+        run.advance()
+        return run
+
+    def execute(self, run: VerifierRun) -> None:
+        """Run guest commands through drakshell only when instrumented."""
+        if run.result is None and run.instrumented and time.time() >= run.deadline:
+            run.finish(
+                ToolResult(
+                    tool=self.id,
+                    status=ToolStatus.timeout,
+                    error="Verifier time budget expired before execution.",
+                )
+            )
+            return
+        run.advance()
+
+    def collect(self, run: VerifierRun) -> ToolResult:
+        """Retrieve guest files only after DRAKVUF has stopped."""
+        run.advance()
+        if run.result is None:
+            raise RuntimeError("Verifier did not return a result after collection")
+        return run.result
+
+    @abc.abstractmethod
+    def _run_phases(
+        self,
+        session: GuestSession,
+        options: Dict[str, Any],
+        scan_dir: pathlib.Path,
+        deadline: float,
+        *,
+        instrumented: bool = False,
+    ) -> Generator[None, None, ToolResult]:
+        """Yield after stage and execute; return the collected ToolResult."""
 
 
 __all__ = [
@@ -176,4 +277,5 @@ __all__ = [
     "VerifierTimeout",
     "GuestSession",
     "VerifierAdapter",
+    "VerifierRun",
 ]
