@@ -351,11 +351,15 @@ class Drakshell:
             raise RuntimeError(f"Process exited with exit code {exit_code}")
 
 
-def get_drakshell(vm, injector):
+def get_drakshell(vm, injector, connect_timeout: int = 10):
     drakshell = Drakshell(vm.vm_name)
     connected = False
     try:
-        drakshell.connect()
+        # A just-restored guest can take several seconds to answer the ping.
+        # Injecting a second drakshell into a guest that already runs one
+        # hijacks explorer.exe and can wedge it, so be patient here (the
+        # analyzer uses the same 10 s, see analyzer.py).
+        drakshell.connect(timeout=connect_timeout)
         connected = True
     except Exception as e:
         log.warning(f"Failed to connect to drakshell: {str(e)}")

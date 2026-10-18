@@ -9,6 +9,7 @@ from .networking import get_network_info_path, start_vm_network, stop_vm_network
 from .paths import CONFIGS_DIR
 from .storage import get_storage_backend
 from .xen import (
+    reap_orphaned_device_models,
     xen_create_vm,
     xen_destroy_vm,
     xen_eject_cd,
@@ -105,6 +106,9 @@ class VirtualMachine:
             ).as_posix()
         # Ensure VM is destroyed
         self.destroy()
+        # A device model left over from an earlier run would still hold this
+        # VM's VNC port and make the restore fail.
+        reap_orphaned_device_models()
         # No need to rollback vm-0. Since the state of vm-0
         # is correct by definition.
         if self.vm_id != 0:

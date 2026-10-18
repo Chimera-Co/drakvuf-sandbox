@@ -1,4 +1,5 @@
 import contextlib
+import fcntl
 import logging
 import pathlib
 import subprocess
@@ -14,6 +15,7 @@ from drakrun.lib.install_info import InstallInfo
 from drakrun.lib.libvmi import VmiInfo
 from drakrun.lib.network_info import NetworkInfo
 from drakrun.lib.networking import start_tcpdump_collector
+from drakrun.lib.paths import RUN_DIR
 from drakrun.lib.version_detection import DrakvufVersionInfo
 from drakrun.lib.vm import VirtualMachine
 
@@ -121,6 +123,26 @@ def run_drakvuf(
 
 
 @contextlib.contextmanager
+def vm_lock(vm_id: int, lock_dir: Optional[pathlib.Path] = None):
+    """
+    Exclusive per-VM lock shared by every worker type (analysis, evasion).
+    flock() is released by the kernel when the holder dies, so a crashed
+    worker can't leave the VM locked.
+    """
+    lock_dir = lock_dir or RUN_DIR
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    with (lock_dir / f"vm-{vm_id}.lock").open("w") as lock_file:
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise RuntimeError(f"vm-{vm_id} is already in use by another worker")
+        try:
+            yield
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+
+
+@contextlib.contextmanager
 def run_vm(
     vm_id: int,
     install_info: InstallInfo,
@@ -128,16 +150,19 @@ def run_vm(
     no_restore: bool = False,
 ):
     vm = VirtualMachine(vm_id, install_info, network_conf)
-    if no_restore:
-        if not vm.is_running:
-            raise RuntimeError(f"Virtual machine {vm.vm_name} is not running")
-        yield vm
-    else:
-        vm.restore()
-        try:
+    with vm_lock(vm_id):
+        if no_restore:
+            if not vm.is_running:
+                raise RuntimeError(f"Virtual machine {vm.vm_name} is not running")
             yield vm
-        finally:
-            vm.destroy()
+        else:
+            try:
+                # restore() is inside the try: a failed restore can leave a
+                # half-created domain or the network up, and must be torn down.
+                vm.restore()
+                yield vm
+            finally:
+                vm.destroy()
 
 
 @contextlib.contextmanager
