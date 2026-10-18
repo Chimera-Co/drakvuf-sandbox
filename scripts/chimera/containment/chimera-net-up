@@ -1,0 +1,120 @@
+#!/bin/bash
+# CHIMERA containment: INetSim network namespace + fail-closed guest firewall.
+# Idempotent; every firewall change is one atomic *-restore transaction per
+# address family, so re-running never leaves an empty guard chain.
+# See docs/chimera/containment-proposal.md.
+#
+#   chimera-net-up               full setup (netns, veth, firewall, ip_forward)
+#   chimera-net-up --rules-only  firewall transactions only (used for the C-1 dry run)
+set -euo pipefail
+
+NS=chimera-inet
+H=inetsim0
+P=inetsim-ns
+HIP=10.99.0.1
+NIP=10.99.0.2
+RULES_ONLY=0
+[[ "${1:-}" == "--rules-only" ]] && RULES_ONLY=1
+
+if [[ $RULES_ONLY -eq 0 ]]; then
+    ip netns list | grep -qw "$NS" || ip netns add "$NS"
+    if ! ip link show "$H" &>/dev/null; then
+        ip link add "$H" type veth peer name "$P"
+        ip link set "$P" netns "$NS"
+    fi
+    sysctl -qw "net.ipv6.conf.$H.disable_ipv6=1"
+    ip netns exec "$NS" sysctl -qw net.ipv6.conf.all.disable_ipv6=1 net.ipv6.conf.default.disable_ipv6=1
+    ip addr replace "$HIP/30" dev "$H"
+    ip -n "$NS" addr replace "$NIP/30" dev "$P"
+    ip link set "$H" up
+    ip -n "$NS" link set lo up
+    ip -n "$NS" link set "$P" up
+    # Replies to guests only; the namespace deliberately has no default route.
+    ip -n "$NS" route replace 10.13.0.0/16 via "$HIP"
+
+    # Xen's vif-bridge hotplug script inserts physdev rules, which auto-loads
+    # br_netfilter with bridge-nf-call-*=1. That sends bridged frames through
+    # iptables (above our guard) and makes PCAPs on drakN show post-DNAT
+    # addresses. We filter only at the IP layer, so turn bridge netfilter off.
+    modprobe br_netfilter
+    sysctl -qw net.bridge.bridge-nf-call-iptables=0 \
+        net.bridge.bridge-nf-call-ip6tables=0 \
+        net.bridge.bridge-nf-call-arptables=0
+fi
+
+# Prints the lines that (re)insert a jump at position 1 inside a transaction.
+jump() {
+    local table=$1 chain=$2 target=$3
+    if iptables -t "$table" -C "$chain" -j "$target" 2>/dev/null; then
+        echo "-D $chain -j $target"
+    fi
+    echo "-I $chain 1 -j $target"
+}
+
+jump6() {
+    local chain=$1
+    if ip6tables -C "$chain" -j CHIMERA6 2>/dev/null; then
+        echo "-D $chain -j CHIMERA6"
+    fi
+    echo "-I $chain 1 -j CHIMERA6"
+}
+
+iptables-restore --noflush <<EOF
+*raw
+:CHIMERA_RAW - [0:0]
+-F CHIMERA_RAW
+-A CHIMERA_RAW -i drak+ -s 0.0.0.0/32 -p udp --sport 68 --dport 67 -j RETURN
+-A CHIMERA_RAW -i drak+ -m rpfilter --invert -j DROP
+-A CHIMERA_RAW -i $H ! -s $NIP/32 -j DROP
+$(jump raw PREROUTING CHIMERA_RAW)
+COMMIT
+*nat
+:CHIMERA_DNAT - [0:0]
+-F CHIMERA_DNAT
+-A CHIMERA_DNAT -i drak+ -p udp --sport 68 --dport 67 -j RETURN
+-A CHIMERA_DNAT -i drak+ -p tcp -j DNAT --to-destination $NIP
+-A CHIMERA_DNAT -i drak+ -p udp -j DNAT --to-destination $NIP
+-A CHIMERA_DNAT -i drak+ -p icmp -j DNAT --to-destination $NIP
+$(jump nat PREROUTING CHIMERA_DNAT)
+COMMIT
+*filter
+:CHIMERA_GUARD - [0:0]
+:CHIMERA_IN - [0:0]
+-F CHIMERA_GUARD
+-F CHIMERA_IN
+-A CHIMERA_GUARD -i drak+ -o $H -d $NIP/32 -j ACCEPT
+-A CHIMERA_GUARD -i $H -o drak+ -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+-A CHIMERA_GUARD -i drak+ -m limit --limit 6/min -j LOG --log-prefix "CHIMERA-EGRESS-DROP "
+-A CHIMERA_GUARD -i drak+ -j DROP
+-A CHIMERA_GUARD -o drak+ -j DROP
+-A CHIMERA_GUARD -i $H -j DROP
+-A CHIMERA_GUARD -o $H -j DROP
+-A CHIMERA_IN -i $H -j DROP
+-A CHIMERA_IN -i drak+ -p udp --sport 68 --dport 67 -j ACCEPT
+-A CHIMERA_IN -i drak+ -j DROP
+$(jump filter FORWARD CHIMERA_GUARD)
+$(jump filter INPUT CHIMERA_IN)
+COMMIT
+EOF
+iptables -P FORWARD DROP
+
+ip6tables-restore --noflush <<EOF
+*filter
+:CHIMERA6 - [0:0]
+-F CHIMERA6
+-A CHIMERA6 -i drak+ -j DROP
+-A CHIMERA6 -o drak+ -j DROP
+-A CHIMERA6 -i $H -j DROP
+-A CHIMERA6 -o $H -j DROP
+$(jump6 INPUT)
+$(jump6 FORWARD)
+COMMIT
+EOF
+
+if [[ $RULES_ONLY -eq 0 ]]; then
+    # Needed for DNAT to the namespace; safe because FORWARD is default-DROP and guarded.
+    echo 1 > /proc/sys/net/ipv4/ip_forward
+    exec "$(dirname "$0")/chimera-net-check"
+else
+    exec "$(dirname "$0")/chimera-net-check" --rules-only
+fi

@@ -1,6 +1,6 @@
-# Containment Change Proposal (M2b) — v2, NOT YET APPLIED
+# Containment Change Proposal (M2b) — v2, APPLIED 2026-10-19
 
-**Date:** 2026-10-19 · **Status:** awaiting approval · **Addresses:** threat-model T2, T3, T6 (risks R1, R2, R3, R11 in `RECON-2026-10-19.md`)
+**Date:** 2026-10-19 · **Status:** applied and verified; see `containment-results-2026-10-19.md` (C-1…C13 PASS, plus implementation changes found during testing: bridge netfilter disabled, Xen physdev rules tolerated by the checker) · **Addresses:** threat-model T2, T3, T6 (risks R1, R2, R3, R11 in `RECON-2026-10-19.md`)
 **Estimated effort:** ~3–4 h including tests · **Reversible:** yes (§6), no reboot required.
 **Review:** v1 was adversarially reviewed by Codex (read-only). Accepted findings are folded in; see §8.
 
@@ -10,20 +10,7 @@ A guest must be able to "see an Internet" (DNS, HTTP/S, SMTP, …) but every pac
 
 ## 2. Design
 
-```
- Guest vm-N ── drakN (10.13.N.1/24, one vif per bridge) ─┐
-   raw    PREROUTING CHIMERA_RAW : drak+ sources must pass reverse-path check (anti-spoofing; DHCP 0.0.0.0 excepted)
-   nat    PREROUTING CHIMERA_DNAT: all TCP/UDP/ICMP from drak+ → 10.99.0.2 (DHCP 68→67 excepted)
-   filter FORWARD    CHIMERA_GUARD (position 1): drak+ → inetsim0 dst 10.99.0.2 ACCEPT; replies ESTABLISHED ACCEPT;
-                                                 everything else touching drak+ or inetsim0 LOG + DROP; policy DROP
-   filter INPUT      CHIMERA_IN (position 1): drak+ only DHCP 68→67; inetsim0 nothing
-   ip6tables         CHIMERA6: drop all IPv6 on drak+ and inetsim0
-                                                         ▼
-                              inetsim0 10.99.0.1/30 (IPv6 disabled)
-                                                         │ veth
-          netns "chimera-inet": inetsim-ns 10.99.0.2/30 (IPv6 disabled) ── INetSim under systemd sandbox
- VNC/websocket → 127.0.0.1 · system dnsmasq disabled (host resolver = router; only guests used it)
-```
+The deployed topology diagram (Mermaid) is in `containment-results-2026-10-19.md`. In summary: guest packets on `drakN` pass `raw` anti-spoofing (rpfilter), then `nat` DNAT of all TCP/UDP/ICMP to INetSim at 10.99.0.2, then the `CHIMERA_GUARD` FORWARD chain (default DROP; only drakN → inetsim0 → 10.99.0.2 accepted). `CHIMERA_IN` allows guests only DHCP to dom0; `CHIMERA6` drops all IPv6; INetSim runs in netns `chimera-inet` with no default route.
 
 The transit subnet moved from 10.13.255.0/30 (v1) to **10.99.0.0/30** because drakrun allows VM id 255, whose bridge network 10.13.255.0/24 would collide.
 

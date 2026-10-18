@@ -1,0 +1,15 @@
+[Unit]
+Description=CHIMERA guest containment (INetSim netns + fail-closed firewall)
+Documentation=file:///home/shreyas/Documents/chimera/chimera-console/docs/chimera/containment-proposal.md
+After=network-pre.target xen-init-dom0.service
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/chimera-net-up
+# Refuses (and leaves the guard in place) while analysis domains are running.
+ExecStop=/usr/local/sbin/chimera-net-down
+
+[Install]
+WantedBy=multi-user.target
