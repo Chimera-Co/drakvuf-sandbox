@@ -3,6 +3,7 @@ import json
 import logging
 import pathlib
 import subprocess
+import time
 from typing import Any, Dict, List, Optional, Protocol
 
 from drakrun.lib.config import DrakrunConfig, NetworkConfigSection, load_config
@@ -219,6 +220,7 @@ def analyze_file(
 
     drakvuf_returncode = None
     drakvuf_hard_timeout = False
+    drakvuf_runtime_s = None
     with run_vm(
         vm_id, install_info, network_conf, no_restore=options.no_vm_restore
     ) as vm:
@@ -396,6 +398,7 @@ def analyze_file(
                 ) as drakvuf,
             ):
                 log.info("Analysis started...")
+                drakvuf_started = time.monotonic()
                 try:
                     # -t should be respected, but let's give 30 more secs
                     if options.timeout is not None:
@@ -408,6 +411,7 @@ def analyze_file(
                     drakvuf.terminate()
                     drakvuf.wait(10)
                 drakvuf_returncode = drakvuf.returncode
+                drakvuf_runtime_s = time.monotonic() - drakvuf_started
         except KeyboardInterrupt:
             log.info("Interrupted with CTRL-C, analysis finished.")
 
@@ -416,7 +420,12 @@ def analyze_file(
 
     extra_metadata = postprocess_analysis_dir(output_dir, config, metadata)
     extra_metadata["telemetry"] = summarize_telemetry(
-        output_dir, options.plugins, drakvuf_returncode, drakvuf_hard_timeout
+        output_dir,
+        options.plugins,
+        drakvuf_returncode,
+        drakvuf_hard_timeout,
+        drakvuf_runtime_s=drakvuf_runtime_s,
+        analysis_timeout_s=options.timeout,
     )
 
     if substatus_callback is not None:

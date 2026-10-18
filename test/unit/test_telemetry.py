@@ -64,3 +64,39 @@ def test_postprocess_records_ok_skipped_and_failed(monkeypatch, tmp_path):
         "broken_step": "failed: ValueError",
         "needs_missing_file": "skipped",
     }
+
+
+def test_clean_full_window_run_is_complete(tmp_path):
+    (tmp_path / "procmon.log").write_text("x")
+    (tmp_path / "drakvuf_stderr.log").write_text("1792364447.257430 DRAKVUF v1.1-da982ab Copyright\n")
+    summary = telemetry.summarize_telemetry(
+        tmp_path, ["procmon"], 0, False, drakvuf_runtime_s=131.0, analysis_timeout_s=120
+    )
+    assert summary["complete"] is True
+    assert summary["drakvuf_exited_early"] is False
+    assert summary["drakvuf_errors"] == []
+
+
+def test_returncode_zero_with_critical_error_is_not_complete(tmp_path):
+    # Observed on this host: DRAKVUF prints a critical error and still exits 0.
+    (tmp_path / "procmon.log").write_text("x")
+    (tmp_path / "drakvuf_stderr.log").write_text(
+        "DRAKVUF v1.1\nCritical error in re-copying remapped gfn\nFailed to refresh shadow copy\n"
+    )
+    summary = telemetry.summarize_telemetry(
+        tmp_path, ["procmon"], 0, False, drakvuf_runtime_s=131.0, analysis_timeout_s=120
+    )
+    assert summary["complete"] is False
+    assert summary["drakvuf_errors"] == [
+        "Critical error in re-copying remapped gfn",
+        "Failed to refresh shadow copy",
+    ]
+
+
+def test_early_exit_is_flagged(tmp_path):
+    (tmp_path / "procmon.log").write_text("x")
+    summary = telemetry.summarize_telemetry(
+        tmp_path, ["procmon"], 0, False, drakvuf_runtime_s=40.0, analysis_timeout_s=120
+    )
+    assert summary["drakvuf_exited_early"] is True
+    assert summary["complete"] is False
