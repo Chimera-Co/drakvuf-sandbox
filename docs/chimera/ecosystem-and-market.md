@@ -110,6 +110,11 @@ Key literature already in `Chimera-docs/Research_Papers`: Ether (2008, hardware-
 | Auto-hardening "suggester/doer"? | **Suggester only, stretch:** map each failed PERDEDOR check to the `xl.cfg` knob that fixes it. No auto-apply. |
 | MS-360 study? | One comparison slide (this table), positioned as breadth (MS-360) versus evasion depth (CHIMERA). |
 
+### 4.4 Verification tooling and network simulation (added 2026-10-19, night)
+- **VMAware** advertises roughly 80–90+ detection techniques depending on version/port ([GitHub](https://redirect.github.com/kernelwernel/VMAware), [docs.rs port](https://docs.rs/vmaware)) **[S]**. The historical "0/93" figure must be re-baselined against a *pinned* VMAware release on the current Xen guest, not quoted.
+- **al-khaser** (the bundled build) is dynamically linked against the VC++ 2015–2022 runtime (`MSVCP140`, `VCRUNTIME140`, `VCRUNTIME140_1` imports) **[V]**. The current guest lacks it, which is why every check "errored". The VC++ x64 redistributable belongs in the golden image.
+- **FakeNet-NG** adds content-based protocol detection on arbitrary ports, which INetSim's dummy services lack ([Mandiant](https://cloud.google.com/blog/topics/threat-intelligence/fakenet-content-based-protocol-detection), [REMnux](https://docs.remnux.org/discover-the-tools/explore+network+interactions/services)) **[S]**. It is a credible future-work replacement for INetSim inside the same isolated namespace, addressing the "C2 behaviour under-observed" limitation.
+
 ## 5. Risks discovered in this research
 
 - **DRAKVUF/Xen version skew** (installed Xen 4.19.2 vs DRAKVUF's 4.20.1 pin): don't upgrade either before 31 Oct unless a blocker forces it. Record versions in every analysis.
