@@ -1,0 +1,18 @@
+[Unit]
+Description=CHIMERA drakrun analysis worker for vm-%i
+Documentation=file:///home/shreyas/Documents/chimera/chimera-console/docs/chimera/containment-results-2026-10-19.md
+# No analysis may run without the containment guard and INetSim.
+Requires=chimera-net.service chimera-inetsim.service redis-server.service
+After=chimera-net.service chimera-inetsim.service redis-server.service xen-init-dom0.service
+
+[Service]
+Type=simple
+ExecStartPre=/usr/local/sbin/chimera-net-check --require-inetsim
+ExecStart=/opt/chimera/venv/bin/drakrun worker --vm-id %i
+Restart=on-failure
+RestartSec=10
+# drakrun manages Xen domains, bridges and iptables: it needs root.
+User=root
+
+[Install]
+WantedBy=multi-user.target

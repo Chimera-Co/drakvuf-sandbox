@@ -9,17 +9,15 @@ CHIMERA deliberately executes hostile code. The platform is therefore itself a s
 
 ## 1. System and trust boundaries
 
-```
- Analyst browser ──(B1)──▶ drak-web (Flask/gunicorn, dom0) ──▶ Redis ──▶ drakrun worker (root, dom0)
-                                                                              │
-          ┌───────────────────────────────────────────────────────────────────┤
-          │ (B2) hypervisor boundary: Xen 4.19.2, qemu-xen device model (dom0) │
-          ▼                                                                   ▼
-   Guest domU (Windows 10, HOSTILE) ──(B3) network: bridge drakN ──▶ dom0 iptables ──▶ INetSim  (today: Internet + LAN!)
-          │
-          └──(B4) data: drakshell serial socket, injector, DRAKVUF/LibVMI reads, VNC, plugin logs, PCAP, memdumps
-                         ──▶ parsers/postprocessors (root) ──▶ reports ──▶ analyst browser (B5)
- Repo (PUBLIC on GitHub) ──(B6)──▶ code that root executes
+```mermaid
+flowchart LR
+    A["Analyst browser"] -->|"B1: HTTP :5000, VNC ws :640x"| W["drak-web<br/>(gunicorn, 127.0.0.1)"]
+    W --> R[("Redis / RQ")] --> K["drakrun worker<br/>(root, dom0)"]
+    K -->|"B2: hypervisor boundary<br/>Xen 4.19.2 + qemu-xen"| G["Guest domU<br/>Windows 10 — HOSTILE"]
+    G -->|"B3: network, bridge drakN"| F["dom0 iptables<br/>CHIMERA chains"] --> I["INetSim netns"]
+    G -->|"B4: drakshell, injector, VMI reads,<br/>plugin logs, PCAP, memdumps"| P["parsers / postprocessors<br/>(root)"]
+    P -->|"B5: reports"| A
+    S["Repo (PUBLIC on GitHub)"] -->|"B6: code executed as root"| K
 ```
 
 | ID | Boundary | Crossed by |

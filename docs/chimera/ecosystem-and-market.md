@@ -6,20 +6,26 @@
 
 ## 1. The stack we stand on (verified from this repo and host)
 
-```
- ┌──────────────────────────── CHIMERA (our fork: Chimera-Co/drakvuf-sandbox) ───────────────────────────┐
- │  React 19 UI (rebranded) · Flask API · evasion API/UI · scoring · PERDEDOR + al-khaser adapters          │
- ├───────────────────────── drakrun = CERT-Polska drakvuf-sandbox v0.21.0 (upstream HEAD 7c328ab) ─────────┤
- │ RQ queue (Redis) · VM lifecycle (xl) · per-VM bridge/dnsmasq/iptables · injector · drakshell (guest helper) │
- │ screenshotter (asyncvnc + Perception) · postprocess: process tree, TTPs, HTTP/socket info, capa, TLS keys  │
- │ profiles: drakpdb (PDB → JSON) · optional S3 (boto3) · experimental Karton plugin (karton-core)             │
- ├──────────────────────────── DRAKVUF v1.1-da982ab (tklengyel/drakvuf, built from /opt/drakvuf) ─────────────┤
- │ 36 plugins compiled in, incl. apimon procmon filetracer socketmon tlsmon memdump regmon syscalls           │
- │ hidsim hidevm cpuidmon envmon wmimon fileextractor  (+ Linux: ebpfmon ptracemon unixsocketmon)             │
- ├──────────── LibVMI df8547f · Volatility3 + dwarf2json (profiles) — DRAKVUF submodules ─────────────────────┤
- ├──────────── Xen 4.19.2 (host, built 2 Sep)  ⚠ DRAKVUF's own submodule pins Xen RELEASE-4.20.1 ──────────────┤
- │ qemu-xen 8.0.5 device model · hvmloader (SMBIOS/ACPI defaults "Xen")                                       │
- └────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph C["CHIMERA — our fork (Chimera-Co/drakvuf-sandbox)"]
+        C1["React 19 UI (rebranded) · evasion API/UI · scoring · PERDEDOR + al-khaser adapters"]
+    end
+    subgraph D["drakrun = CERT-Polska drakvuf-sandbox v0.21.0 (upstream HEAD 7c328ab)"]
+        D1["RQ queue (Redis) · VM lifecycle (xl) · per-VM bridge, dnsmasq, iptables · injector · drakshell"]
+        D2["screenshotter (asyncvnc + Perception) · postprocess: process tree, TTPs, HTTP/socket, capa, TLS keys"]
+        D3["profiles: drakpdb · optional S3 (boto3) · experimental Karton plugin"]
+    end
+    subgraph V["DRAKVUF v1.1-da982ab (tklengyel/drakvuf, /opt/drakvuf)"]
+        V1["36 plugins: apimon procmon filetracer socketmon tlsmon memdump regmon syscalls<br/>hidsim hidevm cpuidmon envmon wmimon fileextractor · Linux: ebpfmon ptracemon unixsocketmon"]
+    end
+    subgraph L["LibVMI df8547f · Volatility3 + dwarf2json (kernel profiles)"]
+        L1[" "]
+    end
+    subgraph X["Xen 4.19.2 (host) — DRAKVUF's own submodule pins 4.20.1"]
+        X1["qemu-xen 8.0.5 device model · hvmloader (SMBIOS/ACPI defaults 'Xen')"]
+    end
+    C --> D --> V --> L --> X
 ```
 
 | Component | Upstream | Pinned/installed | Role in CHIMERA | Notes |
