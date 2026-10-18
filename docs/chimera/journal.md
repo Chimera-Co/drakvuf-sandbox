@@ -17,8 +17,9 @@ Evidence paths under `/var/lib/chimera-evidence/` are on the CHIMERA host (root-
 | 03:14–03:20 | Fixes: device-model reaping, restore inside cleanup, per-VM flock, drakshell connect timeout; telemetry completeness in metadata | `21fdc32`, `846754f` |
 | 03:20 | Codex: evasion status consistency, guest-output caps, PERDEDOR report integrity, coverage guard (reviewed; exit-code semantics verified against a real run) | `bec004b` |
 | 03:21–03:25 | Root-owned deployment `/opt/chimera/{src,venv}`; systemd units for web (127.0.0.1) and worker (requires containment check) | `4c39210`, `4944a32` |
-| 03:26– | Benign reliability series (10× BGInfo via API → RQ → worker) | `benign-series-2026-10-19/` |
+| 03:26–03:52 | Benign reliability series: **10/10 finished**, submit→done 153.0 ± 4.0 s, 0 leftover domains/qemu, 0 egress drops | `benign-series-2026-10-19/`, `benign-series-2026-10-19.md` |
 | 03:30 | al-khaser root cause: binary needs VC++ 2015–2022 runtime missing in guest → all checks "errored" | `/var/lib/drakrun/evasion/e1a35994…/raw/alkhaser/stdout.txt` |
+| 03:50 | Codex task 04 (DRAKVUF-attached verification) **rejected at review**: injector file transfers inside the DRAKVUF window conflict (one VMI monitor per domain); redesign as stage/execute/collect phases sent back | scratchpad brief 05 |
 | 03:35 | M4 design + H1 profile + arm switching; DRAKVUF `cpuidmon -s` verified from source to hide CPUID hypervisor bit + Xen leaves | `hardening-design.md`, `a70b8d9` |
 
 ## Decisions
