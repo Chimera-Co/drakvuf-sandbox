@@ -146,6 +146,8 @@ failures in 6 scans. Both failed at the breakpoint-byte read with "physical addr
 `0x563059962ac0` and `0x5609f1936820` (DRAKVUF heap pointers), while both the original and
 the shadow page mapped normally.
 
+Upstream issue and PR drafts (not submitted): `docs/chimera/upstream/drakvuf-refresh-shadow-copy-uaf.md`.
+
 **Fix** (`scripts/chimera/patches/drakvuf-da982ab-refresh-shadow-copy-stale-trap-list.patch`,
 applies to da982ab and b2f64d8): keep the original condition (refresh only after a
 write to a page that had breakpoints, `pass->traps` used as a flag only), walk the
