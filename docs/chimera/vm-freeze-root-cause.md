@@ -161,10 +161,13 @@ refreshed after reads too (one page read 1.5 million times, run 277 s instead of
 | da982ab + fix (diagnostic logging) | **20/20** | 96–116 s per scan; the stale-list case occurred 11 times and was handled |
 | da982ab + fix (clean build, `drakvuf-da982ab-chimera1`, sha256 `d04230a0…2867e0bf`) | **5/5** | 106–111 s per scan |
 
-The clean build runs for the evasion worker only (systemd drop-in
-`/etc/systemd/system/drakrun-evasion-worker@.service.d/chimera-diag.conf` puts
-`/opt/chimera/drakvuf-diag/bin` first in `PATH`). Portal analyses still use the unpatched
-`/usr/local/bin/drakvuf` until the owner decides to install it there.
+**Installed 2026-10-19 18:39** as `/usr/local/bin/drakvuf` for analyses and evasion
+scans (owner's decision); the original is kept as `/usr/local/bin/drakvuf.orig-da982ab`
+(sha256 `0ff87cee…406ac5a8`). The temporary evasion-only systemd drop-in was removed (kept
+as `/var/lib/chimera-evidence/apimon-2026-10-19/chimera-diag.conf.removed`). Check: BGInfo
+portal analysis `41d079cc` complete, full 120 s, rc 0, 8/9 plugins (clipboardmon empty
+as always). Rollback: `sudo install -m 755 /usr/local/bin/drakvuf.orig-da982ab
+/usr/local/bin/drakvuf` (next DRAKVUF start).
 
 ## Injector readfile race
 
