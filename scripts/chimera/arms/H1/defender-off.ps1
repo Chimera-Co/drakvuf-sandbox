@@ -24,7 +24,9 @@ $values = @{
     'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' = @{ EnableSmartScreen = 0 }
 }
 foreach ($key in $values.Keys) {
-    New-Item -Path $key -Force | Out-Null
+    # Not New-Item -Force: on an existing key that means "replace it", which Defender refuses
+    # for its own policy key, so none of the values below were written (found 2026-10-19).
+    if (-not (Test-Path $key)) { New-Item -Path $key | Out-Null }
     foreach ($name in $values[$key].Keys) {
         New-ItemProperty -Path $key -Name $name -Value $values[$key][$name] -PropertyType DWord -Force | Out-Null
     }

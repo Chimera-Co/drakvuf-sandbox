@@ -34,6 +34,8 @@ def main() -> int:
     # script gets its own path, and it is deleted afterwards so it isn't in the snapshot.
     parser.add_argument("--guest-path", default=None)
     parser.add_argument("--upload", action="append", default=[], metavar="HOST_PATH=GUEST_PATH")
+    # Passed to the script after -File, e.g. --arg=-WhatIf (repeatable).
+    parser.add_argument("--arg", action="append", default=[], dest="script_args")
     args = parser.parse_args()
     guest_path = args.guest_path or rf"C:\Users\Public\chimera-{args.script.name}"
 
@@ -52,7 +54,7 @@ def main() -> int:
     shell = Drakshell(vm.vm_name)
     shell.connect(timeout=10)
     process = shell.run_interactive(
-        ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", guest_path],
+        ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", guest_path, *args.script_args],
         None,
         sys.stdout,
         sys.stderr,
