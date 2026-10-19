@@ -1,6 +1,6 @@
 # Xen Guest Hardening — Design and Experiment Plan (M4)
 
-**Date:** 2026-10-19 · **Status:** H1 snapshot live since 07:49 (steps 1–4 below; validated 15/15 on restore, `journal.md` 07:52). Runtime arms (step 5) measured in §6. Not done: hvmloader ACPI patch (step 6) · **Depends on:** containment (done), lifecycle fixes (done), guest-freeze and DRAKVUF UAF fixes (done, `vm-freeze-root-cause.md`)
+**Date:** 2026-10-19, updated 2026-10-20 · **Status:** live arm H3 since 2026-10-20 02:08 (H2 host firmware IDs + everyday applications; validated 17/17; PERDEDOR score 100.0, al-khaser 20 detections per scan, §7). `cpuidmon -s` and `hidsim` in production since 2026-10-19 21:59 (§6) · **Depends on:** containment (done), lifecycle fixes (done), guest-freeze and DRAKVUF UAF fixes (done, `vm-freeze-root-cause.md`)
 
 ## 1. Problem (measured, not assumed)
 
@@ -87,19 +87,19 @@ Still detected in every arm, by cause:
 
 | Cause | Checks | Fix |
 |---|---|---|
-| ACPI OEM ID `Xen` from hvmloader (Windows shows it as `Win32_BIOS.Version = "Xen - 0"`) | PERDEDOR `smbios_vendor`, `registry_artifacts` (`HARDWARE\ACPI\DSDT\Xen`); al-khaser `firmware_acpi` | H2: patched hvmloader (§7) |
-| SMBIOS type 11 OEM string defaults to `Xen` (H1 sets no `oem=`) | likely al-khaser `number_smbios_tables` (raw SMBIOS scan) | H2: `oem=` entries (§7) |
-| Enum entries of devices from earlier boots (Xen platform PCI, QEMU disk) | al-khaser `Enum\PCI\VEN_5853*`, `registry_disk_enum` | H2: `phantom-devices.ps1` (§7) |
-| Few installed programs | PERDEDOR `installed_programs` (8, needs ≥ 20) | guest realism, needs offline installers (owner) |
-| QEMU strings in ACPI tables (source not yet located) | al-khaser `qemu_firmware_acpi` | re-measure on H2 |
+| ACPI OEM ID `Xen` from hvmloader (Windows shows it as `Win32_BIOS.Version = "Xen - 0"`) | PERDEDOR `smbios_vendor`, `registry_artifacts` (`HARDWARE\ACPI\DSDT\Xen`); al-khaser `firmware_acpi` | H2 (§7.1): both PERDEDOR checks **fixed**; `firmware_acpi` still detected |
+| SMBIOS type 11 OEM string defaults to `Xen` (H1 sets no `oem=`) | likely al-khaser `number_smbios_tables` (raw SMBIOS scan) | H2 sets `oem=` (§7); still detected, so probably not the string (§7.1) |
+| Enum entries of devices from earlier boots (Xen platform PCI, QEMU disk) | al-khaser `Enum\PCI\VEN_5853*`, `registry_disk_enum` | **fixed on H2** (`phantom-devices.ps1`, §7.1) |
+| Few installed programs | PERDEDOR `installed_programs` (8, needs ≥ 20) | **fixed on H3** (§7.2, 32 programs) |
+| QEMU strings in ACPI tables (source not yet located) | al-khaser `qemu_firmware_acpi` | still detected on H2 (§7.1) |
 | No sensors/fans/thermal WMI classes in a VM | 13 al-khaser `*_wmi` checks | residual (would need emulated ACPI thermal devices) |
 | Hyper-V objects present in the Windows image | al-khaser `hyperv_driver_objects`, `hyperv_global_objects` | residual (Windows component, not the hypervisor) |
 | Sample launched by drakshell, not explorer | al-khaser `parent_is_explorer` | residual of the injection path |
 | VM-exit cost | al-khaser `rdtsc_diff_vmexit` | residual (§4) |
 
-## 7. H2: next snapshot (staged, needs one owner session)
+## 7. H2: host firmware IDs (live 2026-10-20 00:19–02:08, now the rollback for H3)
 
-Everything below is built and checked but **not applied**; the live arm is still H1.
+What H2 adds to H1:
 
 - `scripts/chimera/patches/xen-4.19.2-libacpi-host-oem-ids.patch`: ACPI OEM ID, table ID, revision and creator
   set to the host laptop's values (`ACRSYS`, `ACRPRDCT`, 2, `1025`/0x40000, read from `/sys/firmware/acpi/tables`).
@@ -121,6 +121,74 @@ Procedure (owner present for the Windows login):
 4. `drakrun modify-vm0 commit`, `chimera-arm adopt`, `validate_arm.py` on vm-1.
 5. `RUNS=5 scripts/chimera/bench/m4/arms.sh H1`: its `H1` arm runs the config as it is, which now includes `-s` and `hidsim`. Compare with the H1SH column above.
 6. Rollback: `chimera-arm use H1` (H1 files are untouched).
+
+### 7.1 Results (2026-10-19 22:15 – 2026-10-20 01:03)
+
+Steps 1–3 went as planned (`acpi_oem_version=ACRSYS - 2`, `phantom_vm_devices=0`). Getting a clean snapshot took
+three commits, because how explorer was started showed up in al-khaser (5 scans each, all complete and attached,
+491–522 s; evidence `/var/lib/chimera-evidence/m4-h2{,b,c}-*`):
+
+| Snapshot | explorer.exe started by | al-khaser / scan | PERDEDOR / scan | Detections not on H1SH |
+|---|---|---|---|---|
+| H1SH (§6) | logon | 22.2 | 3 | – |
+| H2a, 22:50 | OneDrive, after it updated itself | 21 | 1 | `scan_modules_ldr_enumerate` 5/5 |
+| H2b, 23:32 | a scheduled task | 21 | 1 | `process_in_job` 5/5 |
+| **H2c, 00:19 (live)** | **winlogon** | **20** | **1** | none |
+
+- **Cleared by H2 (5/5 → 0/5 in every H2 snapshot):** PERDEDOR `smbios_vendor` and `registry_artifacts`;
+  al-khaser `Enum\PCI\VEN_5853` (`generic_bd4346103f8ecbf3`) and `registry_disk_enum`. PERDEDOR score 95.0 → 99.48.
+- **H2a, injected libraries:** OneDrive restarted explorer as its own child and explorer inherited OneDrive's
+  `SetDllDirectory`. drakshell runs inside explorer, so the samples it starts loaded `msvcp140`/`vcruntime140`
+  from OneDrive's folder, and al-khaser reported them as injected.
+- **H2b, job object:** explorer restarted from a scheduled task runs inside the Task Scheduler's job, which
+  does not allow breakaway, so every sample also runs in a job.
+- **H2c fix** (`H1/explorer-clean-restart.ps1`): a detached process force-stops explorer and activates
+  explorer's COM class; winlogon then restarts the shell as at logon. `H1/explorer-state.ps1` checks the result:
+  parent `winlogon.exe`, `child_in_job=False`, empty `child_dll_directory`. Run it before every commit.
+- **Defender came back on after the cold boot.** `defender-off.ps1` used `New-Item -Force` on the existing
+  policy key, which means "replace the key"; Defender refuses that for its own key, so no policy value had been
+  written, and Windows re-enabled real-time protection within minutes. Fixed in `5e6d1d1`; protection then
+  stayed off for the 8 minutes checked, and through the commit.
+- **Still detected on H2c (5/5):** al-khaser `firmware_acpi`, `qemu_firmware_acpi` and `number_smbios_tables`
+  are unchanged by the new IDs and strings. They probably count tables (H2 has 6 ACPI tables, including the
+  VM-only `WAET`, and 15 SMBIOS structures) rather than match strings; not yet verified. Also unchanged: the 13
+  WMI sensor checks, the 2 Hyper-V object checks, `parent_is_explorer` and `rdtsc_diff_vmexit` (§6), and
+  PERDEDOR `installed_programs` (8, needs ≥ 20; §7.2).
+
+### 7.2 H3: everyday applications (live 2026-10-20 02:08)
+
+H3 is H2 with 14 everyday applications installed machine-wide, for PERDEDOR `installed_programs`: Chrome,
+Firefox, 7-Zip, VLC, Notepad++, LibreOffice, Zoom, Python, Git, VS Code, Audacity, PuTTY, Temurin JRE and the
+x86 VC++ runtime. The owner approved the downloads on 2026-10-20. H2 is kept unchanged as the rollback.
+
+1. `scripts/chimera/arms/fetch-apps.sh DIR` downloads the installers from the vendors' sites (1.3 GB).
+2. `chimera-arm clone H2 H3`, `chimera-arm use H3`, `drakrun modify-vm0 begin` (warm: the snapshot is signed in).
+3. `provision_guest.py --upload-timeout 900 --upload FILE=<profile>\Downloads\FILE … H1/install-apps.ps1`,
+   first with `--arg=-CheckOnly`: every installer must have a valid Authenticode signature (13 do; 7-Zip does
+   not sign its installers and is checked against the sha256 GitHub publishes for the release). The installers
+   stay in Downloads, as a user's would. The script switches the Google and Mozilla updaters off afterwards.
+4. **`H1/wait-idle.ps1`**, then `explorer-state.ps1` and the Defender check; then commit, adopt, validate and
+   5 scans as in §7.
+
+Results (5 scans each, all complete and attached, 501–562 s; evidence `m4-h3-2026-10-20/`, `m4-h3b-2026-10-20/`):
+
+| Snapshot | Uninstall entries | PERDEDOR / scan | al-khaser / scan | `nt_yield_execution` | backgroundTaskHost starts / scan |
+|---|---|---|---|---|---|
+| H2c (§7.1) | 8 | 1 (score 99.48) | 20 | 0/5 | – |
+| H3a, committed 1 min after the installs | 32 | **0 (score 100.0)** | 21 | **5/5** | 9 |
+| **H3b, committed after the guest went idle (live)** | 32 | **0 (score 100.0)** | **20** | **0/5** | 1–2 |
+
+- **Installed programs cleared:** PERDEDOR reports "32 programs" (threshold 20) and no detections at all.
+- **Settle before commit.** The installs left Windows work queued: search indexing, a Start-menu background task,
+  EdgeUpdate, Update Orchestrator with TiWorker. H3a was committed before that work ran, so every analysis
+  replayed it. In the H3a scans, backgroundTaskHost, RuntimeBroker, EdgeUpdate and MoUsoCoreWorker started while
+  al-khaser ran. Its `NtYieldExecution` check then found other threads ready to run and reported a debugger, 5/5.
+  In an idle modify session the same tasks ran within 5 minutes and stopped. H3b was committed after that, and
+  the detection is gone. `wait-idle.ps1` now waits for 4 quiet 30 s windows. On H3b it reported idle within
+  2 minutes.
+- **Guest clock (found here, not fixed):** inside every analysis the guest clock is the snapshot's (al-khaser's
+  guest log and PERDEDOR's report were 2 h 11 min behind the host on the H2c scans). drakrun does not set the
+  guest time after restoring, so the gap grows as the snapshot ages.
 
 ## 8. Sources
 - Xen 4.19.2 `xl.cfg` manual on this host: `smbios`, `xen_platform_pci`, `viridian`, `cpuid`, `device_model_args_hvm`.

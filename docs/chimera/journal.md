@@ -52,6 +52,22 @@ Evidence paths under `/var/lib/chimera-evidence/` are on the CHIMERA host (root-
 | 19:30–20:10 | Remaining H1 detections traced: `Win32_BIOS.Version = "Xen - 0"` is the ACPI OEM ID from hvmloader (also `HARDWARE\ACPI\DSDT\Xen`); SMBIOS type 11 defaults to `Xen`; Enum entries of the Xen platform device and QEMU disk survive from earlier boots | `hardening-design.md` §6 |
 | 21:59–22:10 | `-s` + `cpuidmon` + `hidsim` enabled in production `config.toml` (backup kept); `hidsim` no longer listed as a missing plugin. BGInfo portal analysis complete, all plugins produced. `drakrun-web` restarted: it fixes an upload's plugins from the config it loaded at start | `512b6e5`, analysis `95f9e10c` |
 | 21:57–22:08 | H2 staged, not applied: hvmloader with the host's ACPI IDs built as a separate file (stock untouched) and booted in a throwaway domain, all ACPI headers `ACRSYS`/`ACRPRDCT`; H2 `cfg.template` (+ SMBIOS OEM strings) parses; phantom-device cleanup script. Needs one owner session (cold boot + login) | `hardening-design.md` §7 |
+| 22:15–22:50 | **H2 applied** (owner signed in after the cold boot): `ACRSYS - 2` ACPI OEM ID, phantom Xen/QEMU devices removed, committed as H2a. Defender was back on: `defender-off.ps1` had never written its policy values (`New-Item -Force` on Defender's own key); fixed | `5e6d1d1` |
+| 22:51–23:25 | H2a, 5 scans: PERDEDOR `smbios_vendor`, `registry_artifacts` and al-khaser `VEN_5853`, `registry_disk_enum` cleared, but new `scan_modules_ldr_enumerate`: OneDrive had restarted explorer, and samples inherited its DLL directory | `m4-h2-2026-10-19/` |
+| 23:32–00:15 | H2b: explorer restarted from a scheduled task, recommitted; 5 scans: DLL detection gone, new `process_in_job` (Task Scheduler job, no breakaway) | `1644a53`, `m4-h2b-2026-10-19/` |
+
+## 2026-10-20
+
+| Time (IST) | What | Evidence / commit |
+|---|---|---|
+| 00:19 | **H2c live**: explorer force-stopped from a detached process and restarted by winlogon (COM activation); explorer-state check clean (no job, no DLL directory); validated 17/17 | `hardening-design.md` §7.1 |
+| 00:29–01:03 | H2c, 5 scans, 5/5 complete: score 99.48, PERDEDOR 1 detection (`installed_programs`, 8 programs), al-khaser 20 (was 22.2 on H1SH); `process_in_job` and the DLL detection gone | `m4-h2c-2026-10-20/` |
+| 00:57–01:10 | Owner approved 14 everyday-app installers (1.3 GB, vendor sites); downloaded with `fetch-apps.sh`. H2 cloned to H3; warm modify session; 13 installers carry valid vendor signatures, 7-Zip is unsigned and matched its GitHub release digest | `hardening-design.md` §7.2 |
+| 01:05–01:13 | 14 apps installed machine-wide in 291 s, all exit 0; HKLM uninstall entries 8 → 32; Google updater services/task disabled. Explorer from winlogon, Defender off; committed (H3a), validated 17/17 | `43e9d7a` |
+| 01:13–01:55 | H3a, 5 scans: **PERDEDOR 0 detections, score 100.0** ("32 programs"), but al-khaser `nt_yield_execution` 5/5 (H2c 0/5): queued post-install work (backgroundTaskHost ×9, RuntimeBroker, EdgeUpdate, MoUso) replays in every analysis | `m4-h3-2026-10-20/` |
+| 01:40 | Found: the guest clock inside analyses is the snapshot's (2 h 11 min behind on the H2c scans) and drakrun never resets it; not fixed yet | `hardening-design.md` §7.2 |
+| 01:56–02:08 | Warm session: the same tasks ran within 5 min in the idle guest and stopped; recommitted (H3b), validated 17/17 | `hardening-design.md` §7.2 |
+| 02:09–02:50 | **H3b live**, 5 scans 5/5 complete: PERDEDOR 0 (score 100.0), al-khaser 20, `nt_yield_execution` 0/5, backgroundTaskHost 1–2 per scan. `H1/wait-idle.ps1` added and run (idle within 2 min, session rolled back) | `m4-h3b-2026-10-20/` |
 
 ## Decisions
 - **Downloads and real malware stay operator-initiated** (VC++ redistributable, app installers for guest realism, malware samples).

@@ -1,6 +1,7 @@
 #!/bin/bash
 # usage: RUNS=5 arms.sh <arm>...   arms: H1 (config.toml as it is), H1S (+cpuidmon -s), H1SH (+cpuidmon -s +hidsim, mouse moves only)
 S=$(dirname "$0"); CFG=/etc/drakrun/config.toml; EV=${EV:-/var/lib/chimera-evidence/m4-2026-10-19}
+sudo -n mkdir -p "$EV"
 sudo -n cp $CFG $CFG.bak.m4
 restore() { sudo -n cp $CFG.bak.m4 $CFG; sudo -n systemctl restart drakrun-evasion-worker@1
   echo "config restored: $(sudo -n diff -q $CFG $CFG.bak.m4 >/dev/null && echo identical)"; }
