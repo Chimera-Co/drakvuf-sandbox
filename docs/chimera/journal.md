@@ -42,11 +42,15 @@ Evidence paths under `/var/lib/chimera-evidence/` are on the CHIMERA host (root-
 | 10:40 | QEMU 8.0.5 rebuilt without the drain in the invalidate handler (mitigation, original binary kept) → **thin + registry reads 10/10, 276 hooks 10/10** | `bisect-summary.txt` (`qemufix-*`) |
 | 10:59 | Xen 4.19.2 built with the host-p2m guard (root-cause fix); staged, **not installed**, needs an owner reboot | `xen-4.19.2-chimera/`, `27b6aeb` |
 | 11:00–11:15 | Guest-stall watchdog in drakrun (no guest CPU progress for 20 s → stop DRAKVUF, `vm_stalled`, `complete=false`). Live-tested by pausing the guest: evasion scan marked "Guest vCPUs stalled", score withheld; portal analysis `complete=false, vm_stalled=true`; normal BGInfo analysis complete, full 120 s, max stall 0 s. First live test found the 40 s threshold too slow (the verifier's 30 s probe timeout fired first and misreported PERDEDOR as "unsupported") → 20 s | `d637fe5`, `7585336` |
+| 16:32–16:45 | **Owner rebooted into the patched Xen** (build 10:59:32 confirmed by `xl info`); INetSim and web started by hand (not enabled at boot); stock QEMU restored. QEMU mapcache invalidations in a DRAKVUF-attached scan: **24** (was 15k–85k) | `invalidate-counts.txt` |
+| 16:45–17:15 | Patched Xen + stock QEMU, PERDEDOR, DRAKVUF attached: thin + registry reads **10/10**, 276 hooks **10/10**, default full list **10/10 without a freeze** (2 runs: DRAKVUF exit "re-copying remapped gfn", correctly marked incomplete). The QEMU no-drain stop-gap is retired | `bisect-summary.txt` (`xenfix-*`), `xenfix-default.txt` |
+| 16:52–17:21 | Injector readfile race: 4/30 scans lost PERDEDOR's report (`ReadFile` FALSE with last error 0). Bounded retry in `GuestSession.get_file` → 10/10 scans scored; 4 first-attempt failures, all recovered on attempt 2 | `d5e1bad`, `bisect-summary.txt` (`retry-*`) |
 
-
+## Decisions
 - **Downloads and real malware stay operator-initiated** (VC++ redistributable, app installers for guest realism, malware samples).
 - **No host reboot** in autonomous work: the laptop boots Windows by default and needs a manual path into Xen.
 - **Guest login is the owner's step**: the golden image has a password-protected account and no auto-logon; Claude never types guest credentials.
 - **H1 identity mirrors the host laptop model** (consistent with the real CPU exposed by `cpuid=host`); serials are synthetic.
 - ~~Proposed: real-malware runs use the thin apimon hook list~~ (withdrawn 11:20: the freeze is a Xen/QEMU interaction, not the hook count; with the patched QEMU the 276-hook list ran 10/10).
-- **Proposed (team to confirm): keep the full hook list, run the patched QEMU until the patched Xen is booted, then re-test with the stock QEMU.** Every analysis now records `vm_stalled`, so a freeze can no longer pass as a finished run.
+- **Patched Xen (host-p2m guard) + stock QEMU is the platform baseline** from 2026-10-19 16:32; the no-drain QEMU is retired. Every analysis records `vm_stalled`, so a freeze can no longer pass as a finished run.
+- **Proposed (team to confirm): use the 276-hook apimon list (no registry-read hooks) for real-malware runs** until the default list's "re-copying remapped gfn" exit (3/11 vs 0/20) is diagnosed; regmon covers the registry, and every report names the hook list.

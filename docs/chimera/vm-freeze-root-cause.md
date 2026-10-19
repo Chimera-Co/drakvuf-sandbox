@@ -21,6 +21,12 @@ PERDEDOR workload on the H1 arm, DRAKVUF attached; complete = full run, no stall
 | default plugins, apimon thin list + registry-read hooks | 2/6, and 5/10 with `shadow_memory = 384` |
 | **thin list + registry-read hooks, patched QEMU below** | **10/10** |
 | **276 hooks, patched QEMU below** | **10/10** |
+| **thin list + registry-read hooks, patched Xen, stock QEMU** | **10/10** |
+| **276 hooks, patched Xen, stock QEMU** | **10/10** |
+| **default full hook list, patched Xen, stock QEMU** | **10/10 without a freeze**; 8/10 complete (2 DRAKVUF exits, see "Remaining DRAKVUF failure") |
+
+With the patched Xen, QEMU received 24 mapcache invalidations during a DRAKVUF-attached
+scan (16 without DRAKVUF), against 15,000–85,000 before.
 
 Ordinary portal analyses were affected too: of the 10 "finished" benign-series runs on
 2026-10-19 03:28–03:52, four went silent 2–23 s into a 120 s window, and every
@@ -75,42 +81,63 @@ and procmon alone rarely freezes.
 
 | Layer | Change | Status |
 |---|---|---|
-| QEMU 8.0.5 (qemu-xen) | Do not call `bdrv_drain_all()` in `xen_invalidate_map_cache()`; locked (in-flight DMA) mappings are already skipped by that function | **Mitigation.** Installed 2026-10-19, 20/20 runs clean (table above). Original kept as `/usr/local/lib/xen/bin/qemu-system-i386.orig-8.0.5`. Patch: `scripts/chimera/patches/qemu-xen-8.0.5-invalidate-no-drain.patch` |
-| Xen 4.19.2 | Request the mapcache invalidation only when the host p2m changes (`p2m_is_hostp2m`) | **Root-cause fix.** Patch: `scripts/chimera/patches/xen-4.19.2-altp2m-no-mapcache-invalidate.patch`. Built 2026-10-19 from the same tree and `.config` as the running hypervisor (only `p2m.o` changed); staged, not installed, at `/var/lib/chimera-evidence/xen-4.19.2-chimera/xen-4.19.2-chimera.gz` (sha256 `706f6d24…e6577ee389`). Needs a host reboot (owner) |
-| drakrun | Guest-CPU stall watchdog: a guest with no CPU progress for 20 s (sampled every 2 s; healthy guests never exceed ~2 s) while DRAKVUF is attached stops DRAKVUF and marks telemetry `complete=false` (`vm_stalled`) instead of silently truncating | Code + tests in this repo |
+| QEMU 8.0.5 (qemu-xen) | Do not call `bdrv_drain_all()` in `xen_invalidate_map_cache()`; locked (in-flight DMA) mappings are already skipped by that function | **Mitigation, no longer in use.** Ran 2026-10-19 10:40–16:35, 20/20 runs clean. Stock QEMU restored after the Xen fix was booted; the patched binary is kept as `/usr/local/lib/xen/bin/qemu-system-i386.chimera-nodrain`. Patch: `scripts/chimera/patches/qemu-xen-8.0.5-invalidate-no-drain.patch` |
+| Xen 4.19.2 | Request the mapcache invalidation only when the host p2m changes (`p2m_is_hostp2m`) | **Root-cause fix.** Patch: `scripts/chimera/patches/xen-4.19.2-altp2m-no-mapcache-invalidate.patch`. Built 2026-10-19 from the same tree and `.config` as the running hypervisor (only `p2m.o` changed); **installed and booted 2026-10-19 16:32** as `/boot/xen-4.19.2.gz` (sha256 `706f6d24…e6577ee389`; original kept as `/boot/xen-4.19.2.gz.orig`). 30/30 runs without a freeze on the stock QEMU |
+| drakrun | Guest-CPU stall watchdog: a guest with no CPU progress for 20 s (sampled every 2 s; healthy guests never exceed ~2 s) while DRAKVUF is attached stops DRAKVUF and marks telemetry `complete=false` (`vm_stalled`) instead of silently truncating | Deployed; live-tested by pausing the guest (analysis and evasion scan) |
 | libvmi df8547f | Upstream libvmi#1123 (attach can scan all guest memory for minutes when vCPU 0 runs user code under KVA shadowing) | Patch prepared: `scripts/chimera/patches/libvmi-df8547f-pr1123-kernel-cr3.patch`; not installed (needs KVA shadowing, unlikely on this CPU; no matching failure in our logs) |
 
 With the QEMU patch QEMU logs `Locked DMA mapping while invalidating mapcache!` when an
 invalidation arrives during a disk DMA; the mapping is kept, as the function intends.
 The Xen patch removes those spurious invalidations at the source.
 
-**Caveat on the QEMU patch.** The drain exists so that QEMU stops using a guest frame
+**Caveat on the QEMU patch (why it was retired).** The drain exists so that QEMU stops using a guest frame
 before the hypervisor reuses it. Removing it is safe for the spurious altp2m
 invalidations (the host p2m did not change), but not established safe for genuine
 ones, such as a guest balloon driver returning memory: an in-flight disk request could
 then write to a frame Xen has already freed, and stale mapcache bucket entries can
 remain. H1 has no Xen platform device (`xen_platform_pci = 0`), so it cannot load a PV
 balloon driver; A0 keeps the device and has not been checked. The no-drain QEMU is a
-stop-gap. Once the host runs the patched Xen, restore the stock QEMU (rollback
-below) and re-run the 10-run check; keep the no-drain QEMU only if the check fails.
+stop-gap; with the patched Xen the stock QEMU passed the 10-run checks, so it was restored.
 
-### Installing the patched Xen (owner, needs a reboot)
+### Installing the patched Xen (done 2026-10-19; kept for rebuilds)
 
 ```
 sudo cp /boot/xen-4.19.2.gz /boot/xen-4.19.2.gz.orig
 sudo install -m 644 /var/lib/chimera-evidence/xen-4.19.2-chimera/xen-4.19.2-chimera.gz /boot/xen-4.19.2.gz
 ```
 
-Then reboot into the usual "Debian GNU/Linux, with Xen hypervisor" entry. The GRUB
-entries point at `/boot/xen-4.19.2.gz`, so `update-grub` is not needed. Check
-with `sudo xl dmesg | head` (build date 2026-10-19).
+Then reboot and pick "Debian GNU/Linux, with Xen hypervisor" (GRUB's default entry is
+plain Debian). Every Xen entry loads `/boot/xen.gz` or `/boot/xen-4.gz`, both symlinks to
+`xen-4.19.2.gz`, so `update-grub` is not needed. Check with `sudo xl info | grep
+cc_compile_date` (Mon Oct 19 10:59:32 IST 2026). After a reboot, start
+`chimera-inetsim` and `drakrun-web` by hand; they are not enabled at boot.
 
 ### Rollback
 
-- QEMU: `sudo install -m 755 /usr/local/lib/xen/bin/qemu-system-i386.orig-8.0.5 /usr/local/lib/xen/bin/qemu-system-i386`
+- QEMU (back to the no-drain stop-gap, if a freeze reappears):
+  `sudo install -m 755 /usr/local/lib/xen/bin/qemu-system-i386.chimera-nodrain /usr/local/lib/xen/bin/qemu-system-i386`
   (takes effect for the next VM start).
 - Xen: if the patched hypervisor does not boot, pick plain "Debian GNU/Linux" in
   GRUB, run `sudo cp /boot/xen-4.19.2.gz.orig /boot/xen-4.19.2.gz` and reboot.
+
+## Remaining DRAKVUF failure (not a freeze)
+
+With the default full apimon hook list, DRAKVUF sometimes exits with rc 0 after
+`Critical error in re-copying remapped gfn` / `Failed to refresh shadow copy`: 3 of
+11 PERDEDOR scans on the patched Xen, 0 of 20 with the 43- and 276-hook lists.
+The guest keeps running; the scan or analysis is recorded as incomplete. Not yet
+diagnosed (`refresh_shadow_copy()` in DRAKVUF's libusermode).
+
+## Injector readfile race
+
+In 4 of 30 scans the injector failed to copy PERDEDOR's report out of the guest
+although the agent had written it: `ReadFile` appeared to return FALSE with last error 0
+(`ERROR_SUCCESS`), in `src/libinjector/win/methods/win_read_file.c` STEP6, most likely
+the return trap catching another thread's call. Reading is idempotent, so
+`GuestSession.get_file` now retries up to 3 times, except on a definite Windows answer
+(file or path not found, access denied, virus infected).
+Verified after deployment: 10/10 scans (276 hooks) produced a score; the first read
+failed in 4 of them and the second attempt succeeded every time.
 
 ## Related upstream fix not in our build
 
