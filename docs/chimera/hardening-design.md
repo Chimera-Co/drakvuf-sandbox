@@ -80,7 +80,7 @@ Checks that changed between arms (detected in N of 5 scans):
 
 **Decision (applied 21:59):** production `config.toml` now has `cpuidmon` and `hidsim` in `plugins` and
 `extra_drakvuf_args = { "-s" = true }` (backup `config.toml.bak-pre-stealth-20261019`). Portal analysis
-`95f9e10c` (BGInfo) complete, 120.8 s, all plugins produced. `drakrun-web` must be restarted after a plugin
+`95f9e10c` (BGInfo) complete, 120.8 s, all plugins produced except `clipboardmon`, which writes no log when nothing uses the clipboard (missing in all 22 recent analyses that load it; corrected 2026-10-20). `drakrun-web` must be restarted after a plugin
 change: it fixes each upload's plugin list from the config it loaded at start.
 
 Still detected in every arm, by cause:
