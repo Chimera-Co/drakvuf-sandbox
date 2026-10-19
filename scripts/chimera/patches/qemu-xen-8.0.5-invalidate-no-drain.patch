@@ -1,0 +1,19 @@
+--- a/hw/i386/xen/xen-mapcache.c	2026-10-19 10:39:42.957854183 +0530
++++ b/hw/i386/xen/xen-mapcache.c	2026-10-19 10:39:42.969854280 +0530
+@@ -493,8 +493,14 @@
+     unsigned long i;
+     MapCacheRev *reventry;
+ 
+-    /* Flush pending AIO before destroying the mapcache */
+-    bdrv_drain_all();
++    /*
++     * CHIMERA: no bdrv_drain_all() here. Under DRAKVUF (altp2m) Xen sends
++     * thousands of IOREQ_TYPE_INVALIDATE per minute; draining all block I/O
++     * from inside the ioreq handler intermittently never returns, leaving every
++     * guest vCPU blocked on its ioreq. In-flight DMA keeps its mappings locked
++     * (entry->lock > 0) and the loop below already skips locked entries, so
++     * those mappings stay valid without the drain.
++     */
+ 
+     mapcache_lock();
+ 

@@ -1,0 +1,19 @@
+--- a/xen/arch/x86/mm/p2m.c	2026-10-19 10:40:21.410164700 +0530
++++ b/xen/arch/x86/mm/p2m.c	2026-10-19 10:40:21.418164765 +0530
+@@ -551,7 +551,15 @@
+         }
+     }
+ 
+-    ioreq_request_mapcache_invalidate(p2m->domain);
++    /*
++     * CHIMERA: only a host p2m change can invalidate the device model's
++     * mapcache, which maps guest frames through the host p2m. Dropping an
++     * entry from an altp2m view (p2m_change_altp2m_gfn(..., INVALID_GFN), done
++     * thousands of times a minute by DRAKVUF) leaves the host p2m untouched;
++     * requesting an invalidation there floods QEMU with IOREQ_TYPE_INVALIDATE.
++     */
++    if ( p2m_is_hostp2m(p2m) )
++        ioreq_request_mapcache_invalidate(p2m->domain);
+ 
+     rc = p2m_set_entry(p2m, gfn, INVALID_MFN, page_order, p2m_invalid,
+                        p2m->default_access);
