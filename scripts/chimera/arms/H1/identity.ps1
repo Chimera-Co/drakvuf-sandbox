@@ -21,6 +21,11 @@ $info = [ordered]@{
     logical_processors     = $cs.NumberOfLogicalProcessors
     memory_mb              = [int]($cs.TotalPhysicalMemory / 1MB)
     xen_pci_devices        = @(Get-PnpDevice -PresentOnly | Where-Object InstanceId -like '*VEN_5853*').Count
+    # Windows builds Win32_BIOS.Version from the ACPI OEM ID and revision ("Xen - 0" from hvmloader).
+    acpi_oem_version       = $bios.Version
+    # Remembered but absent Xen/QEMU devices leave Enum\PCI, Enum\IDE and Enum\SCSI entries.
+    phantom_vm_devices     = @(Get-PnpDevice | Where-Object { $id = $_.InstanceId; -not $_.Present -and
+                                 ('VEN_5853', 'VEN_1AF4', 'QEMU', 'XEN' | Where-Object { $id -like "*$_*" }) }).Count
     defender_realtime      = $mp.RealTimeProtectionEnabled
     defender_tamper        = $mp.IsTamperProtected
     vcruntime140           = Test-Path "$env:SystemRoot\System32\vcruntime140.dll"

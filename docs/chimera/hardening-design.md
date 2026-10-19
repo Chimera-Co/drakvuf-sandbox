@@ -1,6 +1,6 @@
 # Xen Guest Hardening — Design and Experiment Plan (M4)
 
-**Date:** 2026-10-19 · **Status:** design; nothing applied yet · **Depends on:** containment (done), lifecycle fixes (done)
+**Date:** 2026-10-19 · **Status:** H1 snapshot live since 07:49 (steps 1–4 below; validated 15/15 on restore, `journal.md` 07:52). Runtime arms (step 5) measured in §6. Not done: hvmloader ACPI patch (step 6) · **Depends on:** containment (done), lifecycle fixes (done), guest-freeze and DRAKVUF UAF fixes (done, `vm-freeze-root-cause.md`)
 
 ## 1. Problem (measured, not assumed)
 
@@ -18,7 +18,7 @@ PERDEDOR run `621b62cc` (18 Sep 2026, current Xen guest) detected:
 | `win.behavioural.installed_programs` | 8 (need ≥ 20) | fresh image | **guest realism** |
 | `win.behavioural.mouse_movement` | cursor static | no user | **runtime** DRAKVUF `hidsim` (Gruber & Freiling 2022) |
 | *(not yet measured)* CPUID hypervisor bit + `XenVMMXenVMM` leaves | `cpuid="host,htt=0"` doesn't hide them | Xen | **runtime** DRAKVUF `cpuidmon -s` (`src/plugins/cpuidmon/cpuidmon.cpp:139-153` zeroes leaf-1 ECX[31] and leaves 0x40000000–0x40000004) |
-| *(not yet measured)* disk model `QEMU HARDDISK` | string in qemu-xen | qemu IDE default | **config** `device_model_args_hvm=["-global","ide-hd.model=…"]` (to verify) |
+| disk model `QEMU HARDDISK` | string in qemu-xen | qemu IDE default | **config** `device_model_args_hvm=["-global","ide-hd.model=…"]`: applied in H1, guest reports a WD model (`H1-identity-check-vm1.txt`) |
 
 ## 2. Experimental arms
 

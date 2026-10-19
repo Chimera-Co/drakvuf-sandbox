@@ -56,6 +56,12 @@ def main() -> int:
         ("xen_pci_devices", report.get("xen_pci_devices") == "0", report.get("xen_pci_devices")),
         ("defender_realtime", report.get("defender_realtime") == "False", report.get("defender_realtime")),
     ]
+    # Reported by identity.ps1 since 2026-10-19 evening; older reports skip them.
+    if "acpi_oem_version" in report:
+        oem = report["acpi_oem_version"]
+        checks.append(("acpi_oem_version", not oem.upper().startswith(("XEN", "BOCHS", "QEMU")), oem))
+    if "phantom_vm_devices" in report:
+        checks.append(("phantom_vm_devices", report["phantom_vm_devices"] == "0", report["phantom_vm_devices"]))
     failed = 0
     for name, ok, detail in checks:
         failed += not ok
