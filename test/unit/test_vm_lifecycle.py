@@ -136,7 +136,7 @@ def test_fast_singlestep_flag_is_switchable(monkeypatch):
     assert "-F" not in cmdline.get_base_drakvuf_cmdline(**common, fast_singlestep=False)
 
 
-def _monitor(cpu_times, threshold_s=40):
+def _monitor(cpu_times, threshold_s=run_tools.VM_STALL_THRESHOLD_S):
     samples = iter(cpu_times)
     clock = {"now": 0.0}
     monitor = run_tools.StallMonitor(
@@ -157,19 +157,20 @@ def test_stall_monitor_stops_drakvuf_once_when_guest_cpu_freezes():
         monitor.sample()
         clock["now"] += 5
     assert monitor.stalled is True
-    assert stops == [50.0]
+    assert stops == [30.0]
     assert monitor.max_stall_s == 50.0
 
 
 def test_stall_monitor_ignores_slow_progress_and_unreadable_samples():
-    # Idle guest: CPU time moves by 0.1 s every 15-20 s; xl sometimes fails.
-    samples = [10.0 + 0.1 * (i // 4) if i % 7 else None for i in range(28)]
+    # A healthy guest gains CPU time at least every ~2 s (measured); here only
+    # every 10 s, and xl sometimes fails.
+    samples = [10.0 + 0.1 * (i // 2) if i % 7 else None for i in range(28)]
     monitor, clock = _monitor(samples)
     for _ in range(28):
         monitor.sample()
         clock["now"] += 5
     assert monitor.stalled is False
-    assert monitor.max_stall_s < 40
+    assert monitor.max_stall_s < run_tools.VM_STALL_THRESHOLD_S
 
 
 def test_xl_cpu_time_parses_time_column(monkeypatch):

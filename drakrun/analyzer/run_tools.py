@@ -74,7 +74,11 @@ def log_activity_watchdog(
 # A guest whose vCPUs accrue no CPU time for this long is stalled. Seen with
 # apimon on this host: DRAKVUF stays alive in poll() while every vCPU waits, so
 # without this the analysis runs out its timeout with a silently truncated log.
-VM_STALL_THRESHOLD_S = 40
+# Healthy guests (idle or under DRAKVUF) never went more than ~2 s without CPU
+# progress; staying under the evasion verifier's 30 s guest-command budget means a
+# freeze is flagged before a timed-out probe is mistaken for a tool verdict.
+VM_STALL_THRESHOLD_S = 20
+VM_STALL_INTERVAL_S = 2.0
 
 
 def xl_cpu_time(vm_name: str) -> Optional[float]:
@@ -92,7 +96,7 @@ class StallMonitor:
         self,
         vm_name: str,
         threshold_s: float = VM_STALL_THRESHOLD_S,
-        interval_s: float = 5.0,
+        interval_s: float = VM_STALL_INTERVAL_S,
         read_cpu_time: Callable[[str], Optional[float]] = xl_cpu_time,
         clock: Callable[[], float] = time.monotonic,
     ):
