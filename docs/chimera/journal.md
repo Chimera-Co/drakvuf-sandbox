@@ -31,6 +31,10 @@ Evidence paths under `/var/lib/chimera-evidence/` are on the CHIMERA host (root-
 | 06:50–07:28 | H1 cold boot (domid 36); owner signed in (password typed by the owner via a hidden-prompt VNC helper); `realism.ps1` → 8 documents, exit 0 | `h1-after-login.png` |
 | 07:35 | **Correction:** VC++ 2015–2022 x64 runtime 14.51.36247 has been in the guest since 3 Sep (installer exit 1638 = already installed). The 03:30 root cause was wrong: the stored al-khaser run shows `ERROR_VIRUS_INFECTED` on read-back after upload (`guest_exists: false`), i.e. **Defender removed it**. `Get-MpComputerStatus`: real-time, behaviour monitoring and **Tamper Protection on** in A0/H1 — real samples would be quarantined/blocked | `raw/alkhaser/diag_post_upload.json` of evasion run `e1a35994` |
 | 07:20–07:35 | Codex task 06: upstream DRAKVUF `b2f64d8` built side by side (`drakvuf-upstream-build/install`, same options, same libvmi). `refresh_shadow_copy()` byte-identical; none of the 9 commits addresses the apimon crash → upgrade alone is not the fix | `drakvuf-upstream-build/task06-report.md` |
+| 07:37–07:39 | Owner turned Tamper Protection off (GUI); `H1/defender-off.ps1` → real-time/behaviour/IOAV/on-access all False; Edge + Settings closed | `arms-2026-10-19/` |
+| 07:40–07:49 | `drakrun modify-vm0 commit` rc 0 (only optional .NET 2.0 `mscorwks` profile absent); `chimera-arm adopt` → H1 snapshot live | — |
+| 07:52 | **H1 restore validated on vm-1: 15/15** (SMBIOS Acer/INSYDE, WD disk, Intel MAC, 4 vCPU, 5104 MB, no Xen PCI, Defender off, VC++ present); restore 3.3 s, drakshell immediate. Note: guest keeps the MAC it booted with (`…:00`) on every restored VM | `H1-identity-check-vm1.txt` |
+| 07:55–08:00 | H1 smoke via web→queue→worker, BGInfo ×2: **2/2 finished, `complete=true`**, rc 0, full 120 s window, no leftovers; VM start→exec **10.4 s** (A0: 17.0 ± 1.0 s); 8/9 plugins produced, `clipboardmon` empty as in all 10 A0 runs (BGInfo never uses the clipboard) | `H1-smoke/series.json` |
 
 ## Decisions
 - **Downloads and real malware stay operator-initiated** (VC++ redistributable, app installers for guest realism, malware samples).
