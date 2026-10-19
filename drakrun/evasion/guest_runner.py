@@ -64,6 +64,7 @@ import logging
 import pathlib
 import subprocess
 import tempfile
+import time
 import zipfile
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -79,6 +80,19 @@ logger = logging.getLogger(__name__)
 # Grace period after terminate() before giving up on a hung command and
 # marking the whole session broken.
 _TERMINATE_GRACE_SECONDS = 15.0
+
+# Injector readfile occasionally fails transiently (seen on H1: exit 1,
+# "Failed to read guest file" with ErrorCode 0 / ERROR_SUCCESS while the file
+# was present). Reading is idempotent, so retry a few times - but not when
+# Windows gave a definite answer about the file, which a retry cannot change.
+READFILE_ATTEMPTS = 3
+READFILE_RETRY_DELAY_S = 1.0
+_DEFINITE_READ_ERRORS = {
+    2,  # ERROR_FILE_NOT_FOUND
+    3,  # ERROR_PATH_NOT_FOUND
+    5,  # ERROR_ACCESS_DENIED
+    225,  # ERROR_VIRUS_INFECTED (Defender removed it)
+}
 # Fixed budget for setup commands (Expand-Archive) that are not part of a
 # verifier's own timeout budget.
 _SETUP_COMMAND_TIMEOUT_SECONDS = 60.0
@@ -524,8 +538,10 @@ class GuestSession:
         self._check_injector_available()
         self._check_not_broken()
         local_path.parent.mkdir(parents=True, exist_ok=True)
-        result = self.injector.read_file(remote_path, str(local_path))
-        if result.returncode:
+        for attempt in range(1, READFILE_ATTEMPTS + 1):
+            result = self.injector.read_file(remote_path, str(local_path))
+            if not result.returncode:
+                return
             # Injector.read_file() does not pass check=True (a latent gap
             # documented in the implementation plan), so a failed guest-side
             # read otherwise returns silently with a stale/empty local file.
@@ -538,12 +554,19 @@ class GuestSession:
             # that cares - currently only al-khaser's read-only upload
             # diagnostic - recover the precise Win32 failure reason instead
             # of DRAKVUF's single opaque "Couldn't open guest file" string.
-            raise InjectorReadError(
+            error = InjectorReadError(
                 remote_path,
                 result.returncode,
                 getattr(result, "stdout", None),
                 getattr(result, "stderr", None),
             )
+            if (
+                attempt == READFILE_ATTEMPTS
+                or error.error_code in _DEFINITE_READ_ERRORS
+            ):
+                raise error
+            logger.warning(f"{error}; retrying ({attempt}/{READFILE_ATTEMPTS})")
+            time.sleep(READFILE_RETRY_DELAY_S)
 
 
 def connect_guest_session(vm_name: str, injector: Injector) -> GuestSession:

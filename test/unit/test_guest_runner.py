@@ -428,7 +428,7 @@ def test_put_file_mkdir_failure_raises_and_skips_write():
 
 
 def test_get_file_raises_on_nonzero_returncode_instead_of_silently_succeeding(
-    tmp_path,
+    tmp_path, no_readfile_delay
 ):
     """Regression test for Injector.read_file's own gap: it does not pass
     check=True, so a failed guest-side read otherwise returns silently.
@@ -530,7 +530,7 @@ def test_get_file_error_carries_injector_error_code_from_stdout_json(tmp_path):
     assert "ERROR_ACCESS_DENIED" in str(exc)
 
 
-def test_get_file_error_with_stderr_only_keeps_its_original_message_shape(tmp_path):
+def test_get_file_error_with_stderr_only_keeps_its_original_message_shape(tmp_path, no_readfile_delay):
     """No JSON on stdout (older injector output, or a failure raised before
     print_injection_info ran): the error must still be raised, still say
     exactly what it always said, and simply carry no code."""
@@ -554,7 +554,7 @@ def test_get_file_error_with_stderr_only_keeps_its_original_message_shape(tmp_pa
     assert "ErrorCode" not in str(exc)
 
 
-def test_get_file_error_tolerates_malformed_non_json_stdout(tmp_path):
+def test_get_file_error_tolerates_malformed_non_json_stdout(tmp_path, no_readfile_delay):
     """Garbage on stdout must never make the diagnostic itself throw - the
     underlying read failure is what has to reach the caller."""
     injector = FakeInjector()
@@ -570,7 +570,7 @@ def test_get_file_error_tolerates_malformed_non_json_stdout(tmp_path):
     assert "injector readfile failed" in str(excinfo.value)
 
 
-def test_injector_read_error_is_a_runtimeerror_for_existing_callers(tmp_path):
+def test_injector_read_error_is_a_runtimeerror_for_existing_callers(tmp_path, no_readfile_delay):
     """Backwards compatibility is the whole reason this is a subclass: both
     adapter callers catch broad RuntimeError/Exception around get_file(), and
     test_get_file_raises_on_nonzero_returncode_instead_of_silently_succeeding
@@ -595,6 +595,75 @@ def test_get_file_success_path_is_unchanged_by_the_error_plumbing(tmp_path):
     session.get_file(r"C:\report.json", local_path)
 
     assert local_path.read_bytes() == b"real content"
+
+
+@pytest.fixture
+def no_readfile_delay(monkeypatch):
+    import drakrun.evasion.guest_runner as guest_runner_module
+
+    monkeypatch.setattr(guest_runner_module, "READFILE_RETRY_DELAY_S", 0)
+
+
+class FlakyReadInjector(FakeInjector):
+    """Fails the first `failures` reads, then succeeds."""
+
+    def __init__(self, failures, stdout=b""):
+        super().__init__()
+        self.failures = failures
+        self.fail_stdout = stdout
+
+    def read_file(self, remote_path, local_path):
+        if len(self.read_calls) < self.failures:
+            self.read_calls.append((remote_path, local_path))
+            return subprocess.CompletedProcess(
+                [], 1, stdout=self.fail_stdout, stderr=b"Failed to read guest file"
+            )
+        return super().read_file(remote_path, local_path)
+
+
+def test_get_file_retries_a_transient_read_failure(tmp_path, no_readfile_delay):
+    # Seen on H1: exit 1 with ErrorCode 0 (ERROR_SUCCESS) while the report existed.
+    transient = _INJECTOR_ERROR_LINE.replace('"ErrorCode": 5', '"ErrorCode": 0').replace(
+        "ERROR_ACCESS_DENIED", "ERROR_SUCCESS"
+    )
+    injector = FlakyReadInjector(failures=2, stdout=transient.encode())
+    session = GuestSession(injector, FakeDrakshell([]))
+
+    local_path = tmp_path / "report.json"
+    session.get_file(r"C:\Users\Public\perdedor\windows-report.json", local_path)
+
+    assert len(injector.read_calls) == 3
+    assert local_path.read_bytes() == injector.read_content
+
+
+def test_get_file_gives_up_after_bounded_attempts(tmp_path, no_readfile_delay):
+    import drakrun.evasion.guest_runner as guest_runner_module
+
+    injector = FlakyReadInjector(failures=99)
+    session = GuestSession(injector, FakeDrakshell([]))
+
+    with pytest.raises(InjectorReadError):
+        session.get_file(r"C:\report.json", tmp_path / "out.txt")
+    assert len(injector.read_calls) == guest_runner_module.READFILE_ATTEMPTS
+
+
+@pytest.mark.parametrize(
+    "code,name",
+    [(2, "ERROR_FILE_NOT_FOUND"), (5, "ERROR_ACCESS_DENIED"), (225, "ERROR_VIRUS_INFECTED")],
+)
+def test_get_file_does_not_retry_a_definite_windows_answer(
+    tmp_path, no_readfile_delay, code, name
+):
+    line = _INJECTOR_ERROR_LINE.replace('"ErrorCode": 5', f'"ErrorCode": {code}').replace(
+        "ERROR_ACCESS_DENIED", name
+    )
+    injector = FlakyReadInjector(failures=99, stdout=line.encode())
+    session = GuestSession(injector, FakeDrakshell([]))
+
+    with pytest.raises(InjectorReadError) as excinfo:
+        session.get_file(r"C:\Users\Public\alkhaser\al-khaser_x64.exe", tmp_path / "o")
+    assert excinfo.value.error_code == code
+    assert len(injector.read_calls) == 1
 
 
 def test_get_file_writes_local_content_on_success(tmp_path):
