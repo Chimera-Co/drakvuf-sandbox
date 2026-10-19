@@ -42,6 +42,8 @@ def verification_drakvuf(
                     timeout=None,
                     apimon_hooks_path=config.drakrun.apimon_hooks_path,
                     syscall_hooks_path=config.drakrun.syscall_hooks_path,
+                    # Same host-level DRAKVUF switches as analyses get.
+                    extra_drakvuf_args=config.drakrun.extra_drakvuf_args,
                 )
                 if "memdump" in options.plugins:
                     (output_dir / DUMPS_DIR).mkdir(exist_ok=True)
