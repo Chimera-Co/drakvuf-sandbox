@@ -1,0 +1,55 @@
+# CHIMERA arm H1 (config-level hardening) — DomU config template for drakrun.
+# Based on the drakvuf-sandbox default template. See docs/chimera/hardening-design.md.
+# Changes vs. A0 are marked "H1:". The guest identity mirrors the host laptop model
+# (consistent with cpuid="host" exposing a 13th-gen HX mobile CPU); serials are synthetic.
+
+arch = 'x86_64'
+name = "{{ VM_NAME }}"
+maxmem = {{ MEMORY }}
+memory = {{ MEMORY }}
+vcpus = {{ VCPUS }}
+maxvcpus = {{ VCPUS }}
+type = "hvm"
+# H2: hvmloader built with the host laptop's ACPI OEM IDs (ACRSYS/ACRPRDCT rev 2) instead of
+# "Xen"/"HVM"; Windows shows them as Win32_BIOS.Version and HARDWARE\ACPI\DSDT\<OEM ID>.
+# Built by build-hvmloader-acpi.sh. ACPI and SMBIOS tables are made at cold boot only.
+firmware_override = "/usr/local/lib/xen/boot/hvmloader-chimera-acpi"
+boot = "cd"
+hap = 1
+acpi = 1
+on_poweroff = "destroy"
+on_reboot = "{{ ON_REBOOT }}"
+on_crash = "destroy"
+vnc=1
+vnclisten="127.0.0.1:{{ VM_ID }},websocket=127.0.0.1:{{ VNC_PORT }}"
+vncpasswd="{{ VNC_PASS }}"
+usb = 1
+usbdevice = "tablet"
+altp2m = 2
+# H1: 32 -> 128 MiB; upstream drakvuf-sandbox #1222 reports VM crashes during longer analyses at 32
+shadow_memory = 128
+# H1: no HDA audio device (its codec exposes QEMU vendor id 1AF4)
+cpuid="host,htt=0"
+# H1: no Xen platform PCI device (PCI\VEN_5853) and no Hyper-V enlightenments
+# (viridian off also keeps Xen's CPUID leaves at 0x40000000, which cpuidmon -s hides)
+xen_platform_pci = 0
+viridian = 0
+vga="stdvga"
+# H1: Intel OUI 00:1B:21 instead of Xen's 00:16:3E; fixed per VM id
+vif = [ 'type=ioemu,model=e1000,mac=00:1b:21:3a:5c:0{{ VM_ID }},bridge={{ BRIDGE_NAME }}' ]
+disk = [ {{ DISKS }} ]
+serial = [ "unix:/var/run/drakrun/{{ VM_NAME }}.sock,server,nowait" ]
+# H1/H2: SMBIOS identity (hvmloader defaults say "Xen" / "HVM domU")
+smbios = [ "bios_vendor=INSYDE Corp.", "bios_version=V1.20",
+           "system_manufacturer=Acer", "system_product_name=Predator PHN16-71",
+           "system_version=V1.20", "system_serial_number=NHQ90ASDG12NUWE29M6UZJ",
+           "baseboard_manufacturer=RPL", "baseboard_product_name=Compass_RTX",
+           "baseboard_version=V1.20", "baseboard_serial_number=NBQEZMV2L3VV43OJUNL0",
+           "enclosure_manufacturer=Acer", "enclosure_serial_number=NHQYVG4TUZHZJ7FAM2P0AD",
+           "battery_manufacturer=SMP", "battery_device_name=AP21D8M",
+           # H2: SMBIOS type 11 OEM strings as on the host; without any, hvmloader writes "Xen"
+           "oem=Acer System", "oem=OemString3", "oem=OemString4", "oem=OemString5", "oem=OemString6" ]
+# H1: disk model/serial instead of "QEMU HARDDISK"
+device_model_args_hvm = [ "-global", "ide-hd.model=WDC WD10SPZX-21Z10T0", "-global", "ide-hd.serial=WD-WXDC7194EDA5" ]
+#uncomment when using IPT
+#vmtrace_buf_kb = 8192
