@@ -1,7 +1,11 @@
 # Upstream contribution draft: DRAKVUF `refresh_shadow_copy` use-after-free
 
-Status: **draft, not submitted.** The owner submits both texts below to
-[tklengyel/drakvuf](https://github.com/tklengyel/drakvuf) after reading them.
+Status: **submitted 2026-10-19** with the owner's authorisation, texts unchanged:
+issue [tklengyel/drakvuf#1885](https://github.com/tklengyel/drakvuf/issues/1885) and
+PR [tklengyel/drakvuf#1886](https://github.com/tklengyel/drakvuf/pull/1886)
+(head `shreyastek:fix-refresh-shadow-copy-uaf` = `59091ae`, pushed to the existing fork
+`shreyastek/chimeraOG`). Before submitting: upstream `main` was still b2f64d8, astyle 3.1
+with `.astylerc` (the CI check) left `vmi.c` unchanged, and `git diff --check` was clean.
 
 - Local branch: `fix-refresh-shadow-copy-uaf` in `drakvuf-upstream-build/drakvuf`
   (worktree `drakvuf-upstream-build/drakvuf-pr`), one commit `59091ae` on top of upstream
@@ -124,9 +128,9 @@ Notes for reviewers, from two approaches we tried and dropped:
 
 ---
 
-## Before submitting (owner checklist)
+## Before submitting (checklist, done 2026-10-19)
 
-- [ ] Re-check that upstream `main` has not changed `refresh_shadow_copy` since b2f64d8
+- [x] Re-check that upstream `main` has not changed `refresh_shadow_copy` since b2f64d8
       (`git fetch && git log origin/main -- src/libdrakvuf/vmi.c`).
-- [ ] Run astyle with the repository's `.astylerc` (the CI check) on the branch.
-- [ ] Decide whether to mention the project by name; the texts above do not.
+- [x] Run astyle with the repository's `.astylerc` (the CI check) on the branch.
+- [x] Decide whether to mention the project by name: not named; the texts were posted as above.
