@@ -36,23 +36,20 @@ drive this adapter's design; each is load-bearing, not incidental:
 6. Per-check results reach the host through two surfaces, both format-
    verified against Shared/Common.cpp and Shared/log.cpp:
      - log.txt (LOG_PRINT, written to the process's CWD): each line is
-       "[<asctime>] [*] <msg> -> <0|1>" - purely numeric, the primary source.
+       "[<asctime>] [*] <msg> -> <0|1>" - numeric fallback when stdout has
+       no verdicts.
      - stdout: colour comes from SetConsoleTextAttribute (not ANSI escapes,
        so a redirected file is clean text); each line is
        "[*] <msg><padding to column 95>[ BAD  ]" (two spaces, detected) or
-       "[ GOOD ]" (one space, clean) - kept only as a fallback.
+       "[ GOOD ]" (one space, clean) - the primary source.
    Crucially, NOT every --check type routes its checks through exec_check.
    VPC, ANALYSIS_TOOLS, ANTI_DISASSM, DUMPING_CHECK, and CODE_INJECTIONS call
-   their detection functions directly with no exec_check wrapper at all, so
-   they never appear in log.txt or as a [ GOOD ]/[ BAD ] line - there is no
-   machine-readable verdict to parse for them, ever, in this al-khaser
-   version (0.82). Several other categories (VBOX, VMWARE, QEMU, XEN, KVM,
-   WINE, PARALLELS) mix exec_check-wrapped calls with bare, unwrapped ones
-   (e.g. vbox_reg_keys(), vmware_files(), qemu_processes()) - only the
-   exec_check-wrapped subset is parsed into NormalizedChecks; the bare calls'
-   console output is preserved as raw text but is never turned into a
-   fabricated per-check finding, because we have not verified those
-   functions' own output format.
+   their detection functions directly with no exec_check wrapper at all.
+   Some of those functions print GOOD/BAD verdicts themselves: the real
+   0.82 stdout includes VPC and ANALYSIS_TOOLS verdicts, plus individual
+   artifact verdicts in other sections that log.txt omits. Parse every
+   explicit stdout verdict, using the catalog only for metadata. Sections
+   without verdicts remain skipped; free-form output never implies clean.
 """
 
 from __future__ import annotations
@@ -65,7 +62,7 @@ import re
 import subprocess
 import tempfile
 import time
-from typing import Any, Dict, Generator, List, Optional, Tuple
+from typing import Any, Dict, Generator, List, NamedTuple, Optional, Tuple
 
 from drakrun.evasion.constants import Category, CheckStatus, Severity, ToolStatus
 from drakrun.evasion.models import NormalizedCheck, ToolResult
@@ -120,9 +117,8 @@ ALKHASER_UPSTREAM_DEFAULT_SLEEP_SECONDS = 600
 
 # main()'s fixed, unconditional execution order (verified: the only #ifdef in
 # the entire file guards AntiDisassmSEHMisuse() inside ANTI_DISASSM, which
-# produces no exec_check output regardless). This order is what a positional
-# log-line parser must walk, independent of the order --check flags were
-# passed on the command line.
+# produces no exec_check output regardless). Keep skipped section entries
+# in this order, independent of the order --check flags were passed.
 MAIN_EXECUTION_ORDER: Tuple[str, ...] = (
     "TLS",
     "DEBUG",
@@ -879,8 +875,7 @@ _CHECK_TYPE_CHECKS: Dict[str, List[_CheckSpec]] = {
         ),
     ],
     # Virtual PC Detection calls virtual_pc_process()/virtual_pc_reg_keys()
-    # directly with no exec_check wrapper at all - zero machine-readable
-    # verdicts are ever produced for this category.
+    # directly with no exec_check wrapper; stdout still contains verdicts.
     "VPC": [],
     "QEMU": [
         _CheckSpec(
@@ -1013,11 +1008,7 @@ _CHECK_TYPE_CHECKS: Dict[str, List[_CheckSpec]] = {
             "RDTSC-around-CPUID VM-exit timing check.",
         ),
     ],
-    # analysis_tools_process() is called directly, no exec_check wrapper -
-    # zero machine-readable verdicts, despite PERDEDOR crediting an
-    # equivalent check ("analysis tooling in the process list") to
-    # design_specific; that placement cannot be reproduced here because
-    # al-khaser's own version never emits one.
+    # Direct functions can emit stdout verdicts without catalog entries.
     "ANALYSIS_TOOLS": [],
     # Every AntiDisassm* function is called directly with plain _tprintf
     # banners, no exec_check wrapper - zero machine-readable verdicts.
@@ -1028,10 +1019,7 @@ _CHECK_TYPE_CHECKS: Dict[str, List[_CheckSpec]] = {
 }
 
 # Category headers actually emitted by print_category(), verified verbatim.
-# Not required for parsing (log.txt carries no headers at all, and the
-# positional walk below does not depend on stdout headers either) - kept
-# only so a future stdout-only fallback parser has the real strings to
-# anchor on rather than needing to guess them again.
+# These provide section context for stdout findings outside the catalog.
 CATEGORY_HEADERS: Dict[str, Optional[str]] = {
     "TLS": "TLS Callbacks",
     "DEBUG": "Debugger Detection",
@@ -1054,11 +1042,41 @@ CATEGORY_HEADERS: Dict[str, Optional[str]] = {
 }
 
 _LOG_LINE_RE = re.compile(
-    r"^\[[^\]]*\]\s*\[\*\]\s?(?P<msg>.*?)\s*->\s*(?P<result>\d+)\s*$"
+    r"^(?:\[[^\]]*\]\s*)?\[\*\]\s?(?P<msg>.*?)\s*->\s*(?P<result>[01])\s*$"
 )
 _STDOUT_LINE_RE = re.compile(
     r"^\[\*\]\s?(?P<msg>.*?)\s*\[\s*(?P<verdict>BAD|GOOD)\s*\]\s*$"
 )
+_SECTION_RE = re.compile(r"^\s*-+\[(?P<section>[^\]]+)\]-+\s*$")
+_SECTION_CHECK_TYPES = {
+    header: check_type for check_type, header in CATEGORY_HEADERS.items() if header
+}
+# NormalizedCheck.category uses the shared four-category enum. Map stdout
+# sections to those bins, retaining the original section in evidence.
+_SECTION_CATEGORIES = {
+    header: (
+        Category.timing
+        if check_type == "TIMING_ATTACKS"
+        else (
+            Category.design_specific
+            if check_type in {"TLS", "DEBUG", "INJECTION", "ANALYSIS_TOOLS"}
+            else Category.environment_artifact
+        )
+    )
+    for header, check_type in _SECTION_CHECK_TYPES.items()
+}
+
+
+class _ParsedCheck(NamedTuple):
+    message: str
+    detected: bool
+    section: Optional[str] = None
+
+
+def _decode_output(data: bytes) -> str:
+    if data.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
+        return data.decode("utf-16", errors="replace")
+    return data.decode("utf-8-sig", errors="replace")
 
 
 def _severity_for(spec: "_CheckSpec") -> Severity:
@@ -1848,90 +1866,137 @@ class AlKhaserAdapter(VerifierAdapter):
         selected = set(checks) if checks else set(DEFAULT_ENABLED_CHECK_TYPES)
         return [t for t in MAIN_EXECUTION_ORDER if t in selected]
 
-    def _parse_log_lines(self, text: str) -> List[Tuple[str, bool]]:
-        """Parse every '[*] <msg> -> <0|1>' line, in file order. Returns
-        (message, detected) pairs; a line that doesn't match the format is
-        simply not yielded (never guessed at)."""
+    def _parse_log_lines(self, text: str) -> List[_ParsedCheck]:
+        """Parse numeric verdicts in file order, without section context.
+
+        A line that doesn't match the format is never guessed at.
+        """
         out = []
         for line in text.splitlines():
             m = _LOG_LINE_RE.match(line)
             if m:
-                out.append((m.group("msg").rstrip(), m.group("result") != "0"))
+                out.append(
+                    _ParsedCheck(m.group("msg").strip(), m.group("result") == "1")
+                )
         return out
 
-    def _parse_stdout_lines(self, text: str) -> List[Tuple[str, bool]]:
-        """Fallback parser for the padded stdout format, used only when
-        log.txt could not be retrieved at all."""
+    def _parse_stdout_lines(self, text: str) -> List[_ParsedCheck]:
+        """Read explicit verdicts in file order, including non-catalog checks.
+
+        splitlines() handles CRLF; the verdict regex tolerates alignment and
+        either BAD padding. A banner or unfinished check has no verdict and
+        is never promoted to a clean result.
+        """
         out = []
+        section = None
         for line in text.splitlines():
+            header = _SECTION_RE.match(line)
+            if header:
+                section = header.group("section").strip()
+                continue
             m = _STDOUT_LINE_RE.match(line)
             if m:
-                out.append((m.group("msg").rstrip(), m.group("verdict") == "BAD"))
+                out.append(
+                    _ParsedCheck(
+                        m.group("msg").strip(), m.group("verdict") == "BAD", section
+                    )
+                )
         return out
 
     def _normalize(
-        self, checks: Optional[List[str]], parsed_lines: List[Tuple[str, bool]]
+        self, checks: Optional[List[str]], parsed_lines: List[_ParsedCheck]
     ) -> List[NormalizedCheck]:
-        """Positionally pair parsed (message, detected) lines against the
-        expected exec_check sequence for each selected check type, in
-        main()'s fixed execution order. A check type with zero expected
-        messages (VPC, CODE_INJECTIONS, ANALYSIS_TOOLS, ANTI_DISASSM,
-        DUMPING_CHECK, or any category run entirely through bare/unwrapped
-        calls) contributes a single explanatory `skipped` entry instead of
-        being silently absent - so its console output being unparsed is
-        visible in the normalized result, not just in the raw files."""
+        """Use output as the inventory; the catalog supplies metadata only.
+
+        Matching each message independently prevents added/reordered checks
+        from blocking all later results. Never synthesize a verdict for a
+        missing catalog entry. Types without a catalog or observed verdicts
+        retain their explanatory skipped entry.
+        """
         results: List[NormalizedCheck] = []
-        cursor = 0
-        for check_type in self._effective_check_types(checks):
+        catalog: Dict[str, List[Tuple[str, _CheckSpec]]] = {}
+        for check_type, specs in _CHECK_TYPE_CHECKS.items():
+            for spec in specs:
+                catalog.setdefault(spec.message.strip(), []).append((check_type, spec))
+        effective_types = self._effective_check_types(checks)
+        observed_types = set()
+        occurrences: Dict[str, int] = {}
+        for parsed in parsed_lines:
+            check_type = _SECTION_CHECK_TYPES.get(parsed.section)
+            candidates = catalog.get(parsed.message, [])
+            # Firmware messages repeat under VBOX, VMWARE and QEMU. Use the
+            # section to retain their distinct catalog ids; numeric logs
+            # have no sections, so prefer unused ids from selected types.
+            match = next((c for c in candidates if c[0] == check_type), None)
+            if match is None:
+                match = next(
+                    (
+                        c
+                        for c in candidates
+                        if c[0] in effective_types
+                        and f"alkhaser.{c[1].category.value}.{c[1].slug}"
+                        not in occurrences
+                    ),
+                    candidates[0] if candidates else None,
+                )
+            if match:
+                catalog_type, spec = match
+                observed_types.add(catalog_type)
+                check_id = f"alkhaser.{spec.category.value}.{spec.slug}"
+            else:
+                category = _SECTION_CATEGORIES.get(
+                    parsed.section, Category.design_specific
+                )
+                # Include section and full message, so punctuation/path
+                # differences cannot collapse unrelated checks into one id.
+                identity = f"{parsed.section or ''}\0{parsed.message}"
+                slug = (
+                    "generic_"
+                    + hashlib.sha256(identity.encode("utf-8")).hexdigest()[:16]
+                )
+                spec = _CheckSpec(
+                    slug,
+                    parsed.message,
+                    category,
+                    f"al-khaser verdict from {parsed.section or 'output without a section header'}.",
+                )
+                check_id = f"alkhaser.{category.value}.{slug}"
+            if check_type:
+                observed_types.add(check_type)
+            occurrences[check_id] = occurrences.get(check_id, 0) + 1
+            if occurrences[check_id] > 1:
+                check_id += f".{occurrences[check_id]}"
+            results.append(
+                NormalizedCheck(
+                    id=check_id,
+                    category=spec.category,
+                    name=parsed.message,
+                    description=spec.description,
+                    status=(
+                        CheckStatus.detected if parsed.detected else CheckStatus.clean
+                    ),
+                    severity=_severity_for(spec),
+                    tool=TOOL_ID,
+                    evidence={"section": parsed.section} if parsed.section else None,
+                )
+            )
+        for check_type in effective_types:
             specs = _CHECK_TYPE_CHECKS.get(check_type, [])
-            if not specs:
+            if not specs and check_type not in observed_types:
                 results.append(
                     NormalizedCheck(
                         id=f"alkhaser.skipped.{check_type.lower()}",
                         category=Category.design_specific,
                         name=f"{check_type} (no machine-readable output)",
                         description=(
-                            f"al-khaser's {check_type} checks run directly "
-                            "without going through its exec_check result "
-                            "wrapper, so this version of al-khaser produces "
-                            "no parseable per-check verdict for this "
-                            "category. Its console output is preserved in "
-                            "the raw artifacts for manual review."
+                            f"No parseable per-check verdict was available for "
+                            f"al-khaser's {check_type} section. Direct calls "
+                            "can produce only free-form output; the raw "
+                            "artifacts are preserved for manual review."
                         ),
                         status=CheckStatus.skipped,
                         severity=Severity.info,
                         tool=TOOL_ID,
-                    )
-                )
-                continue
-            for spec in specs:
-                if (
-                    cursor < len(parsed_lines)
-                    and parsed_lines[cursor][0] == spec.message.rstrip()
-                ):
-                    _, detected = parsed_lines[cursor]
-                    cursor += 1
-                    status = CheckStatus.detected if detected else CheckStatus.clean
-                else:
-                    status = CheckStatus.error
-                results.append(
-                    NormalizedCheck(
-                        id=f"alkhaser.{spec.category.value}.{spec.slug}",
-                        category=spec.category,
-                        name=spec.message.strip(),
-                        description=spec.description,
-                        status=status,
-                        severity=(
-                            _severity_for(spec)
-                            if status != CheckStatus.error
-                            else Severity.info
-                        ),
-                        tool=TOOL_ID,
-                        error_detail=(
-                            None
-                            if status != CheckStatus.error
-                            else "Expected log line for this check was missing or out of order."
-                        ),
                     )
                 )
         return results
@@ -2099,9 +2164,7 @@ class AlKhaserAdapter(VerifierAdapter):
         try:
             session.get_file(guest_stdout_path, local_stdout)
             raw_artifacts.append(str(local_stdout.relative_to(scan_dir)))
-            stdout_text = read_report_bytes(local_stdout).decode(
-                "utf-8", errors="replace"
-            )
+            stdout_text = _decode_output(read_report_bytes(local_stdout))
         except ReportTooLarge as exc:
             report_error = str(exc)
         except Exception:  # noqa: BLE001 - retrieval failure is reported, not fatal
@@ -2111,7 +2174,7 @@ class AlKhaserAdapter(VerifierAdapter):
         try:
             session.get_file(guest_log_path, local_log)
             raw_artifacts.append(str(local_log.relative_to(scan_dir)))
-            log_text = read_report_bytes(local_log).decode("utf-8", errors="replace")
+            log_text = _decode_output(read_report_bytes(local_log))
         except ReportTooLarge as exc:
             report_error = str(exc)
         except (
@@ -2134,11 +2197,18 @@ class AlKhaserAdapter(VerifierAdapter):
                 error=report_error,
             )
 
-        if log_text is not None:
+        # stdout includes direct-function verdicts missing from log.txt.
+        # Never combine both surfaces: exec_check verdicts occur in both.
+        parsed = self._parse_stdout_lines(stdout_text)
+        if not parsed and log_text:
             parsed = self._parse_log_lines(log_text)
-        elif stdout_text:
-            parsed = self._parse_stdout_lines(stdout_text)
-        else:
+        if not parsed and (
+            not (stdout_text or log_text)
+            or any(
+                _CHECK_TYPE_CHECKS[t]
+                for t in self._effective_check_types(validated["checks"])
+            )
+        ):
             return ToolResult(
                 tool=TOOL_ID,
                 status=ToolStatus.error,
@@ -2147,7 +2217,11 @@ class AlKhaserAdapter(VerifierAdapter):
                 exit_code=exit_code,
                 command=" ".join(command_txt),
                 raw_artifacts=raw_artifacts,
-                error="Neither log.txt nor stdout could be retrieved from the guest.",
+                error=(
+                    "Neither log.txt nor stdout could be retrieved from the guest."
+                    if not stdout_text and not log_text
+                    else "No GOOD/BAD or numeric check verdicts found in al-khaser output."
+                ),
                 truncated=truncated,
             )
 

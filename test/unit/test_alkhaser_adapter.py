@@ -533,7 +533,8 @@ def test_run_captures_diagnostic_twice_without_affecting_result(
     result = adapter.run(session, options, tmp_path, deadline=time.time() + 60)
 
     assert result.status == ToolStatus.ok
-    assert len(result.checks) == 2
+    # Only the one observed verdict is a check; the catalog is metadata.
+    assert [c.status for c in result.checks] == [CheckStatus.clean]
 
     raw_dir = tmp_path / "raw" / "alkhaser"
     post_upload = json.loads((raw_dir / "diag_post_upload.json").read_text())
@@ -907,7 +908,8 @@ def test_run_captures_metadata_probe_at_both_checkpoints(tmp_path, alkhaser_bina
     result = adapter.run(session, options, tmp_path, deadline=time.time() + 60)
 
     assert result.status == ToolStatus.ok
-    assert len(result.checks) == 2
+    # Only the one observed verdict is a check; the catalog is metadata.
+    assert [c.status for c in result.checks] == [CheckStatus.clean]
 
     raw_dir = tmp_path / "raw" / "alkhaser"
     post_upload = json.loads((raw_dir / "probe_post_upload.json").read_text())
@@ -948,7 +950,8 @@ def test_run_probe_failure_does_not_alter_verifier_result(tmp_path, alkhaser_bin
 
     assert result.status == ToolStatus.ok
     assert result.error is None
-    assert len(result.checks) == 2
+    # Only the one observed verdict is a check; the catalog is metadata.
+    assert [c.status for c in result.checks] == [CheckStatus.clean]
     # al-khaser itself still launched despite both probes failing.
     assert any("--sleep" in argv[2] for (argv, _t, _c) in session.run_calls)
 
@@ -1595,7 +1598,8 @@ def test_run_read_probe_failure_does_not_alter_verifier_result(
 
     assert result.status == ToolStatus.ok
     assert result.error is None
-    assert len(result.checks) == 2
+    # Only the one observed verdict is a check; the catalog is metadata.
+    assert [c.status for c in result.checks] == [CheckStatus.clean]
     # al-khaser still launched exactly once.
     assert _diagnostic_order(session).count("launch") == 1
 
