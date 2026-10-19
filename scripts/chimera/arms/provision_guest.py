@@ -34,6 +34,8 @@ def main() -> int:
     # script gets its own path, and it is deleted afterwards so it isn't in the snapshot.
     parser.add_argument("--guest-path", default=None)
     parser.add_argument("--upload", action="append", default=[], metavar="HOST_PATH=GUEST_PATH")
+    # Seconds per uploaded file; the injector's default of 60 is short for large installers.
+    parser.add_argument("--upload-timeout", type=int, default=60)
     # Passed to the script after -File, e.g. --arg=-WhatIf (repeatable).
     parser.add_argument("--arg", action="append", default=[], dest="script_args")
     args = parser.parse_args()
@@ -48,7 +50,7 @@ def main() -> int:
         host_path, _, upload_guest_path = upload.partition("=")
         if not upload_guest_path:
             parser.error(f"--upload needs HOST_PATH=GUEST_PATH, got {upload!r}")
-        injector.write_file(str(pathlib.Path(host_path).resolve()), upload_guest_path)
+        injector.write_file(str(pathlib.Path(host_path).resolve()), upload_guest_path, timeout=args.upload_timeout)
     injector.write_file(str(args.script.resolve()), guest_path)
 
     shell = Drakshell(vm.vm_name)
