@@ -120,13 +120,51 @@ cc_compile_date` (Mon Oct 19 10:59:32 IST 2026). After a reboot, start
 - Xen: if the patched hypervisor does not boot, pick plain "Debian GNU/Linux" in
   GRUB, run `sudo cp /boot/xen-4.19.2.gz.orig /boot/xen-4.19.2.gz` and reboot.
 
-## Remaining DRAKVUF failure (not a freeze)
+## DRAKVUF "re-copying remapped gfn" exits: root cause and fix
 
-With the default full apimon hook list, DRAKVUF sometimes exits with rc 0 after
-`Critical error in re-copying remapped gfn` / `Failed to refresh shadow copy`: 3 of
-11 PERDEDOR scans on the patched Xen, 0 of 20 with the 43- and 276-hook lists.
-The guest keeps running; the scan or analysis is recorded as incomplete. Not yet
-diagnosed (`refresh_shadow_copy()` in DRAKVUF's libusermode).
+With the default full apimon hook list, DRAKVUF sometimes stopped with rc 0 after
+`Critical error in re-copying remapped gfn` / `Failed to refresh shadow copy` (5 of 17
+PERDEDOR scans on 2026-10-19). The guest kept running; the scan was marked incomplete.
+This is a use-after-free in DRAKVUF's `libdrakvuf/vmi.c`, present in da982ab and in
+upstream master (unchanged up to upstream 52483ba6, 2026-09-26).
+
+1. A write to a page carrying breakpoints is intercepted in `_pre_mem_cb`, which saves
+   a borrowed pointer to that page's breakpoint list: `pass->traps =
+   g_hash_table_lookup(breakpoint_lookup_gfn, gfn)` (`vmi.c:583`; the IDRX path does the
+   same at `vmi.c:473`).
+2. One single-step later, `_post_mem_cb` runs trap callbacks and
+   `process_free_requests()`. Removing a breakpoint on the same page calls
+   `g_slist_remove()` on that list (`vmi.c:1145`), freeing nodes.
+3. `refresh_shadow_copy()` then walks the saved `pass->traps` (`vmi.c:230`). If a node was freed and
+   reused, its `data` is a heap pointer, and `vmi_read_8_pa()` on it fails. If it was
+   freed but not yet reused, DRAKVUF silently writes `0xCC` into the shadow copy at a
+   breakpoint that no longer exists.
+
+Evidence: an instrumented build
+(`scripts/chimera/patches/drakvuf-da982ab-refresh-shadow-copy-diag.patch`) caught 2
+failures in 6 scans. Both failed at the breakpoint-byte read with "physical addresses"
+`0x563059962ac0` and `0x5609f1936820` (DRAKVUF heap pointers), while both the original and
+the shadow page mapped normally.
+
+**Fix** (`scripts/chimera/patches/drakvuf-da982ab-refresh-shadow-copy-stale-trap-list.patch`,
+applies to da982ab and b2f64d8): keep the original condition (refresh only after a
+write to a page that had breakpoints, `pass->traps` used as a flag only), walk the
+current list from `breakpoint_lookup_gfn`, skip breakpoints already removed, and look up
+the shadow page if the page got its first breakpoint during the step. Two earlier
+attempts were wrong and are recorded for reviewers: refreshing whenever the page has
+breakpoints now crashed on pages without a recorded shadow (NULL `remapped_gfn`), and
+refreshed after reads too (one page read 1.5 million times, run 277 s instead of ~100 s).
+
+| DRAKVUF build, default hook list, patched Xen | Complete | Notes |
+|---|---|---|
+| da982ab (production) | 12/17 | 5 "re-copying remapped gfn" exits |
+| da982ab + fix (diagnostic logging) | **20/20** | 96–116 s per scan; the stale-list case occurred 11 times and was handled |
+| da982ab + fix (clean build, `drakvuf-da982ab-chimera1`, sha256 `d04230a0…2867e0bf`) | **5/5** | 106–111 s per scan |
+
+The clean build runs for the evasion worker only (systemd drop-in
+`/etc/systemd/system/drakrun-evasion-worker@.service.d/chimera-diag.conf` puts
+`/opt/chimera/drakvuf-diag/bin` first in `PATH`). Portal analyses still use the unpatched
+`/usr/local/bin/drakvuf` until the owner decides to install it there.
 
 ## Injector readfile race
 
