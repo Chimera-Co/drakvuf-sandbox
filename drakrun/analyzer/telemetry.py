@@ -55,6 +55,8 @@ def summarize_telemetry(
     drakvuf_hard_timeout: bool,
     drakvuf_runtime_s: Optional[float] = None,
     analysis_timeout_s: Optional[int] = None,
+    vm_stalled: bool = False,
+    vm_max_stall_s: Optional[float] = None,
 ) -> Dict[str, Any]:
     plugin_status = {}
     for plugin in plugins:
@@ -79,11 +81,15 @@ def summarize_telemetry(
         "drakvuf_runtime_s": None if drakvuf_runtime_s is None else round(drakvuf_runtime_s, 1),
         "drakvuf_exited_early": exited_early,
         "drakvuf_errors": errors,
+        # Guest vCPUs made no progress while DRAKVUF was attached (see StallMonitor).
+        "vm_stalled": vm_stalled,
+        "vm_max_stall_s": None if vm_max_stall_s is None else round(vm_max_stall_s, 1),
         # One verdict for reports and benchmarks: the engine ran the whole window cleanly.
         "complete": drakvuf_returncode == 0
         and not drakvuf_hard_timeout
         and not exited_early
-        and not errors,
+        and not errors
+        and not vm_stalled,
         "plugins": plugin_status,
         "missing_plugins": sorted(
             name for name, entry in plugin_status.items() if entry["status"] != "produced"

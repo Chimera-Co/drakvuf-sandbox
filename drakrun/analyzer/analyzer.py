@@ -25,7 +25,7 @@ from .analysis_metadata import AnalysisMetadata
 from .analysis_options import AnalysisOptions, StartMethod
 from .post_restore import get_post_restore_command, prepare_ps_command
 from .postprocessing import postprocess_analysis_dir
-from .run_tools import run_drakvuf, run_screenshotter, run_tcpdump, run_vm
+from .run_tools import StallMonitor, run_drakvuf, run_screenshotter, run_tcpdump, run_vm
 from .telemetry import summarize_telemetry
 from .startup_command import (
     get_sample_filename_from_host_path,
@@ -220,6 +220,7 @@ def analyze_file(
 
     drakvuf_returncode = None
     drakvuf_hard_timeout = False
+    stall_monitor = StallMonitor(f"vm-{vm_id}")
     drakvuf_runtime_s = None
     with run_vm(
         vm_id, install_info, network_conf, no_restore=options.no_vm_restore
@@ -396,6 +397,7 @@ def analyze_file(
                     exec_parameters=exec_parameters,
                     drakvuf_cwd=output_dir,
                     fast_singlestep=config.drakrun.fast_singlestep,
+                    stall_monitor=stall_monitor,
                 ) as drakvuf,
             ):
                 log.info("Analysis started...")
@@ -427,6 +429,8 @@ def analyze_file(
         drakvuf_hard_timeout,
         drakvuf_runtime_s=drakvuf_runtime_s,
         analysis_timeout_s=options.timeout,
+        vm_stalled=stall_monitor.stalled,
+        vm_max_stall_s=stall_monitor.max_stall_s,
     )
 
     if substatus_callback is not None:

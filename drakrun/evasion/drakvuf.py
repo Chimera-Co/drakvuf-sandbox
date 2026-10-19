@@ -20,6 +20,7 @@ def verification_drakvuf(
     """
     metadata.drakvuf_attached = False
     process = None
+    stall_monitor = None
     output_file = scan_dir / "drakvuf" / "drakmon.log"
     try:
         with ExitStack() as stack:
@@ -28,7 +29,7 @@ def verification_drakvuf(
             try:
                 from drakrun.analyzer.analysis_options import AnalysisOptions
                 from drakrun.analyzer.analyzer import prepare_drakvuf_args
-                from drakrun.analyzer.run_tools import run_drakvuf
+                from drakrun.analyzer.run_tools import StallMonitor, run_drakvuf
                 from drakrun.lib.paths import DUMPS_DIR
                 from drakrun.lib.version_detection import get_drakvuf_version
 
@@ -45,6 +46,7 @@ def verification_drakvuf(
                     # Same host-level DRAKVUF switches as analyses get.
                     extra_drakvuf_args=config.drakrun.extra_drakvuf_args,
                 )
+                stall_monitor = StallMonitor(vm_name)
                 if "memdump" in options.plugins:
                     (output_dir / DUMPS_DIR).mkdir(exist_ok=True)
                 process = stack.enter_context(
@@ -59,6 +61,7 @@ def verification_drakvuf(
                         exec_parameters=None,
                         drakvuf_cwd=output_dir,
                         fast_singlestep=config.drakrun.fast_singlestep,
+                        stall_monitor=stall_monitor,
                     )
                 )
                 # Popen can succeed even when DRAKVUF immediately rejects its
@@ -80,7 +83,13 @@ def verification_drakvuf(
             finally:
                 # Check before run_drakvuf gracefully terminates the process,
                 # so an expected termination return code isn't a false failure.
-                if metadata.drakvuf_attached and process.poll() is not None:
+                if metadata.drakvuf_attached and stall_monitor.stalled:
+                    metadata.drakvuf_attached = False
+                    metadata.drakvuf_error = (
+                        "Guest vCPUs stalled under DRAKVUF for "
+                        f"{stall_monitor.max_stall_s:.0f} s; DRAKVUF was stopped"
+                    )
+                elif metadata.drakvuf_attached and process.poll() is not None:
                     metadata.drakvuf_attached = False
                     metadata.drakvuf_error = (
                         "DRAKVUF exited before verifier runs completed "

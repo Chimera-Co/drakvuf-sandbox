@@ -134,3 +134,58 @@ def test_fast_singlestep_flag_is_switchable(monkeypatch):
     )
     assert "-F" in cmdline.get_base_drakvuf_cmdline(**common)
     assert "-F" not in cmdline.get_base_drakvuf_cmdline(**common, fast_singlestep=False)
+
+
+def _monitor(cpu_times, threshold_s=40):
+    samples = iter(cpu_times)
+    clock = {"now": 0.0}
+    monitor = run_tools.StallMonitor(
+        "vm-1",
+        threshold_s=threshold_s,
+        read_cpu_time=lambda name: next(samples),
+        clock=lambda: clock["now"],
+    )
+    return monitor, clock
+
+
+def test_stall_monitor_stops_drakvuf_once_when_guest_cpu_freezes():
+    # Observed apimon hang: CPU time stops at 37.2 while DRAKVUF stays alive.
+    monitor, clock = _monitor([30.0, 33.5, 37.2] + [37.2] * 10)
+    stops = []
+    monitor.on_stall = lambda: stops.append(clock["now"])
+    for _ in range(13):
+        monitor.sample()
+        clock["now"] += 5
+    assert monitor.stalled is True
+    assert stops == [50.0]
+    assert monitor.max_stall_s == 50.0
+
+
+def test_stall_monitor_ignores_slow_progress_and_unreadable_samples():
+    # Idle guest: CPU time moves by 0.1 s every 15-20 s; xl sometimes fails.
+    samples = [10.0 + 0.1 * (i // 4) if i % 7 else None for i in range(28)]
+    monitor, clock = _monitor(samples)
+    for _ in range(28):
+        monitor.sample()
+        clock["now"] += 5
+    assert monitor.stalled is False
+    assert monitor.max_stall_s < 40
+
+
+def test_xl_cpu_time_parses_time_column(monkeypatch):
+    out = (
+        "Name                                        ID   Mem VCPUs\tState\tTime(s)\n"
+        "vm-1                                        62  5121     4     ------      37.2\n"
+    )
+    monkeypatch.setattr(
+        run_tools.subprocess,
+        "run",
+        lambda *a, **k: subprocess.CompletedProcess(a, 0, stdout=out, stderr=""),
+    )
+    assert run_tools.xl_cpu_time("vm-1") == 37.2
+    monkeypatch.setattr(
+        run_tools.subprocess,
+        "run",
+        lambda *a, **k: subprocess.CompletedProcess(a, 1, stdout="", stderr="no domain"),
+    )
+    assert run_tools.xl_cpu_time("vm-1") is None

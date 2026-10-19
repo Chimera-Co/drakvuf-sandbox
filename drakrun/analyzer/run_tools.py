@@ -5,7 +5,7 @@ import pathlib
 import subprocess
 import threading
 import time
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from drakrun.analyzer.screenshotter import Screenshotter
 from drakrun.analyzer.startup_command import ExecParameters
@@ -71,6 +71,69 @@ def log_activity_watchdog(
             logger.debug(f"Watchdog error: {e}")
 
 
+# A guest whose vCPUs accrue no CPU time for this long is stalled. Seen with
+# apimon on this host: DRAKVUF stays alive in poll() while every vCPU waits, so
+# without this the analysis runs out its timeout with a silently truncated log.
+VM_STALL_THRESHOLD_S = 40
+
+
+def xl_cpu_time(vm_name: str) -> Optional[float]:
+    try:
+        out = subprocess.run(
+            ["xl", "list", vm_name], capture_output=True, text=True, timeout=10
+        ).stdout
+        return float(out.splitlines()[1].split()[5])
+    except (subprocess.SubprocessError, OSError, IndexError, ValueError):
+        return None
+
+
+class StallMonitor:
+    def __init__(
+        self,
+        vm_name: str,
+        threshold_s: float = VM_STALL_THRESHOLD_S,
+        interval_s: float = 5.0,
+        read_cpu_time: Callable[[str], Optional[float]] = xl_cpu_time,
+        clock: Callable[[], float] = time.monotonic,
+    ):
+        self.vm_name = vm_name
+        self.threshold_s = threshold_s
+        self.interval_s = interval_s
+        self._read_cpu_time = read_cpu_time
+        self._clock = clock
+        self._last_cpu: Optional[float] = None
+        self._progress_at = 0.0
+        self.max_stall_s = 0.0
+        self.stalled = False
+        # Set by run_drakvuf: stop DRAKVUF instead of waiting out the timeout.
+        self.on_stall: Optional[Callable[[], None]] = None
+
+    def sample(self) -> None:
+        cpu = self._read_cpu_time(self.vm_name)
+        now = self._clock()
+        if cpu is None:
+            return
+        if self._last_cpu is None or cpu > self._last_cpu:
+            self._last_cpu, self._progress_at = cpu, now
+            return
+        stall = now - self._progress_at
+        self.max_stall_s = max(self.max_stall_s, stall)
+        if stall >= self.threshold_s and not self.stalled:
+            self.stalled = True
+            logger.warning(
+                f"{self.vm_name}: no guest CPU progress for {stall:.0f} s, stopping DRAKVUF"
+            )
+            if self.on_stall is not None:
+                self.on_stall()
+
+    def run(self, stop_event: threading.Event) -> None:
+        while not stop_event.wait(timeout=self.interval_s):
+            try:
+                self.sample()
+            except Exception as e:
+                logger.debug(f"Stall monitor error: {e}")
+
+
 @contextlib.contextmanager
 def run_drakvuf(
     vm_name: str,
@@ -83,6 +146,7 @@ def run_drakvuf(
     exec_parameters: Optional[ExecParameters] = None,
     drakvuf_cwd: Optional[pathlib.Path] = None,
     fast_singlestep: bool = True,
+    stall_monitor: Optional[StallMonitor] = None,
 ):
     drakvuf_cmdline = get_base_drakvuf_cmdline(
         vm_name,
@@ -111,17 +175,29 @@ def run_drakvuf(
         name="drakvuf-watchdog",
     )
     watchdog_thread.start()
+    stall_thread = None
 
     try:
         with output_file.open("wb") as output, output_err_file.open("wb") as output_err:
             drakvuf = subprocess.Popen(
                 drakvuf_cmdline, stdout=output, stderr=output_err, cwd=drakvuf_cwd
             )
+            if stall_monitor is not None:
+                stall_monitor.on_stall = drakvuf.terminate
+                stall_thread = threading.Thread(
+                    target=stall_monitor.run,
+                    args=(stop_watchdog,),
+                    daemon=True,
+                    name="drakvuf-stall-monitor",
+                )
+                stall_thread.start()
             with process_graceful_exit(drakvuf):
                 yield drakvuf
     finally:
         stop_watchdog.set()
         watchdog_thread.join(timeout=1)
+        if stall_thread is not None:
+            stall_thread.join(timeout=1)
 
 
 @contextlib.contextmanager

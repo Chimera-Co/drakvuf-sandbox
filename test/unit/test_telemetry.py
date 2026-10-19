@@ -100,3 +100,14 @@ def test_early_exit_is_flagged(tmp_path):
     )
     assert summary["drakvuf_exited_early"] is True
     assert summary["complete"] is False
+
+
+def test_guest_stall_is_not_complete(tmp_path):
+    (tmp_path / "procmon.log").write_text("x")
+    summary = telemetry.summarize_telemetry(
+        tmp_path, ["procmon"], 0, False, drakvuf_runtime_s=131.0, analysis_timeout_s=120,
+        vm_stalled=True, vm_max_stall_s=42.04,
+    )
+    assert summary["vm_stalled"] is True
+    assert summary["vm_max_stall_s"] == 42.0
+    assert summary["complete"] is False

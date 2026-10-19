@@ -89,6 +89,14 @@ def worker_module(monkeypatch, tmp_path):
         yield FakeVm()
 
     fake_run_tools.run_vm = fake_run_vm
+
+    class FakeStallMonitor:
+        def __init__(self, vm_name):
+            self.vm_name = vm_name
+            self.stalled = False
+            self.max_stall_s = 0.0
+
+    fake_run_tools.StallMonitor = FakeStallMonitor
     monkeypatch.setitem(sys.modules, "drakrun.analyzer.run_tools", fake_run_tools)
 
     monkeypatch.setattr(
@@ -487,6 +495,10 @@ def instrumented_scan(worker_module, app_config, monkeypatch, tmp_path):
             guest.drakshell.check_call(f"run-{tool_id}")
             if captured.get("exit_during_tool"):
                 process.returncode = 2
+            if captured.get("stall_during_tool"):
+                captured["stall_monitor"].stalled = True
+                captured["stall_monitor"].max_stall_s = 45.0
+                process.returncode = -15
             if captured.get("adapter_error"):
                 raise ValueError("adapter bug")
             yield
@@ -649,6 +661,17 @@ def test_drakvuf_early_exit_invalidates_results_and_stops_further_tools(
     assert metadata["score"]["state"] == "incomplete"
     assert "run-alkhaser" not in scan.events
     assert scan.events[-3:] == ["drakvuf-stop", "collect-perdedor", "destroy"]
+
+
+def test_guest_stall_under_drakvuf_invalidates_results(instrumented_scan):
+    scan = instrumented_scan
+    scan.captured["stall_during_tool"] = True
+    metadata = scan.execute(with_drakvuf=True)
+    assert scan.captured["stall_monitor"].vm_name == "vm-1"
+    assert metadata["drakvuf_attached"] is False
+    assert "stalled under DRAKVUF for 45 s" in metadata["drakvuf_error"]
+    assert all(result["status"] == "error" for result in metadata["tool_results"])
+    assert metadata["score"]["state"] == "incomplete"
 
 
 def test_drakvuf_stops_even_when_adapters_raise(instrumented_scan):
