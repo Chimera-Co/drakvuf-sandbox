@@ -19,6 +19,9 @@ EXTRA_ARTEFACTS = {
     "tlsmon": ["wireshark_key_file.txt"],
 }
 
+# Plugins that only act on the guest (hidsim injects mouse input) and never write a log.
+NO_LOG_PLUGINS = {"hidsim"}
+
 # DRAKVUF reports internal failures on stderr but can still exit with code 0,
 # e.g. "Critical error in re-copying remapped gfn" (seen with apimon under
 # heavy registry/WMI load on this host).
@@ -60,6 +63,9 @@ def summarize_telemetry(
 ) -> Dict[str, Any]:
     plugin_status = {}
     for plugin in plugins:
+        if plugin in NO_LOG_PLUGINS:
+            plugin_status[plugin] = {"status": "no_log", "bytes": 0}
+            continue
         entry = file_status(analysis_dir / f"{plugin}.log")
         for artefact in EXTRA_ARTEFACTS.get(plugin, []):
             entry[artefact] = file_status(analysis_dir / artefact)["status"]
@@ -92,7 +98,7 @@ def summarize_telemetry(
         and not vm_stalled,
         "plugins": plugin_status,
         "missing_plugins": sorted(
-            name for name, entry in plugin_status.items() if entry["status"] != "produced"
+            name for name, entry in plugin_status.items() if entry["status"] not in ("produced", "no_log")
         ),
         "pcap": file_status(analysis_dir / "dump.pcap"),
         "screenshots": screenshots,

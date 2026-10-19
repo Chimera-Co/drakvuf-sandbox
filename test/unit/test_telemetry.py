@@ -28,6 +28,15 @@ def test_summarize_telemetry_classifies_plugin_outputs(tmp_path):
     assert summary["drakvuf_hard_timeout"] is False
 
 
+def test_input_only_plugin_is_not_reported_missing(tmp_path):
+    (tmp_path / "procmon.log").write_text("{}\n")
+
+    summary = telemetry.summarize_telemetry(tmp_path, ["procmon", "hidsim"], 0, False)
+
+    assert summary["plugins"]["hidsim"]["status"] == "no_log"
+    assert summary["missing_plugins"] == []
+
+
 def test_hard_timeout_and_unknown_returncode_are_recorded(tmp_path):
     (tmp_path / "procmon.log").write_text("x")
     summary = telemetry.summarize_telemetry(tmp_path, ["procmon", "regmon"], None, True)
