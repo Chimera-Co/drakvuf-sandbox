@@ -35,9 +35,12 @@ Evidence paths under `/var/lib/chimera-evidence/` are on the CHIMERA host (root-
 | 07:40–07:49 | `drakrun modify-vm0 commit` rc 0 (only optional .NET 2.0 `mscorwks` profile absent); `chimera-arm adopt` → H1 snapshot live | — |
 | 07:52 | **H1 restore validated on vm-1: 15/15** (SMBIOS Acer/INSYDE, WD disk, Intel MAC, 4 vCPU, 5104 MB, no Xen PCI, Defender off, VC++ present); restore 3.3 s, drakshell immediate. Note: guest keeps the MAC it booted with (`…:00`) on every restored VM | `H1-identity-check-vm1.txt` |
 | 07:55–08:00 | H1 smoke via web→queue→worker, BGInfo ×2: **2/2 finished, `complete=true`**, rc 0, full 120 s window, no leftovers; VM start→exec **10.4 s** (A0: 17.0 ± 1.0 s); 8/9 plugins produced, `clipboardmon` empty as in all 10 A0 runs (BGInfo never uses the clipboard) | `H1-smoke/series.json` |
+| 08:00–08:20 | INetSim answers NCSI (`connecttest.txt`, `ncsi.txt`, `dns.msftncsi.com`); `-F` made configurable; al-khaser parser reads every stdout verdict → real H1 run parses to **336 verdicts: 309 clean / 27 detected** (Xen, QEMU, Hyper-V, generic VM, timing, debugger sections) | `1f3d1ac`, `d32d867`, `6cf4611` |
+| 08:10–08:38 | apimon hang isolation on H1, PERDEDOR workload, 3 runs each: default hooks with `-F` **0/3**, without `-F` **0/3**, alternative injection mode **0/3**, entry-only hooks **2/3** (~252k apimon events, `RegEnumKeyExW` 216,559), thin 23-hook list **3/3** (~3.1k events), pruned 296-hook list **0/3** (died after 8–13.5k events). Every hang: DRAKVUF exits rc 0 and leaves the domain **paused**. Hangs track the number of installed hooks, not event volume; consistent with a pause leak in the user-hook path (hypothesis, no patch tested) | `apimon-2026-10-19/` (+ `*-hang-diag.txt`) |
 
 ## Decisions
 - **Downloads and real malware stay operator-initiated** (VC++ redistributable, app installers for guest realism, malware samples).
 - **No host reboot** in autonomous work: the laptop boots Windows by default and needs a manual path into Xen.
 - **Guest login is the owner's step**: the golden image has a password-protected account and no auto-logon; Claude never types guest credentials.
 - **H1 identity mirrors the host laptop model** (consistent with the real CPU exposed by `cpuid=host`); serials are synthetic.
+- **Proposed (team to confirm): real-malware runs use the thin apimon hook list** until a larger list passes 3/3 or a DRAKVUF fix is verified; registry coverage comes from regmon, and every report states which APIs were hooked.
