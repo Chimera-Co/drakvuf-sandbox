@@ -395,6 +395,7 @@ def analyze_file(
                     drakvuf_version_info=drakvuf_version_info,
                     exec_parameters=exec_parameters,
                     drakvuf_cwd=output_dir,
+                    fast_singlestep=config.drakrun.fast_singlestep,
                 ) as drakvuf,
             ):
                 log.info("Analysis started...")

@@ -56,6 +56,7 @@ def verification_drakvuf(
                         drakvuf_version_info=get_drakvuf_version(),
                         exec_parameters=None,
                         drakvuf_cwd=output_dir,
+                        fast_singlestep=config.drakrun.fast_singlestep,
                     )
                 )
                 # Popen can succeed even when DRAKVUF immediately rejects its

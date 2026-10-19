@@ -14,13 +14,14 @@ def get_base_drakvuf_cmdline(
     start_method: Optional[str] = None,
     working_dir: Optional[str] = None,
     extra_args: Optional[List[str]] = None,
+    fast_singlestep: bool = True,
 ) -> List[str]:
     args = [
         "drakvuf",
         "-o",
         "json",
         # be aware of https://github.com/tklengyel/drakvuf/pull/951
-        "-F",  # enable fast singlestep
+        *(["-F"] if fast_singlestep else []),  # enable fast singlestep
         "-k",
         hex(vmi_info.vmi_offsets.kpgd),
         "-r",

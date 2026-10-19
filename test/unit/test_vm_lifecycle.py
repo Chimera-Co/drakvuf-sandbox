@@ -118,3 +118,19 @@ def test_failed_restore_is_still_cleaned_up(monkeypatch, tmp_path):
         with run_tools.run_vm(1, None, None):
             pass
     assert FakeVM.calls == ["restore", "destroy"]
+
+
+def test_fast_singlestep_flag_is_switchable(monkeypatch):
+    from types import SimpleNamespace
+
+    import drakrun.lib.drakvuf_cmdline as cmdline
+
+    monkeypatch.setattr(cmdline, "get_dll_cmdline_args", lambda _: [])
+    common = dict(
+        vm_name="vm-1",
+        kernel_profile_path="/k.json",
+        vmi_info=SimpleNamespace(vmi_offsets=SimpleNamespace(kpgd=0x1AA000)),
+        drakvuf_version_info=None,
+    )
+    assert "-F" in cmdline.get_base_drakvuf_cmdline(**common)
+    assert "-F" not in cmdline.get_base_drakvuf_cmdline(**common, fast_singlestep=False)

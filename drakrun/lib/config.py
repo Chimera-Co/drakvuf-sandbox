@@ -55,6 +55,9 @@ class DrakrunConfigSection(BaseModel):
     worker_hostname: Optional[str] = None
     # Don't pick 'shellexec' method even if supported by Drakvuf
     no_shellexec: bool = False
+    # DRAKVUF -F (Xen fast singlestep). Upstream leaves it off by default;
+    # drakrun has always passed it. Switchable to test the apimon crash.
+    fast_singlestep: bool = True
 
 
 class DrakrunDefaultsPresetSection(BaseModel):

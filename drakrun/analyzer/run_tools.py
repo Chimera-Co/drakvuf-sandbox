@@ -82,6 +82,7 @@ def run_drakvuf(
     drakvuf_version_info: DrakvufVersionInfo,
     exec_parameters: Optional[ExecParameters] = None,
     drakvuf_cwd: Optional[pathlib.Path] = None,
+    fast_singlestep: bool = True,
 ):
     drakvuf_cmdline = get_base_drakvuf_cmdline(
         vm_name,
@@ -89,6 +90,7 @@ def run_drakvuf(
         vmi_info=vmi_info,
         drakvuf_version_info=drakvuf_version_info,
         extra_args=drakvuf_args,
+        fast_singlestep=fast_singlestep,
         **(
             dict(
                 exec_cmd=exec_parameters.command,
