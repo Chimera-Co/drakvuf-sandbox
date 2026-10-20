@@ -16,3 +16,10 @@ enabled = false
 # Unset or missing model_path uses the labelled demonstration stub.
 # model_path = "/etc/drakrun/classifier/model.py"
 timeout_s = 60
+
+[worker]
+# No bindings means every worker serves Windows and Linux, as before.
+# vm_guest_os = {1 = "windows", 2 = "linux"}
+memory_admission_timeout = 1800
+memory_admission_poll_interval = 5
+memory_admission_margin_mb = 192

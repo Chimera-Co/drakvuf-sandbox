@@ -7,12 +7,15 @@ import threading
 import time
 from typing import Callable, List, Optional
 
+from rq import get_current_job
+
 from drakrun.analyzer.screenshotter import Screenshotter
 from drakrun.analyzer.startup_command import ExecParameters
-from drakrun.lib.config import NetworkConfigSection
+from drakrun.lib.config import NetworkConfigSection, load_config
 from drakrun.lib.drakvuf_cmdline import get_base_drakvuf_cmdline
 from drakrun.lib.install_info import InstallInfo
 from drakrun.lib.libvmi import VmiInfo
+from drakrun.lib.memory_admission import memory_admission
 from drakrun.lib.network_info import NetworkInfo
 from drakrun.lib.networking import start_tcpdump_collector
 from drakrun.lib.paths import RUN_DIR
@@ -239,9 +242,21 @@ def run_vm(
             yield vm
         else:
             try:
+                # Reclaim a stale domain from a previous worker before asking
+                # Xen for enough memory to restore this slot again.
+                if vm.is_running:
+                    vm.destroy()
                 # restore() is inside the try: a failed restore can leave a
                 # half-created domain or the network up, and must be torn down.
-                vm.restore()
+                with memory_admission(
+                    install_info.memory, load_config().worker, lock_dir=RUN_DIR
+                ) as waited:
+                    vm.restore()
+                if waited >= 1:
+                    job = get_current_job()
+                    if job is not None:
+                        job.meta["memory_admission_wait_seconds"] = round(waited, 3)
+                        job.save_meta()
                 yield vm
             finally:
                 vm.destroy()

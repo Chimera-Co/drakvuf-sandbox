@@ -98,6 +98,7 @@ def test_vm_lock_is_exclusive_and_released(tmp_path):
 
 class FakeVM:
     calls = []
+    is_running = False
 
     def __init__(self, vm_id, install_info, network_conf):
         self.vm_id = vm_id
@@ -110,12 +111,16 @@ class FakeVM:
         FakeVM.calls.append("destroy")
 
 
-def test_failed_restore_is_still_cleaned_up(monkeypatch, tmp_path):
+def test_failed_restore_is_still_cleaned_up(monkeypatch, tmp_path, base_config):
+    from types import SimpleNamespace
+
     FakeVM.calls = []
     monkeypatch.setattr(run_tools, "VirtualMachine", FakeVM)
     monkeypatch.setattr(run_tools, "RUN_DIR", tmp_path)
+    monkeypatch.setattr(run_tools, "load_config", lambda: base_config)
+    monkeypatch.setattr("drakrun.lib.memory_admission.xen_free_memory_mb", lambda: 9999)
     with pytest.raises(RuntimeError, match="Failed to restore"):
-        with run_tools.run_vm(1, None, None):
+        with run_tools.run_vm(1, SimpleNamespace(memory=5120), None):
             pass
     assert FakeVM.calls == ["restore", "destroy"]
 

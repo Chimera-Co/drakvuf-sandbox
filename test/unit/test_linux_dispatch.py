@@ -20,7 +20,10 @@ from drakrun.cli.analyze import analyze
 
 
 @pytest.mark.parametrize("guest_os", ["linux", "windows"])
-def test_worker_dispatch_and_metadata(tmp_path, monkeypatch, base_config, guest_os):
+@pytest.mark.parametrize("bound", [False, True])
+def test_worker_dispatch_and_metadata(
+    tmp_path, monkeypatch, base_config, guest_os, bound
+):
     sample = tmp_path / "sample"
     sample.write_bytes(b"test")
     options = AnalysisOptions.with_config_defaults(
@@ -35,6 +38,9 @@ def test_worker_dispatch_and_metadata(tmp_path, monkeypatch, base_config, guest_
         save_meta=Mock(),
     )
     monkeypatch.setattr(worker, "_WORKER_VM_ID", 2)
+    monkeypatch.setattr(worker, "_WORKER_GUEST_OS", guest_os if bound else "any")
+    if bound:
+        job.meta["memory_admission_wait_seconds"] = 5.5
     monkeypatch.setattr(worker, "ANALYSES_DIR", tmp_path / "analyses")
     monkeypatch.setattr(worker, "load_config", lambda: base_config)
     monkeypatch.setattr(worker, "get_current_job", lambda: job)
@@ -55,6 +61,8 @@ def test_worker_dispatch_and_metadata(tmp_path, monkeypatch, base_config, guest_
     assert saved.status == "finished"
     assert saved.model_extra["selected"] == guest_os
     assert job.meta["extra_metadata"] == {"selected": guest_os}
+    if bound:
+        assert saved.model_extra["memory_admission_wait_seconds"] == 5.5
     assert not sample.exists()
 
 

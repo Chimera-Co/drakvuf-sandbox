@@ -61,6 +61,18 @@ class VirtualMachine:
         template = template.replace("{{ VNC_PORT }}", str(6400 + self.vm_id))
         template = template.replace("{{ VCPUS }}", str(self.install_info.vcpus))
         template = template.replace("{{ MEMORY }}", str(self.install_info.memory))
+        cpus = self.install_info.cpus
+        if "{{ CPUS }}" in template:
+            if cpus is not None:
+                template = template.replace("{{ CPUS }}", cpus)
+            else:
+                template = "".join(
+                    line
+                    for line in template.splitlines(keepends=True)
+                    if "{{ CPUS }}" not in line
+                )
+        elif cpus is not None:
+            template = template.rstrip("\n") + f'\ncpus = "{cpus}"\n'
         template = template.replace("{{ VNC_PASS }}", str(self.install_info.vnc_passwd))
         template = template.replace(
             "{{ BRIDGE_NAME }}", str(self._network_info.bridge_name)

@@ -1,5 +1,5 @@
 import pathlib
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import (
@@ -32,6 +32,17 @@ class NetworkConfigSection(BaseModel):
     dns_server: str
     out_interface: str
     net_enable: bool
+
+
+WorkerGuestOS = Literal["windows", "linux", "any"]
+
+
+class WorkerConfigSection(BaseModel):
+    vm_guest_os: Dict[int, WorkerGuestOS] = Field(default_factory=dict)
+    memory_admission_timeout: float = Field(default=1800, ge=0, allow_inf_nan=False)
+    memory_admission_poll_interval: float = Field(default=5, gt=0, allow_inf_nan=False)
+    # Reserve 64 MB shadow memory and 128 MB for Xen/device-model overhead.
+    memory_admission_margin_mb: int = Field(default=192, ge=0)
 
 
 class DrakrunConfigSection(BaseModel):
@@ -179,6 +190,7 @@ class DrakrunConfig(BaseSettings):
         env_nested_delimiter="__",
     )
     redis: RedisConfigSection
+    worker: WorkerConfigSection = Field(default_factory=WorkerConfigSection)
     network: NetworkConfigSection
     drakrun: DrakrunConfigSection
     capa: CapaConfigSection = CapaConfigSection()
