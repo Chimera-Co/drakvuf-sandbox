@@ -131,5 +131,5 @@ If a guest is seen reaching anything other than INetSim (the `CHIMERA-EGRESS` dr
 
 | Date | Change | By |
 |---|---|---|
-| 2026-10-19 | Initial version from the Phase-1 recon and Codex review | Claude (team review pending) |
-| 2026-10-21 | v1.1: containment, INetSim isolation, localhost-only services and root-owned deployment marked in place after checking the live host; Linux guest added (T11) | Claude (team review pending) |
+| 2026-10-19 | Initial version from the Phase-1 recon and code review | Group 3 |
+| 2026-10-21 | v1.1: containment, INetSim isolation, localhost-only services and root-owned deployment marked in place after checking the live host; Linux guest added (T11) | Group 3 |
