@@ -132,4 +132,4 @@ def test_linux_golden_is_advertised_when_present(base_config, monkeypatch, tmp_p
     )
     sandbox = resolve_sandbox(base_config, "linux")
     assert sandbox.platform == "linux"
-    assert sandbox.verifiers == ["chimera-vmcheck"]
+    assert sandbox.verifiers == ["perdedor", "chimera-vmcheck"]

@@ -142,7 +142,7 @@ def get_sandbox_registry(config: DrakrunConfig) -> List[SandboxDefinition]:
                     display_name="Linux -- Current",
                     platform="linux",
                     os_version="Debian 12",
-                    verifiers=["chimera-vmcheck"],
+                    verifiers=["perdedor", "chimera-vmcheck"],
                 )
             )
     return registry

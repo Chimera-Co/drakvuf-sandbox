@@ -167,8 +167,8 @@ class AlKhaserConfigSection(BaseModel):
 
 class PerdedorConfigSection(BaseModel):
     # Checkout of the perdedor repository. The adapter needs the on-disk
-    # agents/windows/*.ps1 tree to inject into the guest, which a wheel
-    # install would not provide.
+    # Windows agent tree or Linux/common Python sources to stage in the guest,
+    # which a wheel install would not provide.
     repo_path: Optional[pathlib.Path] = None
     timeout: int = 900
 

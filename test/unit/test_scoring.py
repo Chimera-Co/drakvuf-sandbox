@@ -291,3 +291,34 @@ def test_thresholds_are_configurable():
 
     score_lenient = compute_score([result], pass_threshold=95.0, warn_threshold=90.0)
     assert score_lenient.state == ScoreState.fail  # 82.5 < 90
+
+
+@pytest.mark.parametrize(
+    "status", [ToolStatus.ok, ToolStatus.error, ToolStatus.timeout]
+)
+def test_linux_perdedor_is_primary_even_when_vmcheck_finishes(status):
+    perdedor = ToolResult(
+        tool="perdedor",
+        status=status,
+        checks=[_check("linux.primary", CheckStatus.clean)],
+    )
+    vmcheck = ToolResult(
+        tool="chimera-vmcheck",
+        status=ToolStatus.ok,
+        checks=[
+            _check(
+                "cpu.hypervisor_flag",
+                CheckStatus.detected,
+                Severity.critical,
+                tool="chimera-vmcheck",
+            )
+        ],
+    )
+    score = compute_score([vmcheck, perdedor])
+    assert score.primary_tool == "perdedor"
+    assert score.chimera_score == (100.0 if status == ToolStatus.ok else None)
+    assert "weighted_score" not in score.tool_scores["chimera-vmcheck"]
+    assert any(
+        "chimera-vmcheck ran as corroborating evidence" in r for r in score.rationale
+    )
+    assert not any("legacy Linux scoring" in r for r in score.rationale)

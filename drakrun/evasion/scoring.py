@@ -1,7 +1,7 @@
 """CHIMERA evasion scoring.
 
-Windows keeps PERDEDOR as the primary; al-khaser remains corroborating only.
-Linux uses chimera-vmcheck with the same documented severity-weighted formula.
+PERDEDOR is primary on Windows and Linux. Other tools corroborate its findings.
+Linux scans without PERDEDOR retain the historical chimera-vmcheck scoring.
 Missing, failed or insufficiently covered primaries produce an incomplete score.
 Scores describe their own checklist; they are not calibrated across OSes.
 """
@@ -19,7 +19,7 @@ from drakrun.evasion.constants import (
 )
 from drakrun.evasion.models import EvasionScore, NormalizedCheck, ToolResult
 
-# Historical Windows primary; retained for stored reports and native rendering.
+# Primary on both supported guest platforms.
 PRIMARY_TOOL_ID = "perdedor"
 
 DEFAULT_PASS_THRESHOLD = 90.0
@@ -115,18 +115,11 @@ def compute_score(
 ) -> EvasionScore:
     """Score the primary's applicable checks and retain every tool's counts.
 
-    PERDEDOR remains the Windows primary. Linux selects chimera-vmcheck when
+    PERDEDOR is primary on Windows and Linux. Linux selects chimera-vmcheck when
     PERDEDOR is absent, reusing the same formula and coverage requirements.
     Other tools remain corroborating and never change the primary's score.
     """
     rationale: List[str] = []
-    if any(tr.tool == "chimera-vmcheck" for tr in tool_results):
-        rationale.append(
-            "Linux checklist scoring uses the CHIMERA severity-weighted formula: "
-            "100 * (1 - detected severity weights / applicable checks). "
-            "Low-resource/activity/tool/timing heuristics weigh 0.15; other checks weigh 0.65. "
-            "This heuristic score is not a probability or a cross-OS benchmark."
-        )
     tool_scores: Dict[str, Any] = {
         tr.tool: _tool_native_summary(tr) for tr in tool_results
     }
@@ -137,6 +130,13 @@ def compute_score(
         and not any(tr.tool == PRIMARY_TOOL_ID for tr in tool_results)
         else PRIMARY_TOOL_ID
     )
+    if primary_tool_id == "chimera-vmcheck":
+        rationale.append(
+            "PERDEDOR was not selected; chimera-vmcheck retains its legacy Linux scoring: "
+            "100 * (1 - detected severity weights / applicable checks). "
+            "Low-resource/activity/tool/timing heuristics weigh 0.15; other checks weigh 0.65. "
+            "This heuristic score is not a probability or a cross-OS benchmark."
+        )
     primary_result = next(
         (tr for tr in tool_results if tr.tool == primary_tool_id), None
     )

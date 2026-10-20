@@ -46,6 +46,7 @@ from __future__ import annotations
 import json
 import math
 import pathlib
+import shlex
 import time
 from typing import Any, Dict, Generator, List, Optional
 
@@ -90,12 +91,7 @@ def _load_perdedor_common():
 class PerdedorAdapter(VerifierAdapter):
     id = TOOL_ID
     display_name = "PERDEDOR"
-    # PERDEDOR genuinely supports linux/android/windows platforms in its own
-    # CLI, but this adapter only implements the Windows integration so far -
-    # Linux/Android sandboxes are future work (a Linux/Android GuestSession
-    # would run `perdedor test linux`/`... android -s <serial>` directly
-    # in-guest, which needs no PowerShell-probe equivalent).
-    supported_platforms = frozenset({"windows"})
+    supported_platforms = frozenset({"windows", "linux"})
 
     def options_schema(self) -> Dict[str, Any]:
         return {
@@ -129,6 +125,11 @@ class PerdedorAdapter(VerifierAdapter):
         *,
         instrumented: bool = False,
     ) -> Generator[None, None, ToolResult]:
+        if options.get("guest_os", "windows") == "linux":
+            return (
+                yield from self._run_linux_phases(session, options, scan_dir, deadline)
+            )
+
         started_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         raw_dir = scan_dir / "raw" / TOOL_ID
         raw_dir.mkdir(parents=True, exist_ok=True)
@@ -266,18 +267,7 @@ class PerdedorAdapter(VerifierAdapter):
 
         validate_report, ValidationError = _load_perdedor_common()
         try:
-            validate_report(report, source="perdedor-guest-report")
-            weighted_score = report["summary"]["weighted_score"]
-            if (
-                isinstance(weighted_score, bool)
-                or not isinstance(weighted_score, (int, float))
-                or not math.isfinite(weighted_score)
-            ):
-                raise ValueError("summary.weighted_score must be a finite number")
-            checks = self._normalize(report)
-            ids = [check.id for check in checks]
-            if len(ids) != len(set(ids)):
-                raise ValueError("duplicate check ids")
+            checks = self._validate_and_normalize(report, validate_report)
         except (ValidationError, ValueError, TypeError, KeyError, OverflowError) as exc:
             return ToolResult(
                 tool=TOOL_ID,
@@ -308,6 +298,96 @@ class PerdedorAdapter(VerifierAdapter):
                 else None
             ),
         )
+
+    def _run_linux_phases(self, session, options, scan_dir, deadline):
+        from drakrun.lib.linux_install import GUEST_AGENT_DIR, GUEST_WORK_DIR
+        from drakrun.evasion.verifiers.perdedor_linux import build_linux_zipapp
+
+        start = time.time()
+        raw = scan_dir / "raw" / TOOL_ID
+        raw.mkdir(parents=True, exist_ok=True)
+        # Runs from where samples run; the report goes to the agent's directory
+        guest_app = f"{GUEST_WORK_DIR}/perdedor-linux.pyz"
+        guest_report = f"{GUEST_AGENT_DIR}/perdedor-linux-report.json"
+        argv = ["python3", guest_app, "--output", guest_report]
+        result = ToolResult(
+            tool=TOOL_ID,
+            status=ToolStatus.error,
+            started_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            command=shlex.join(argv),
+        )
+        (raw / "command.txt").write_text(result.command, encoding="utf-8")
+        result.raw_artifacts.append(str((raw / "command.txt").relative_to(scan_dir)))
+        try:
+            repo_path = options.get("repo_path")
+            if not repo_path:
+                result.status = ToolStatus.unsupported
+                result.error = (
+                    "No perdedor checkout configured ([evasion.perdedor].repo_path)."
+                )
+                return result
+            app = raw / "perdedor-linux.pyz"
+            try:
+                build_linux_zipapp(pathlib.Path(repo_path), app)
+            except VerifierError as exc:
+                result.status, result.error = ToolStatus.unsupported, str(exc)
+                return result
+            result.raw_artifacts.append(str(app.relative_to(scan_dir)))
+            session.put_file(app, guest_app)
+            yield
+            command = session.run(argv, timeout=max(0, deadline - time.time()))
+            result.exit_code, stdout, stderr = command
+            result.truncated = getattr(command, "truncated", False)
+            yield
+            for name, data in (
+                ("agent-stdout.txt", stdout),
+                ("agent-stderr.txt", stderr),
+            ):
+                (raw / name).write_bytes(data)
+                result.raw_artifacts.append(str((raw / name).relative_to(scan_dir)))
+            local_report = raw / "linux-report.json"
+            session.get_file(guest_report, local_report)
+            result.raw_artifacts.append(str(local_report.relative_to(scan_dir)))
+            report = json.loads(read_report_bytes(local_report).decode("utf-8"))
+            validate_report, _ = _load_perdedor_common()
+            result.checks = self._validate_and_normalize(report, validate_report)
+            if report["platform"] != "linux" or any(
+                finding["platform"] != "linux" for finding in report["findings"]
+            ):
+                raise ValueError("Expected a PERDEDOR Linux report")
+            result.tool_version = report.get("perdedor_version")
+            if result.exit_code != 0:
+                result.error = (
+                    f"PERDEDOR agent exited with exit code {result.exit_code}."
+                )
+            elif result.truncated:
+                result.error = "PERDEDOR command output was truncated"
+            else:
+                result.status = ToolStatus.ok
+        except VerifierTimeout as exc:
+            result.status, result.error = ToolStatus.timeout, str(exc)
+        except Exception as exc:  # noqa: BLE001 - transport/validation failure -> error
+            result.error = f"PERDEDOR Linux verifier failed: {exc}"
+        finally:
+            result.finished_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            result.duration_s = round(time.time() - start, 3)
+        return result
+
+    def _validate_and_normalize(self, report, validate_report):
+        """Use identical schema, finite-score and unique-id checks on both OSes."""
+        validate_report(report, source="perdedor-guest-report")
+        weighted_score = report["summary"]["weighted_score"]
+        if (
+            isinstance(weighted_score, bool)
+            or not isinstance(weighted_score, (int, float))
+            or not math.isfinite(weighted_score)
+        ):
+            raise ValueError("summary.weighted_score must be a finite number")
+        checks = self._normalize(report)
+        ids = [check.id for check in checks]
+        if len(ids) != len(set(ids)):
+            raise ValueError("duplicate check ids")
+        return checks
 
     def _probe_pwsh(
         self, session: GuestSession, deadline: float, started_at: str

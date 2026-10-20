@@ -257,6 +257,7 @@ def worker_verify(options: EvasionScanOptions) -> None:
         run_options = {
             **validated_user_options,
             **_admin_options_for_tool(tool_id, config),
+            "guest_os": sandbox.platform,
         }
         runnable_tools.append((tool_id, adapter, run_options))
 
