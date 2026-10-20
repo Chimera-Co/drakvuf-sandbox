@@ -229,7 +229,7 @@ def render_html_report(scan_dir: pathlib.Path, metadata: EvasionScanMetadata) ->
   <p class="meta">
     Scan {html_lib.escape(metadata.id)} &middot;
     Sandbox {html_lib.escape(str(sandbox.get('display_name', sandbox.get('id', '-'))))}
-    ({html_lib.escape(str(sandbox.get('platform', '-')))}) &middot;
+    ({html_lib.escape(str(sandbox.get('platform', metadata.options.guest_os)))}) &middot;
     Profile {html_lib.escape(metadata.options.profile)}
   </p>
 </header>
@@ -245,7 +245,7 @@ def render_html_report(scan_dir: pathlib.Path, metadata: EvasionScanMetadata) ->
 <section>
   <h2>Tool-native results</h2>
   <p class="meta">
-    Each tool's own, unweighted counts. Only {html_lib.escape(PRIMARY_TOOL_ID)} contributes a
+    Each tool's own, unweighted counts. Only {html_lib.escape(score.primary_tool or PRIMARY_TOOL_ID) if score else PRIMARY_TOOL_ID} contributes a
     weighted score to the CHIMERA evasion score above; every other tool is corroborating
     evidence only and is never averaged in.
   </p>

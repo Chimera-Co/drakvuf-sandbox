@@ -44,9 +44,10 @@ def _register_builtin_adapters() -> None:
     # force-load every adapter module (and their optional dependencies) as a
     # side effect of an unrelated import elsewhere in the codebase.
     from drakrun.evasion.verifiers.alkhaser import AlKhaserAdapter
+    from drakrun.evasion.verifiers.linux_vmcheck import LinuxVmcheckAdapter
     from drakrun.evasion.verifiers.perdedor import PerdedorAdapter
 
-    for adapter_cls in (PerdedorAdapter, AlKhaserAdapter):
+    for adapter_cls in (PerdedorAdapter, AlKhaserAdapter, LinuxVmcheckAdapter):
         register(adapter_cls())
 
 

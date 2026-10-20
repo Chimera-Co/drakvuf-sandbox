@@ -4,15 +4,7 @@ import { CanceledError } from "axios";
 import { getSandboxes, createScan } from "./evasionApi.js";
 import { EvasionToolOptions } from "./EvasionToolOptions.jsx";
 
-/**
- * Every choice on this page - which sandboxes exist, which tools are
- * available for the chosen one, and what each tool can be configured with -
- * comes straight from GET /api/evasion/sandboxes. Nothing here hardcodes a
- * platform, a sandbox name, or a tool id: a Linux sandbox with no supported
- * tools yet simply renders an empty tool list, and a future third verifier
- * shows up automatically because this component only ever iterates over
- * what the API returned.
- */
+/** Sandbox and tool capabilities come from the API for the selected OS. */
 
 function ToolChecklist({ tools, selectedTools, onToggle }) {
     if (tools.length === 0) {
@@ -87,6 +79,7 @@ function EvasionScanForm() {
     const [sandboxes, setSandboxes] = useState();
     const [error, setError] = useState();
     const [sandboxId, setSandboxId] = useState();
+    const [guestOs, setGuestOs] = useState("windows");
     const [selectedTools, setSelectedTools] = useState([]);
     const [profile, setProfile] = useState("full");
     const [toolOptions, setToolOptions] = useState({});
@@ -99,11 +92,10 @@ function EvasionScanForm() {
         getSandboxes({ abortController })
             .then((response) => {
                 setSandboxes(response);
-                if (response.length > 0) {
-                    setSandboxId(response[0].id);
-                    setSelectedTools(
-                        response[0].available_tools.map((t) => t.id),
-                    );
+                const initial = response.find((s) => s.platform === "windows");
+                if (initial) {
+                    setSandboxId(initial.id);
+                    setSelectedTools(initial.available_tools.map((t) => t.id));
                 }
             })
             .catch((err) => {
@@ -133,7 +125,8 @@ function EvasionScanForm() {
         );
     }
 
-    const currentSandbox = sandboxes.find((s) => s.id === sandboxId);
+    const osSandboxes = sandboxes.filter((s) => s.platform === guestOs);
+    const currentSandbox = osSandboxes.find((s) => s.id === sandboxId);
     const availableTools = currentSandbox ? currentSandbox.available_tools : [];
 
     const onSandboxChange = (id) => {
@@ -168,6 +161,7 @@ function EvasionScanForm() {
             }
             const result = await createScan({
                 sandboxId,
+                guestOs,
                 tools: selectedTools,
                 profile,
                 toolOptions: relevantToolOptions,
@@ -183,16 +177,42 @@ function EvasionScanForm() {
     return (
         <form onSubmit={submit}>
             <div className="mb-3">
+                <label htmlFor="evasion-guest-os" className="form-label">
+                    Guest OS
+                </label>
+                <select
+                    id="evasion-guest-os"
+                    className="form-select"
+                    value={guestOs}
+                    onChange={(ev) => {
+                        const os = ev.target.value;
+                        setGuestOs(os);
+                        const sandbox = sandboxes.find(
+                            (s) => s.platform === os,
+                        );
+                        onSandboxChange(sandbox?.id);
+                    }}
+                >
+                    <option value="windows">Windows</option>
+                    <option value="linux">Linux</option>
+                </select>
+                {osSandboxes.length === 0 ? (
+                    <div className="form-text">
+                        No sandbox is available for this OS.
+                    </div>
+                ) : null}
+            </div>
+            <div className="mb-3">
                 <label htmlFor="evasion-sandbox" className="form-label">
                     Sandbox
                 </label>
                 <select
                     className="form-select"
                     id="evasion-sandbox"
-                    value={sandboxId}
+                    value={sandboxId || ""}
                     onChange={(ev) => onSandboxChange(ev.target.value)}
                 >
-                    {sandboxes.map((sandbox) => (
+                    {osSandboxes.map((sandbox) => (
                         <option key={sandbox.id} value={sandbox.id}>
                             {sandbox.display_name} ({sandbox.platform})
                         </option>
@@ -260,7 +280,11 @@ function EvasionScanForm() {
                 <button
                     className="btn btn-primary"
                     type="submit"
-                    disabled={submitting || selectedTools.length === 0}
+                    disabled={
+                        submitting ||
+                        !currentSandbox ||
+                        selectedTools.length === 0
+                    }
                 >
                     Start scan
                 </button>

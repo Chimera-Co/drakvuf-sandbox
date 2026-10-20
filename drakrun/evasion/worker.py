@@ -119,6 +119,7 @@ def worker_verify(options: EvasionScanOptions) -> None:
     frontend's poll loop from ever observing a "finished" job whose report
     isn't actually there yet.
     """
+    import contextlib
     import datetime
     import logging
     import time
@@ -129,7 +130,9 @@ def worker_verify(options: EvasionScanOptions) -> None:
     from drakrun.analyzer.run_tools import run_vm
     from drakrun.evasion.drakvuf import verification_drakvuf
     from drakrun.evasion.guest_runner import connect_guest_session
+    from drakrun.evasion.linux_guest_runner import connect_linux_guest_session
     from drakrun.evasion.report import write_evasion_json, write_html_report
+    from drakrun.evasion.sandbox_registry import LINUX_INSTALL_INFO_PATH
     from drakrun.evasion.scoring import compute_score
     from drakrun.evasion.storage import get_scan_dir
     from drakrun.evasion.verifiers import get_adapters_for_platform
@@ -151,6 +154,9 @@ def worker_verify(options: EvasionScanOptions) -> None:
         raise RuntimeError("Fatal error: no vm_id assigned in worker")
     vm_id = _WORKER_VM_ID
 
+    # Old RQ jobs may hold a pickled pre-guest_os options instance. Rebuild
+    # from its stored fields so newly added defaults also apply to those jobs.
+    options = EvasionScanOptions.model_validate(options.to_dict())
     job = get_current_job()
     config = load_config()
 
@@ -256,10 +262,18 @@ def worker_verify(options: EvasionScanOptions) -> None:
 
     job_success = True
     try:
+        if sandbox.platform != options.guest_os:
+            raise ValueError("guest_os must match the selected sandbox platform")
+        if options.guest_os == "linux" and options.with_drakvuf:
+            raise ValueError("Linux evasion scans do not yet support with_drakvuf")
         if runnable_tools:
-            install_info = InstallInfo.load(INSTALL_INFO_PATH)
-            vmi_info = VmiInfo.load(VMI_INFO_PATH)
-            kernel_profile_path = VMI_KERNEL_PROFILE_PATH.as_posix()
+            if options.guest_os == "linux":
+                install_info = InstallInfo.load(LINUX_INSTALL_INFO_PATH)
+                kernel_profile_path = str(install_info.snapshot_dir / "kernel.json")
+            else:
+                install_info = InstallInfo.load(INSTALL_INFO_PATH)
+                vmi_info = VmiInfo.load(VMI_INFO_PATH)
+                kernel_profile_path = VMI_KERNEL_PROFILE_PATH.as_posix()
             network_conf = NetworkConfigSection(
                 out_interface=config.network.out_interface,
                 dns_server=config.network.dns_server,
@@ -272,11 +286,26 @@ def worker_verify(options: EvasionScanOptions) -> None:
             # exit - regardless of how this "with" block is left (normal
             # completion, an adapter bug, a guest becoming unreachable, or
             # the score/report step raising below).
-            with run_vm(vm_id, install_info, network_conf) as vm:
-                injector = Injector(vm.vm_name, vmi_info, kernel_profile_path)
-                session = connect_guest_session(vm.vm_name, injector)
+            with run_vm(
+                vm_id, install_info, network_conf
+            ) as vm, contextlib.ExitStack() as sessions:
+                if options.guest_os == "linux":
+                    from drakrun.lib.linux_agent import (
+                        set_guest_clock as set_linux_clock,
+                    )
 
-                if not config.drakrun.no_post_restore:
+                    session = connect_linux_guest_session(
+                        vm.vm_name, kernel_profile_path
+                    )
+                    sessions.callback(session.close)
+                    if not config.drakrun.no_post_restore:
+                        metadata.guest_clock = set_linux_clock(session.agent)
+                    session.agent.call("net", {"timeout": 30}, timeout=45)
+                else:
+                    injector = Injector(vm.vm_name, vmi_info, kernel_profile_path)
+                    session = connect_guest_session(vm.vm_name, injector)
+
+                if options.guest_os == "windows" and not config.drakrun.no_post_restore:
                     post_restore_cmd = get_post_restore_command(network_conf.net_enable)
                     session.drakshell.check_call(post_restore_cmd)
                     metadata.guest_clock = set_guest_clock(session.drakshell)

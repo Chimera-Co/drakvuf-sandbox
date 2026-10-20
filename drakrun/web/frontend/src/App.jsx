@@ -64,17 +64,17 @@ function AppSidenav() {
                         <div className="sb-sidenav-menu-heading">
                             Verification
                         </div>
-                        <Link className="nav-link" to="/evasion">
-                            <div className="sb-nav-link-icon">
-                                <FontAwesomeIcon icon={faShieldHalved} />
-                            </div>
-                            Sandbox Evasion
-                        </Link>
                         <Link className="nav-link" to="/verification-runs">
                             <div className="sb-nav-link-icon">
                                 <FontAwesomeIcon icon={faClockRotateLeft} />
                             </div>
                             Verification Runs
+                        </Link>
+                        <Link className="nav-link" to="/evasion">
+                            <div className="sb-nav-link-icon">
+                                <FontAwesomeIcon icon={faShieldHalved} />
+                            </div>
+                            Sandbox Evasion
                         </Link>
                         <div className="sb-sidenav-menu-heading">Sandbox</div>
                         <a className="nav-link" href="/openapi/swagger">

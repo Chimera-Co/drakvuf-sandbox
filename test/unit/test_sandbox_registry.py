@@ -20,6 +20,15 @@ from drakrun.evasion.sandbox_registry import (
     resolve_sandbox,
 )
 
+
+@pytest.fixture(autouse=True)
+def isolated_linux_golden(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "drakrun.evasion.sandbox_registry.LINUX_INSTALL_INFO_PATH",
+        tmp_path / "install.json",
+    )
+
+
 _ONE_SANDBOX = """
 [sandbox.win10-base]
 display_name = "Windows 10 -- Current"
@@ -113,3 +122,14 @@ def test_sandbox_definition_to_dict_is_json_safe(config_factory):
 
     assert data["id"] == "win10-base"
     assert isinstance(data["verifiers"], list)
+
+
+def test_linux_golden_is_advertised_when_present(base_config, monkeypatch, tmp_path):
+    install = tmp_path / "linux-install.json"
+    install.write_text("{}")
+    monkeypatch.setattr(
+        "drakrun.evasion.sandbox_registry.LINUX_INSTALL_INFO_PATH", install
+    )
+    sandbox = resolve_sandbox(base_config, "linux")
+    assert sandbox.platform == "linux"
+    assert sandbox.verifiers == ["chimera-vmcheck"]

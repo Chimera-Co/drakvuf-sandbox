@@ -722,3 +722,81 @@ def test_drakvuf_teardown_failure_never_collects(instrumented_scan):
     metadata = json.loads((scan.scan_dir / "metadata.json").read_text())
     assert metadata["status"] == "failed"
     assert "teardown failed" in metadata["error"]
+
+
+@pytest.mark.parametrize("fail_run", [False, True])
+def test_linux_worker_restores_linux_golden_and_closes_agent(
+    worker_module, config_factory, monkeypatch, tmp_path, fail_run
+):
+    from types import SimpleNamespace
+
+    from test_linux_evasion import raw_report
+
+    config = config_factory("""
+[sandbox.linux-test]
+platform = "linux"
+verifiers = ["chimera-vmcheck"]
+""")
+    config.drakrun.no_post_restore = True
+    _patch_load_config(monkeypatch, config)
+    install_paths, closed, calls = [], [], []
+    install = SimpleNamespace(snapshot_dir=tmp_path / "golden")
+
+    def load_install(path):
+        install_paths.append(path)
+        return install
+
+    monkeypatch.setattr("drakrun.lib.install_info.InstallInfo.load", load_install)
+    monkeypatch.setattr(
+        "drakrun.lib.libvmi.VmiInfo.load",
+        lambda *a: pytest.fail("Windows VMI must not be loaded"),
+    )
+    session = FakeGuestSession(
+        files={
+            "/opt/chimera/work/linux-report.json": json.dumps(raw_report()).encode()
+        },
+        raise_on_run=RuntimeError("agent failed") if fail_run else None,
+    )
+    session.agent = SimpleNamespace(call=lambda *a, **kw: calls.append((a, kw)))
+    session.close = lambda: closed.append(True)
+    monkeypatch.setattr(
+        "drakrun.evasion.linux_guest_runner.connect_linux_guest_session",
+        lambda vm, kernel: session,
+    )
+    monkeypatch.setattr(
+        "drakrun.evasion.guest_runner.connect_guest_session",
+        lambda *a: pytest.fail("Windows session must not be opened"),
+    )
+    job = FakeJob()
+    monkeypatch.setattr("rq.get_current_job", lambda: job)
+    worker_module.worker_verify(
+        EvasionScanOptions(
+            sandbox_id="linux-test", guest_os="linux", tools=["chimera-vmcheck"]
+        )
+    )
+    report = json.loads((tmp_path / job.id / "evasion.json").read_text())
+    assert str(install_paths[0]) == "/var/lib/drakrun/linux/golden/install.json"
+    assert closed == [True]
+    assert calls[0][0][0] == "net"
+    assert report["options"]["guest_os"] == "linux"
+    assert report["tool_results"][0]["status"] == ("error" if fail_run else "ok")
+    assert report["score"]["state"] == ("incomplete" if fail_run else "fail")
+    assert "chimera-vmcheck" in (tmp_path / job.id / "report.html").read_text()
+
+
+def test_worker_accepts_pre_guest_os_pickled_options(
+    worker_module, app_config, monkeypatch, tmp_path
+):
+    _patch_load_config(monkeypatch, app_config)
+    session = FakeGuestSession()
+    monkeypatch.setattr(
+        "drakrun.evasion.guest_runner.connect_guest_session", lambda *a: session
+    )
+    job = FakeJob()
+    monkeypatch.setattr("rq.get_current_job", lambda: job)
+    options = EvasionScanOptions(sandbox_id="win10", tools=["perdedor"])
+    del options.__dict__["guest_os"]  # Shape of an old RQ-pickled instance.
+    worker_module.worker_verify(options)
+    report = json.loads((tmp_path / job.id / "evasion.json").read_text())
+    assert report["sandbox"]["platform"] == "windows"
+    assert "guest_os" not in report["options"]

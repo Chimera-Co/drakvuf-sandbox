@@ -9,7 +9,7 @@ models should stay independently evolvable.
 """
 
 import uuid
-from typing import Annotated, Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Literal, Optional
 
 from pydantic import AfterValidator, BaseModel, Field, RootModel
 
@@ -74,8 +74,13 @@ class SandboxInfo(BaseModel):
 SandboxListResponse = RootModel[List[SandboxInfo]]
 
 
+class ToolListQuery(BaseModel):
+    guest_os: Optional[Literal["windows", "linux"]] = None
+
+
 class CreateScanRequest(BaseModel):
     sandbox_id: str
+    guest_os: Literal["windows", "linux"] = "windows"
     tools: List[str]
     profile: str = "full"
     tool_options: Dict[str, Dict[str, Any]] = Field(default_factory=dict)

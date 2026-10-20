@@ -1,35 +1,9 @@
 """CHIMERA evasion scoring.
 
-This module computes exactly one number - ``chimera_score`` - and it always
-comes from PERDEDOR's own severity-weighted scoring formula (verified from
-``perdedor_common/scoring.py`` in the perdedor submodule and replicated here
-over our own ``NormalizedCheck`` list, which is a verbatim 1:1 copy of
-PERDEDOR's findings). PERDEDOR is the only verifier with a documented,
-tool-native scoring methodology; nothing here invents a weighting scheme for
-a tool that doesn't have one.
-
-al-khaser (and any future non-primary adapter) is never averaged into
-``chimera_score`` and never produces its own weighted score - al-khaser
-itself has no scoring concept at all (it is a checklist tool with a plain
-0/1 result per check and no aggregate verdict). Its results are surfaced
-purely as corroborating counts (clean/detected/errored/skipped) alongside
-the CHIMERA score, with an explicit note that they are not incorporated
-into it. This keeps "tool-native result" and "CHIMERA normalized score"
-visibly distinct, per the subsystem's design requirement.
-
-These situations must never be silently reported as a passing (or any)
-numeric score:
-  - the primary tool (PERDEDOR) did not run at all for this scan,
-  - it ran but did not complete successfully (unsupported/error/timeout),
-  - it completed, but every one of its checks ended up errored or skipped,
-    leaving nothing applicable to score (PERDEDOR's own formula would call
-    this 100.0 - "nothing detected because nothing was checked" - which
-    reads exactly like a clean, fully-verified sandbox; this module refuses
-    to make that conflation),
-  - fewer than half of its checks were applicable, leaving insufficient
-    coverage to support a headline score.
-In these cases ``chimera_score`` is ``None`` and ``state`` is
-``ScoreState.incomplete`` - never a number, and never coerced to "pass".
+Windows keeps PERDEDOR as the primary; al-khaser remains corroborating only.
+Linux uses chimera-vmcheck with the same documented severity-weighted formula.
+Missing, failed or insufficiently covered primaries produce an incomplete score.
+Scores describe their own checklist; they are not calibrated across OSes.
 """
 
 from __future__ import annotations
@@ -45,12 +19,7 @@ from drakrun.evasion.constants import (
 )
 from drakrun.evasion.models import EvasionScore, NormalizedCheck, ToolResult
 
-# The only tool this subsystem currently trusts for an aggregate score.
-# Deliberately a single constant, not a pluggable "primary tool" concept per
-# adapter, because PERDEDOR is presently the only verifier with a documented
-# native scoring methodology to reuse - inventing an equivalent for a tool
-# that has none would be exactly the kind of fabricated weighting this
-# module is required not to do.
+# Historical Windows primary; retained for stored reports and native rendering.
 PRIMARY_TOOL_ID = "perdedor"
 
 DEFAULT_PASS_THRESHOLD = 90.0
@@ -123,7 +92,7 @@ def _weighted_score(checks: List[NormalizedCheck]) -> Optional[float]:
 
 
 def _per_category_scores(checks: List[NormalizedCheck]) -> Dict[str, float]:
-    """PERDEDOR-only, weighted-score-per-category (feeds the four-category
+    """Primary-tool weighted-score-per-category (feeds the four-category
     evasion profile visualization). A category with zero applicable checks
     is omitted entirely - not scored as 0 or 100 - for the same reason
     _weighted_score returns None rather than guessing."""
@@ -144,47 +113,57 @@ def compute_score(
     pass_threshold: float = DEFAULT_PASS_THRESHOLD,
     warn_threshold: float = DEFAULT_WARN_THRESHOLD,
 ) -> EvasionScore:
-    """Combine every tool's result for one scan into a single EvasionScore.
+    """Score the primary's applicable checks and retain every tool's counts.
 
-    ``tool_scores`` carries every tool's plain, unweighted counts (the
-    tool-native view). Only ``tool_scores[PRIMARY_TOOL_ID]`` additionally
-    gets a ``weighted_score`` key - the exact number PERDEDOR's own
-    severity-weighted formula produces, and the same number ``chimera_score``
-    is set to when available. No other tool's entry ever gets a
-    ``weighted_score`` key, because no other tool has one to report.
+    PERDEDOR remains the Windows primary. Linux selects chimera-vmcheck when
+    PERDEDOR is absent, reusing the same formula and coverage requirements.
+    Other tools remain corroborating and never change the primary's score.
     """
     rationale: List[str] = []
+    if any(tr.tool == "chimera-vmcheck" for tr in tool_results):
+        rationale.append(
+            "Linux checklist scoring uses the CHIMERA severity-weighted formula: "
+            "100 * (1 - detected severity weights / applicable checks). "
+            "Low-resource/activity/tool/timing heuristics weigh 0.15; other checks weigh 0.65. "
+            "This heuristic score is not a probability or a cross-OS benchmark."
+        )
     tool_scores: Dict[str, Any] = {
         tr.tool: _tool_native_summary(tr) for tr in tool_results
     }
 
+    primary_tool_id = (
+        "chimera-vmcheck"
+        if any(tr.tool == "chimera-vmcheck" for tr in tool_results)
+        and not any(tr.tool == PRIMARY_TOOL_ID for tr in tool_results)
+        else PRIMARY_TOOL_ID
+    )
     primary_result = next(
-        (tr for tr in tool_results if tr.tool == PRIMARY_TOOL_ID), None
+        (tr for tr in tool_results if tr.tool == primary_tool_id), None
     )
     chimera_score: Optional[float] = None
     per_category: Dict[str, float] = {}
 
     if primary_result is None:
         rationale.append(
-            f"{PRIMARY_TOOL_ID} was not part of this scan; no primary CHIMERA score is available."
+            f"{primary_tool_id} was not part of this scan; no primary CHIMERA score is available."
         )
     elif primary_result.status != ToolStatus.ok:
         detail = f" Detail: {primary_result.error}" if primary_result.error else ""
         rationale.append(
-            f"{PRIMARY_TOOL_ID} did not complete successfully "
+            f"{primary_tool_id} did not complete successfully "
             f"(status={primary_result.status.value}); no primary CHIMERA score "
             f"is available.{detail}"
         )
     else:
-        summary = tool_scores[PRIMARY_TOOL_ID]
+        summary = tool_scores[primary_tool_id]
         if not summary["applicable"]:
             rationale.append(
-                f"{PRIMARY_TOOL_ID} completed, but every one of its checks was "
+                f"{primary_tool_id} completed, but every one of its checks was "
                 "errored or skipped, so there is nothing applicable to score."
             )
         elif summary["applicable"] < MIN_APPLICABLE_FRACTION * summary["total"]:
             rationale.append(
-                f"{PRIMARY_TOOL_ID} coverage is insufficient: "
+                f"{primary_tool_id} coverage is insufficient: "
                 f"{summary['applicable']}/{summary['total']} checks applicable; "
                 f"at least {MIN_APPLICABLE_FRACTION:.0%} is required for a score."
             )
@@ -192,7 +171,7 @@ def compute_score(
             chimera_score = _weighted_score(primary_result.checks)
             summary["weighted_score"] = chimera_score
             rationale.append(
-                f"CHIMERA score is {PRIMARY_TOOL_ID}'s own severity-weighted "
+                f"CHIMERA score is {primary_tool_id}'s own severity-weighted "
                 f"score over {summary['applicable']} applicable check(s) "
                 f"({summary['raw_score']} clean)."
             )
@@ -208,7 +187,7 @@ def compute_score(
     # averaged in, per the explicit requirement not to combine incompatible
     # tool scores.
     for result in tool_results:
-        if result.tool == PRIMARY_TOOL_ID:
+        if result.tool == primary_tool_id:
             continue
         summary = tool_scores[result.tool]
         if result.status == ToolStatus.ok:
@@ -238,7 +217,7 @@ def compute_score(
     return EvasionScore(
         chimera_score=chimera_score,
         state=state,
-        primary_tool=PRIMARY_TOOL_ID if primary_result is not None else None,
+        primary_tool=primary_tool_id if primary_result is not None else None,
         per_category=per_category,
         tool_scores=tool_scores,
         rationale=rationale,

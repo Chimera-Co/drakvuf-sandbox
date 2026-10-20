@@ -14,22 +14,24 @@ export async function getSandboxes({ abortController } = {}) {
     return request.data;
 }
 
-export async function getTools({ abortController } = {}) {
-    const request = await axios.get(
-        "/evasion/tools",
-        abortController ? { signal: abortController.signal } : {},
-    );
+export async function getTools({ abortController, guestOs } = {}) {
+    const request = await axios.get("/evasion/tools", {
+        ...(abortController ? { signal: abortController.signal } : {}),
+        ...(guestOs ? { params: { guest_os: guestOs } } : {}),
+    });
     return request.data;
 }
 
 export async function createScan({
     sandboxId,
+    guestOs = "windows",
     tools,
     profile,
     toolOptions = {},
 }) {
     const request = await axios.post("/evasion/scans", {
         sandbox_id: sandboxId,
+        ...(guestOs !== "windows" ? { guest_os: guestOs } : {}),
         tools,
         profile,
         tool_options: toolOptions,

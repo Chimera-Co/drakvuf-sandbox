@@ -60,6 +60,7 @@ from drakrun.web.schema_evasion import (
     SandboxListResponse,
     ScanListResponse,
     ScanStatusResponse,
+    ToolListQuery,
     ToolListResponse,
 )
 from drakrun.web.storage import list_entity_files, read_entity_file, send_entity_file
@@ -118,8 +119,11 @@ def list_sandboxes():
 
 
 @evasion_api.get("/tools", responses={200: ToolListResponse})
-def list_tools():
-    return jsonify([_tool_info(adapter) for adapter in all_adapters()])
+def list_tools(query: ToolListQuery):
+    adapters = (
+        get_adapters_for_platform(query.guest_os) if query.guest_os else all_adapters()
+    )
+    return jsonify([_tool_info(adapter) for adapter in adapters])
 
 
 @evasion_api.post(
@@ -131,6 +135,17 @@ def create_scan(body: CreateScanRequest):
         sandbox = resolve_sandbox(config, body.sandbox_id)
     except SandboxNotFound:
         return jsonify({"error": f"Sandbox '{body.sandbox_id}' not found"}), 404
+
+    if sandbox.platform != body.guest_os:
+        return (
+            jsonify({"error": "guest_os must match the selected sandbox platform"}),
+            400,
+        )
+    if body.guest_os == "linux" and body.with_drakvuf:
+        return (
+            jsonify({"error": "Linux evasion scans do not yet support with_drakvuf"}),
+            400,
+        )
 
     if body.profile not in ("full", "custom"):
         return jsonify({"error": "profile must be 'full' or 'custom'"}), 400
@@ -163,6 +178,7 @@ def create_scan(body: CreateScanRequest):
     timeout = body.timeout or config.evasion.default_timeout
     options = EvasionScanOptions(
         sandbox_id=sandbox.id,
+        guest_os=body.guest_os,
         tools=list(body.tools),
         profile=body.profile,
         tool_options=validated_tool_options,

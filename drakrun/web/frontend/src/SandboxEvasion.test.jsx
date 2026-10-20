@@ -67,8 +67,8 @@ describe("SandboxEvasion", () => {
         );
         expect(screen.getByText("al-khaser")).toBeInTheDocument();
 
-        fireEvent.change(screen.getByLabelText("Sandbox"), {
-            target: { value: "linux-test" },
+        fireEvent.change(screen.getByLabelText("Guest OS"), {
+            target: { value: "linux" },
         });
 
         // Neither tool is hardcoded as always-available: a sandbox whose
@@ -120,5 +120,40 @@ describe("SandboxEvasion", () => {
         expect(args.sandboxId).toBe("win10");
         expect([...args.tools].sort()).toEqual(["alkhaser", "perdedor"]);
         expect(args.profile).toBe("full");
+    });
+    it("switches OS and submits only the Linux tool", async () => {
+        evasionApi.getSandboxes.mockResolvedValue([
+            WINDOWS_SANDBOX,
+            {
+                ...LINUX_SANDBOX,
+                available_tools: [
+                    {
+                        id: "chimera-vmcheck",
+                        display_name: "CHIMERA Linux VM check",
+                        options_schema: { full_suite_only: true, options: [] },
+                    },
+                ],
+            },
+        ]);
+        evasionApi.createScan.mockResolvedValue({ scan_id: "linux-scan" });
+        renderPage();
+        await screen.findByText("PERDEDOR");
+        fireEvent.change(screen.getByLabelText("Guest OS"), {
+            target: { value: "linux" },
+        });
+        expect(
+            await screen.findByText("CHIMERA Linux VM check"),
+        ).toBeInTheDocument();
+        expect(screen.queryByText("PERDEDOR")).not.toBeInTheDocument();
+        fireEvent.click(screen.getByText("Start scan"));
+        await waitFor(() =>
+            expect(evasionApi.createScan).toHaveBeenCalledWith({
+                sandboxId: "linux-test",
+                guestOs: "linux",
+                tools: ["chimera-vmcheck"],
+                profile: "full",
+                toolOptions: {},
+            }),
+        );
     });
 });

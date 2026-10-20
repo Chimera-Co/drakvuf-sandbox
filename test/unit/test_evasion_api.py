@@ -614,3 +614,53 @@ def test_scan_artifacts_zip_download(client, scan_dir):
 def test_scan_artifacts_zip_unknown_scan_is_404(client, scan_dir):
     resp = client.get("/api/evasion/scans/ffffffff-ffff-4fff-8fff-ffffffffffff/logs")
     assert resp.status_code == 404
+
+
+@pytest.mark.parametrize(
+    "guest_os,expected",
+    [("windows", {"perdedor", "alkhaser"}), ("linux", {"chimera-vmcheck"})],
+)
+def test_tools_filtered_by_os(client, guest_os, expected):
+    response = client.get(f"/api/evasion/tools?guest_os={guest_os}")
+    assert response.status_code == 200
+    assert {tool["id"] for tool in response.json} == expected
+
+
+def test_create_linux_scan_routes_guest_os(client, evasion_api_module, monkeypatch):
+    evasion_api_module.config.sandbox["linux-test"].verifiers = ["chimera-vmcheck"]
+    captured = {}
+    monkeypatch.setattr(
+        evasion_api_module, "enqueue_verification", lambda **kw: captured.update(kw)
+    )
+    payload = {
+        "sandbox_id": "linux-test",
+        "guest_os": "linux",
+        "tools": ["chimera-vmcheck"],
+    }
+    response = client.post("/api/evasion/scans", json=payload)
+    assert response.status_code == 200
+    assert captured["sandbox"].platform == "linux"
+    assert captured["options"].guest_os == "linux"
+    assert captured["options"].to_dict()["guest_os"] == "linux"
+    sandboxes = client.get("/api/evasion/sandboxes").json
+    assert (
+        next(s for s in sandboxes if s["id"] == "linux-test")["available_tools"][0][
+            "id"
+        ]
+        == "chimera-vmcheck"
+    )
+    for changes in (
+        {"guest_os": "windows"},
+        {"tools": ["perdedor"]},
+        {"with_drakvuf": True},
+    ):
+        assert (
+            client.post("/api/evasion/scans", json={**payload, **changes}).status_code
+            == 400
+        )
+
+
+def test_legacy_scan_options_keep_windows_default():
+    options = EvasionScanOptions(sandbox_id="win10", tools=["perdedor"])
+    assert options.guest_os == "windows"
+    assert "guest_os" not in options.to_dict()

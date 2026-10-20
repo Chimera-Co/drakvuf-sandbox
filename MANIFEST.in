@@ -6,4 +6,3 @@ include drakrun/tools/drakshell/drakshell
 recursive-include drakrun/data/capa-rules *.yml
 recursive-include drakrun/web/frontend/dist *
 
-include scripts/chimera/linux/evasion/chimera-vmcheck.py

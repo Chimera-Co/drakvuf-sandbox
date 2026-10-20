@@ -14,6 +14,7 @@ return type or any caller.
 from __future__ import annotations
 
 import logging
+import pathlib
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
@@ -25,6 +26,7 @@ from drakrun.lib.paths import INSTALL_INFO_PATH
 logger = logging.getLogger(__name__)
 
 DEFAULT_SANDBOX_ID = "default"
+LINUX_INSTALL_INFO_PATH = pathlib.Path("/var/lib/drakrun/linux/golden/install.json")
 
 
 class SandboxDefinition(BaseModel):
@@ -118,13 +120,32 @@ def get_sandbox_registry(config: DrakrunConfig) -> List[SandboxDefinition]:
     feature works out of the box and the current sandbox is never hardcoded
     into either the backend or the frontend.
     """
-    if not config.sandbox:
-        return [_synthesize_default_sandbox(config)]
-
-    return [
-        _section_to_definition(sandbox_id, section)
-        for sandbox_id, section in config.sandbox.items()
-    ]
+    registry = (
+        [
+            _section_to_definition(sandbox_id, section)
+            for sandbox_id, section in config.sandbox.items()
+        ]
+        if config.sandbox
+        else [_synthesize_default_sandbox(config)]
+    )
+    if LINUX_INSTALL_INFO_PATH.is_file() and not any(
+        s.platform == "linux" for s in registry
+    ):
+        # Explicit entries always win; avoid shadowing an administrator's id.
+        sandbox_id = (
+            "linux" if not any(s.id == "linux" for s in registry) else "linux-golden"
+        )
+        if not any(s.id == sandbox_id for s in registry):
+            registry.append(
+                SandboxDefinition(
+                    id=sandbox_id,
+                    display_name="Linux -- Current",
+                    platform="linux",
+                    os_version="Debian 12",
+                    verifiers=["chimera-vmcheck"],
+                )
+            )
+    return registry
 
 
 def resolve_sandbox(config: DrakrunConfig, sandbox_id: str) -> SandboxDefinition:

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import json
 import pathlib
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -79,6 +79,9 @@ class EvasionScanOptions(BaseModel):
     """The validated request that becomes an RQ job payload."""
 
     sandbox_id: str
+    guest_os: Literal["windows", "linux"] = Field(
+        default="windows", exclude_if=lambda value: value == "windows"
+    )
     tools: List[str]
     profile: str = "full"  # "full" | "custom"
     # Per-tool option overrides, only meaningful when profile == "custom".
@@ -96,8 +99,8 @@ class EvasionScanOptions(BaseModel):
 class EvasionScore(BaseModel):
     """The CHIMERA evasion score for one scan.
 
-    chimera_score is PERDEDOR's own weighted_score when PERDEDOR ran (the
-    primary structured scoring source); al-khaser findings never change this
+    chimera_score comes from PERDEDOR on Windows or chimera-vmcheck on Linux
+    using the severity-weighted formula; al-khaser findings never change this
     number, only ``state`` and ``rationale`` (corroborating evidence, never
     averaged in).
     """

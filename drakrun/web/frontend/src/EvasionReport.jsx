@@ -213,9 +213,12 @@ export function EvasionReport({ scan }) {
                                         {sandbox.display_name || sandbox.id}
                                     </div>
                                     <div className="text-muted small">
-                                        Platform: {sandbox.platform} &middot;
-                                        Profile: {options.profile} &middot;
-                                        Tools:{" "}
+                                        Platform:{" "}
+                                        {sandbox.platform ||
+                                            options.guest_os ||
+                                            "windows"}{" "}
+                                        &middot; Profile: {options.profile}{" "}
+                                        &middot; Tools:{" "}
                                         {(options.tools || []).join(", ")}
                                     </div>
                                     <div className="text-muted small">
