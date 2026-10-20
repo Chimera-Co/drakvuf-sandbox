@@ -384,3 +384,28 @@ def test_report_compares_arms_on_windows_malware_only(tmp_path):
     report = (tmp_path / "report.md").read_text()
     assert "## Linux samples" in report and "XorDDoS" in report
     assert "## Benign samples (false-positive check)" in report and "Bginfo" in report
+
+
+def test_linux_shortlist_takes_recent_elf_and_skips_spreading_bots():
+    by_family = {
+        "BPFDoor": [
+            entry(SHA[0], "BPFDoor", ["elf"], file_type="elf"),
+            entry(SHA[1], "BPFDoor", ["elf", "mirai"], file_type="elf"),
+            entry(SHA[2], "BPFDoor", ["exe"]),
+        ],
+        "CoinMiner": [entry(SHA[3], "CoinMiner", ["elf", "xmrig"], file_type="elf")],
+    }
+    rows = samples.linux_shortlist(lambda f: by_family.get(f, []), "2026-04-01")
+    assert [(r["sha256"], r["role"], r["guest_os"]) for r in rows] == [(SHA[0], "test", "linux"), (SHA[3], "control", "linux")]
+
+
+def test_only_x86_64_elf_runs_in_the_linux_guest():
+    head = bytearray(64)
+    head[:4], head[4], head[5] = b"\x7fELF", 2, 1
+    head[18:20] = (0x3E).to_bytes(2, "little")
+    assert samples.elf_machine(bytes(head)) == "x86-64"
+    head[18:20] = (0x28).to_bytes(2, "little")  # ARM
+    assert samples.elf_machine(bytes(head)) == "ELF machine 0x28"
+    head[4] = 1
+    assert samples.elf_machine(bytes(head)) == "32-bit ELF"
+    assert samples.elf_machine(b"MZ") == "not an ELF file"

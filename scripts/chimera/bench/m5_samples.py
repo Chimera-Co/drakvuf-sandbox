@@ -7,6 +7,8 @@ CHIMERA M5 sample shortlist and download from MalwareBazaar (abuse.ch).
              samples; writes shortlist.csv for the team to review. Nothing is
              downloaded. About 20 small queries: abuse.ch rate-limits heavy use
              and its terms forbid high-volume harvesting, so do not loop this.
+  linux-shortlist  the same for the Linux sandbox: up to two ELF candidates per
+             Linux family (about 9 queries), added to shortlist.csv with guest_os linux
   download   operator only, after the mentor's written sign-off and the team's
              review: fetch the reviewed shortlist as MalwareBazaar's
              password-protected ZIPs into a root-only directory and write the
@@ -57,7 +59,13 @@ EXCLUDED_TAGS = {"worm", "wormable", "file-infector", "infector", "ransomware"}
 # Common families used as controls; samples carrying an evasion tag are skipped.
 # Team to confirm each has no reported environment checks (XWorm left out: it spreads over USB).
 CONTROL_FAMILIES = ["AsyncRAT", "njrat", "RemcosRAT", "DCRat", "NanoCore"]
-FIELDS = ["sha256", "role", "family", "tags", "file_name", "first_seen", "source_url"]
+# Linux: backdoors, implants and miners that hide or evade analysis, none of which
+# spreads by itself. Botnets that scan for and infect other hosts (Mirai, Gafgyt,
+# XorDDoS, Kinsing, P2PInfect, Sysrv, ...) are left out, as worms are on Windows.
+LINUX_FAMILIES = ["BPFDoor", "Rekoobe", "Bifrost", "Sliver", "perfctl", "sedexp", "WolfsBane", "Merlin"]
+LINUX_CONTROL_FAMILIES = ["CoinMiner"]
+LINUX_EXCLUDED_TAGS = {"mirai", "gafgyt", "bashlite", "mozi", "xorddos", "kinsing", "p2pinfect", "sysrv", "muhstik", "tsunami"}
+FIELDS = ["sha256", "role", "family", "tags", "file_name", "first_seen", "source_url", "guest_os"]
 
 
 def auth_key():
@@ -83,19 +91,21 @@ def _tags(entry):
     return {t.lower() for t in entry.get("tags") or []}
 
 
-def eligible(entry, since):
+def eligible(entry, since, guest_os="windows"):
     family = (entry.get("signature") or "").strip()
+    linux = guest_os == "linux"
     return bool(
         family
         and family.lower() not in EXCLUDED_FAMILIES
-        and not _tags(entry) & EXCLUDED_TAGS
-        and entry.get("file_type") == "exe"
+        and not _tags(entry) & (EXCLUDED_TAGS | (LINUX_EXCLUDED_TAGS if linux else set()))
+        and entry.get("file_type") == ("elf" if linux else "exe")
         and (entry.get("first_seen") or "")[:10] >= since
     )
 
 
-def _row(entry, role):
+def _row(entry, role, guest_os="windows"):
     return {
+        "guest_os": guest_os,
         "sha256": entry["sha256_hash"],
         "role": role,
         "family": entry["signature"].strip(),
@@ -110,7 +120,7 @@ def _rank(entry):
     return (len(_tags(entry) & set(EVASION_TAGS)), entry["first_seen"])
 
 
-def pick(entries, count, role, taken):
+def pick(entries, count, role, taken, guest_os="windows"):
     """One sample per family: the one with the most evasion tags, then the newest."""
     best = {}
     for entry in entries:
@@ -124,7 +134,7 @@ def pick(entries, count, role, taken):
     rows = []
     for entry in ranked[:count]:
         taken.add(entry["signature"].strip().lower())
-        rows.append(_row(entry, role))
+        rows.append(_row(entry, role, guest_os))
     return rows
 
 
@@ -140,6 +150,32 @@ def shortlist(fetch_family, count, controls, since):
     ]
     rows += pick(control_entries, controls, "control", taken)
     return rows
+
+
+def linux_shortlist(fetch_family, since, per_family=2):
+    """Up to two ELF samples per Linux family: MalwareBazaar's metadata does not
+    give the CPU, so the download keeps only x86-64 ones and a second candidate
+    stands in for an ARM or MIPS build."""
+    rows = []
+    for families, role in ((LINUX_FAMILIES, "test"), (LINUX_CONTROL_FAMILIES, "control")):
+        for family in families:
+            candidates = [
+                e for e in fetch_family(family)
+                if eligible(e, since, "linux") and e["signature"].strip().lower() == family.lower()
+            ]
+            candidates.sort(key=_rank, reverse=True)
+            rows += [_row(e, role, "linux") for e in candidates[:per_family]]
+    return rows
+
+
+def elf_machine(data):
+    """'x86-64', or why the file cannot run in the x86-64 Linux guest."""
+    if data[:4] != b"\x7fELF":
+        return "not an ELF file"
+    if data[4] != 2:
+        return "32-bit ELF"
+    machine = int.from_bytes(data[18:20], "little" if data[5] == 1 else "big")
+    return "x86-64" if machine == 0x3E else f"ELF machine {machine:#x}"
 
 
 def add_samples(rows, fetch_family, families, since):
@@ -203,6 +239,23 @@ def write_shortlist(out, rows):
     print(f"{tests} test + {len(rows) - tests} control samples -> {out / 'shortlist.csv'} (metadata only)")
 
 
+def cmd_linux_shortlist(args):
+    import requests
+
+    out = private_dir(pathlib.Path(args.out))
+    since = (datetime.date.today() - datetime.timedelta(days=args.since_days)).isoformat()
+    fetch = cached_fetch(requests.Session(), auth_key(), out / "metadata")
+    with (out / "shortlist.csv").open(newline="") as f:
+        rows = [r for r in csv.DictReader(f) if (r.get("guest_os") or "windows") != "linux"]
+    for row in rows:
+        row.setdefault("guest_os", "windows")
+        row["guest_os"] = row["guest_os"] or "windows"
+    linux = linux_shortlist(fetch, since)
+    write_shortlist(out, rows + linux)
+    for row in linux:
+        print(f"linux {row['role']} {row['family']} {row['sha256'][:16]}")
+
+
 def cmd_add(args):
     import requests
 
@@ -218,6 +271,16 @@ def cmd_add(args):
         print(f"added {row['family']} {row['sha256'][:16]}")
 
 
+def unzip_head(path):
+    """The first bytes of the archive's only entry, decrypted in memory with 7-Zip."""
+    import subprocess
+
+    data = subprocess.run(
+        ["7z", "x", "-so", f"-p{ZIP_PASSWORD}", str(path)], capture_output=True, check=True
+    ).stdout
+    return data[:64]
+
+
 def cmd_download(args):
     import requests
 
@@ -229,7 +292,11 @@ def cmd_download(args):
     with (out / "shortlist.csv").open(newline="") as f:
         rows = list(csv.DictReader(f))
     register = []
+    linux_taken = {}
     for row in rows:
+        guest_os = row.get("guest_os") or "windows"
+        if guest_os == "linux" and linux_taken.get(row["family"], 0) >= 1:
+            continue  # the family already has an x86-64 sample
         path = zips / f"{row['sha256']}.zip"
         if not path.exists():
             resp = session.post(
@@ -242,6 +309,13 @@ def cmd_download(args):
             with os.fdopen(fd, "wb") as f:
                 f.write(resp.content)
             print(f"saved {row['family']} {row['sha256'][:12]}", flush=True)
+        if guest_os == "linux":
+            machine = elf_machine(unzip_head(path))
+            if machine != "x86-64":
+                print(f"skipped {row['family']} {row['sha256'][:12]}: {machine}", flush=True)
+                path.unlink()  # not needed: never keep a sample that will not run
+                continue
+            linux_taken[row["family"]] = linux_taken.get(row["family"], 0) + 1
         register.append(
             {
                 "sha256": row["sha256"],
@@ -254,6 +328,7 @@ def cmd_download(args):
                 "file_name": row.get("file_name", ""),
                 "source_url": row["source_url"],
                 "retrieved": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "guest_os": guest_os,
             }
         )
     with (out / "register.csv").open("w", newline="") as f:
@@ -272,6 +347,10 @@ def main(argv=None):
     p.add_argument("--controls", type=int, default=5)
     p.add_argument("--since-days", type=int, default=180)
     p.set_defaults(func=cmd_shortlist)
+    p = sub.add_parser("linux-shortlist", help="add Linux ELF candidates to shortlist.csv (metadata only)")
+    p.add_argument("--out", default="/var/lib/chimera-samples")
+    p.add_argument("--since-days", type=int, default=180)
+    p.set_defaults(func=cmd_linux_shortlist)
     p = sub.add_parser("add", help="one more test sample from each named family")
     p.add_argument("families", nargs="+")
     p.add_argument("--out", default="/var/lib/chimera-samples")
