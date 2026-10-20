@@ -36,3 +36,18 @@ export function formatDate(date) {
 export function fromTimestamp(timestamp) {
     return new Date(timestamp * 1000);
 }
+
+const GUEST_OS_LABELS = { windows: "Windows 10", linux: "Debian 12 (Linux)" };
+
+/**
+ * Which sandbox an analysis ran in, e.g. "Windows 10 · vm-1" or "Debian 12 (Linux) · vm-2".
+ * Analyses from before the Linux sandbox have no guest_os and ran on Windows.
+ *
+ * @param {Object} analysis Analysis metadata (options.guest_os, vm_id)
+ * @returns {String}
+ */
+export function formatSandbox(analysis) {
+    const os = analysis.options?.guest_os || "windows";
+    const label = GUEST_OS_LABELS[os] || os;
+    return analysis.vm_id != null ? `${label} · vm-${analysis.vm_id}` : label;
+}

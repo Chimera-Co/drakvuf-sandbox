@@ -2,8 +2,19 @@ import { useEffect, useState } from "react";
 import { ProcessTree } from "./ProcessTree.jsx";
 import { useAnalysisReport } from "./AnalysisReportContext.jsx";
 
-function isProcessInteresting(process) {
-    return process.procname.endsWith("explorer.exe");
+function baseName(path) {
+    return (path || "").split(/[\\/]/).pop().toLowerCase();
+}
+
+// Expanded on load: explorer.exe (Windows desktop) and the sample itself, found by its file
+// name, so the path down to the sample opens on both Windows and Linux.
+function isProcessInteresting(process, sampleName) {
+    const name = baseName(process.procname);
+    return (
+        name === "explorer.exe" ||
+        (sampleName !== undefined &&
+            (name === sampleName || baseName(process.args?.[0]) === sampleName))
+    );
 }
 
 function getProcessParents(processTree, processId) {
@@ -26,14 +37,17 @@ function getProcessParents(processTree, processId) {
     return undefined;
 }
 
-function getInterestingProcesses(processTree) {
+function getInterestingProcesses(processTree, sampleName) {
     let activeSet = new Set();
     for (let process of processTree) {
-        if (isProcessInteresting(process)) {
+        if (isProcessInteresting(process, sampleName)) {
             activeSet.add(process.seqid);
         }
         if (process.children.length > 0) {
-            const activeChildren = getInterestingProcesses(process.children);
+            const activeChildren = getInterestingProcesses(
+                process.children,
+                sampleName,
+            );
             if (activeChildren.size) {
                 activeSet = activeSet.union(activeChildren);
                 activeSet.add(process.seqid);
@@ -45,6 +59,7 @@ function getInterestingProcesses(processTree) {
 
 export function ProcessTreeView({
     analysisId,
+    sampleName,
     selectedProcess,
     onProcessSelect,
 }) {
@@ -57,7 +72,12 @@ export function ProcessTreeView({
         getAnalysisProcessTree({ analysisId })
             .then((data) => {
                 setProcessTree(data);
-                setUncollapsed(getInterestingProcesses(data));
+                setUncollapsed(
+                    getInterestingProcesses(
+                        data,
+                        sampleName ? baseName(sampleName) : undefined,
+                    ),
+                );
             })
             .catch((e) => {
                 console.error(e);

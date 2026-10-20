@@ -1,5 +1,5 @@
 import { PluginList } from "./PluginPicker.jsx";
-import { formatDate } from "./formatUtils.js";
+import { formatDate, formatSandbox } from "./formatUtils.js";
 
 export function AnalysisMetadataTable({ analysis }) {
     const startCommand = analysis.options["start_command"] || "-";
@@ -17,6 +17,10 @@ export function AnalysisMetadataTable({ analysis }) {
                 <tr>
                     <th>Type</th>
                     <td>{analysis.file.type}</td>
+                </tr>
+                <tr>
+                    <th>Sandbox</th>
+                    <td>{formatSandbox(analysis)}</td>
                 </tr>
                 <tr>
                     <th>Start command</th>

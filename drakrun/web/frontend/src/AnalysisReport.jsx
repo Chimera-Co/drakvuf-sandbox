@@ -332,6 +332,7 @@ export function AnalysisReport() {
                 <div className="col-6">
                     <ProcessTreeView
                         analysisId={analysis.id}
+                        sampleName={analysis.options?.sample_filename}
                         selectedProcess={selectedProcess}
                         onProcessSelect={onSelectProcess}
                     />
