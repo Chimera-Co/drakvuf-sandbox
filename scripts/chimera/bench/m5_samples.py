@@ -18,6 +18,8 @@ repository or on the command line):
 
   sudo /opt/chimera/venv/bin/python scripts/chimera/bench/m5_samples.py shortlist \
       --out /var/lib/chimera-samples
+  # optional: a second sample from some families (cached metadata, no new query per family)
+  sudo /opt/chimera/venv/bin/python scripts/chimera/bench/m5_samples.py add AgentTesla Formbook
   # review /var/lib/chimera-samples/shortlist.csv; delete rows to drop them
   sudo /opt/chimera/venv/bin/python scripts/chimera/bench/m5_samples.py download \
       --out /var/lib/chimera-samples --i-have-the-mentor-signoff
@@ -26,6 +28,7 @@ repository or on the command line):
 import argparse
 import csv
 import datetime
+import json
 import os
 import pathlib
 import sys
@@ -91,35 +94,37 @@ def eligible(entry, since):
     )
 
 
+def _row(entry, role):
+    return {
+        "sha256": entry["sha256_hash"],
+        "role": role,
+        "family": entry["signature"].strip(),
+        "tags": " ".join(entry.get("tags") or []),
+        "file_name": entry.get("file_name", ""),
+        "first_seen": entry["first_seen"],
+        "source_url": f"https://bazaar.abuse.ch/sample/{entry['sha256_hash']}/",
+    }
+
+
+def _rank(entry):
+    return (len(_tags(entry) & set(EVASION_TAGS)), entry["first_seen"])
+
+
 def pick(entries, count, role, taken):
     """One sample per family: the one with the most evasion tags, then the newest."""
     best = {}
-
-    def rank(e):
-        return (len(_tags(e) & set(EVASION_TAGS)), e["first_seen"])
-
     for entry in entries:
         family = entry["signature"].strip().lower()  # MalwareBazaar spells some families two ways (Stealc/StealC)
         if family in taken:
             continue
-        if family not in best or rank(entry) > rank(best[family]):
+        if family not in best or _rank(entry) > _rank(best[family]):
             best[family] = entry
     ranked = sorted(best.values(), key=lambda e: e["first_seen"], reverse=True)
     ranked.sort(key=lambda e: -len(_tags(e) & set(EVASION_TAGS)))  # stable: newest first within a tag count
     rows = []
     for entry in ranked[:count]:
         taken.add(entry["signature"].strip().lower())
-        rows.append(
-            {
-                "sha256": entry["sha256_hash"],
-                "role": role,
-                "family": entry["signature"].strip(),
-                "tags": " ".join(entry.get("tags") or []),
-                "file_name": entry.get("file_name", ""),
-                "first_seen": entry["first_seen"],
-                "source_url": f"https://bazaar.abuse.ch/sample/{entry['sha256_hash']}/",
-            }
-        )
+        rows.append(_row(entry, role))
     return rows
 
 
@@ -137,6 +142,42 @@ def shortlist(fetch_family, count, controls, since):
     return rows
 
 
+def add_samples(rows, fetch_family, families, since):
+    """One more test sample from each named family: its best-ranked eligible
+    sample not already on the shortlist."""
+    present = {r["sha256"] for r in rows}
+    added = []
+    for family in families:
+        candidates = [
+            e for e in fetch_family(family)
+            if eligible(e, since) and e["sha256_hash"] not in present
+            and e["signature"].strip().lower() == family.lower()
+        ]
+        if not candidates:
+            print(f"{family}: no further eligible sample", file=sys.stderr)
+            continue
+        best = max(candidates, key=_rank)
+        present.add(best["sha256_hash"])
+        added.append(_row(best, "test"))
+    return added
+
+
+def cached_fetch(session, key, cache_dir):
+    """get_siginfo per family, saved once under cache_dir so later runs do not
+    query MalwareBazaar again (abuse.ch rate-limits heavy accounts)."""
+    cache_dir = private_dir(cache_dir)
+
+    def fetch(family):
+        path = cache_dir / f"{family.lower()}.json"
+        if path.exists():
+            return json.loads(path.read_text())
+        data = query(session, key, query="get_siginfo", signature=family, limit="100")
+        path.write_text(json.dumps(data))
+        return data
+
+    return fetch
+
+
 def private_dir(path):
     path.mkdir(parents=True, exist_ok=True)
     path.chmod(0o700)
@@ -146,21 +187,35 @@ def private_dir(path):
 def cmd_shortlist(args):
     import requests
 
-    key, session = auth_key(), requests.Session()
-    since = (datetime.date.today() - datetime.timedelta(days=args.since_days)).isoformat()
-    rows = shortlist(
-        lambda family: query(session, key, query="get_siginfo", signature=family, limit="100"),
-        args.count,
-        args.controls,
-        since,
-    )
     out = private_dir(pathlib.Path(args.out))
+    since = (datetime.date.today() - datetime.timedelta(days=args.since_days)).isoformat()
+    fetch = cached_fetch(requests.Session(), auth_key(), out / "metadata")
+    rows = shortlist(fetch, args.count, args.controls, since)
+    write_shortlist(out, rows)
+
+
+def write_shortlist(out, rows):
     with (out / "shortlist.csv").open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDS)
         writer.writeheader()
         writer.writerows(rows)
     tests = sum(r["role"] == "test" for r in rows)
     print(f"{tests} test + {len(rows) - tests} control samples -> {out / 'shortlist.csv'} (metadata only)")
+
+
+def cmd_add(args):
+    import requests
+
+    out = pathlib.Path(args.out)
+    with (out / "shortlist.csv").open(newline="") as f:
+        rows = list(csv.DictReader(f))
+    since = (datetime.date.today() - datetime.timedelta(days=args.since_days)).isoformat()
+    fetch = cached_fetch(requests.Session(), auth_key(), out / "metadata")
+    added = add_samples(rows, fetch, args.families, since)
+    controls = [r for r in rows if r["role"] == "control"]
+    write_shortlist(out, [r for r in rows if r["role"] == "test"] + added + controls)
+    for row in added:
+        print(f"added {row['family']} {row['sha256'][:16]}")
 
 
 def cmd_download(args):
@@ -216,6 +271,11 @@ def main(argv=None):
     p.add_argument("--controls", type=int, default=5)
     p.add_argument("--since-days", type=int, default=180)
     p.set_defaults(func=cmd_shortlist)
+    p = sub.add_parser("add", help="one more test sample from each named family")
+    p.add_argument("families", nargs="+")
+    p.add_argument("--out", default="/var/lib/chimera-samples")
+    p.add_argument("--since-days", type=int, default=180)
+    p.set_defaults(func=cmd_add)
     p = sub.add_parser("download")
     p.add_argument("--out", default="/var/lib/chimera-samples")
     p.add_argument("--i-have-the-mentor-signoff", action="store_true")

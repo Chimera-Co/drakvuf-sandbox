@@ -159,6 +159,26 @@ def test_shortlist_one_per_family_drops_worms_and_old_or_non_exe():
     assert rows[0]["source_url"].endswith(f"/{SHA[1]}/")
 
 
+def test_add_takes_the_next_best_sample_not_on_the_list():
+    rows = [{"sha256": SHA[1], "role": "test", "family": "GuLoader"}]
+    fetched = [
+        entry(SHA[1], "GuLoader", ["anti-vm"]),
+        entry(SHA[0], "GuLoader", ["exe"], "2026-10-02 00:00:00"),
+        entry(SHA[2], "GuLoader", ["exe"], "2026-10-09 00:00:00"),
+        entry(SHA[3], "Formbook", ["anti-vm"]),  # another family in the same response is ignored
+    ]
+    added = samples.add_samples(rows, lambda f: fetched, ["GuLoader", "Nothing"], "2026-04-01")
+    assert [(r["sha256"], r["role"]) for r in added] == [(SHA[2], "test")]
+
+
+def test_metadata_is_queried_once_per_family(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(samples, "query", lambda session, key, **data: calls.append(data) or [{"signature": "X"}])
+    fetch = samples.cached_fetch(None, "k", tmp_path / "metadata")
+    assert fetch("GuLoader") == fetch("guloader") == [{"signature": "X"}]
+    assert len(calls) == 1
+
+
 def test_download_refuses_without_signoff(tmp_path):
     with pytest.raises(SystemExit, match="signoff"):
         samples.main(["download", "--out", str(tmp_path)])
