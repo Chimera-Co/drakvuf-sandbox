@@ -45,7 +45,7 @@ GUEST_WORK_DIR = f"/home/{DESKTOP_USER}/Downloads"
 GUEST_AGENT_DIR = "/var/lib/console-helper"
 DEFAULT_VCPUS = 4
 DEFAULT_MEMORY = 4096
-DEFAULT_DISK_SIZE = "20G"
+DEFAULT_DISK_SIZE = "128G"
 # Profile structs whose anonymous members DRAKVUF needs by name (see linux_profile.py)
 FLATTEN_STRUCTS = ["iov_iter"]
 

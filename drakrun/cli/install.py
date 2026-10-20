@@ -67,7 +67,7 @@ log = logging.getLogger(__name__)
     is_eager=True,
 )
 @click.option(
-    "--disk-size", "disk_size", default=None, help="Disk size  [default: 100G, Linux 20G]"
+    "--disk-size", "disk_size", default=None, help="Disk size  [default: 100G, Linux 128G]"
 )
 @click.option(
     "--zfs-tank-name",
