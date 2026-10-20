@@ -298,12 +298,12 @@ function HTTPRow({ httpRequest }) {
                         {httpRequest.unmatched_reason}
                     </div>
                 ) : null}
-                {httpRequest["process_seqid"] != null ? (
+                {processSeqids(httpRequest).length > 0 ? (
                     <div>
                         <b>Process: </b>
-                        <SummaryProcessBadge
-                            processId={httpRequest["process_seqid"]}
-                        />
+                        {processSeqids(httpRequest).map((p) => (
+                            <SummaryProcessBadge processId={p} key={p} />
+                        ))}
                     </div>
                 ) : (
                     []
@@ -330,6 +330,12 @@ function SummaryHTTPSection() {
             </ul>
         </SummarySection>
     );
+}
+
+// One process, or every process that used a TLS connection when there are several
+function processSeqids(entry) {
+    if (entry.process_seqid != null) return [entry.process_seqid];
+    return entry.process_seqids || [];
 }
 
 function SummaryTLSSection() {
@@ -369,11 +375,9 @@ function SummaryTLSSection() {
                                     </summary>
                                     <pre>{failure.tls_error}</pre>
                                 </details>
-                                {failure.process_seqid != null && (
-                                    <SummaryProcessBadge
-                                        processId={failure.process_seqid}
-                                    />
-                                )}
+                                {processSeqids(failure).map((p) => (
+                                    <SummaryProcessBadge processId={p} key={p} />
+                                ))}
                                 {failure.matched === false && (
                                     <div className="text-warning">
                                         Unmatched INetSim session:{" "}

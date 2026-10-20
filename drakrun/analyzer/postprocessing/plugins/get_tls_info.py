@@ -87,6 +87,8 @@ def get_tls_info(context: PostprocessContext) -> None:
             "matched": session["matched"],
             "sni": conn.get("sni"),
             "process_seqid": conn.get("process_seqid"),
+            # Every process that used the connection (e.g. a parent and the child that inherited the socket)
+            "process_seqids": conn.get("process_seqids", []),
             "server_port": conn.get("remote_port"),
             "remote_ip": conn.get("remote_ip"),
         }
