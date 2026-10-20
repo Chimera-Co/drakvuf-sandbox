@@ -116,6 +116,34 @@ def set_guest_clock(agent: LinuxAgent) -> Dict[str, Any]:
         return {"set": False, "error": str(exc)}
 
 
+def wait_for_vm_network(agent: LinuxAgent, vm_id: int, timeout: float = 30) -> Dict[str, Any]:
+    """Wait until the guest has its address in this VM's subnet (10.13.<vm_id>.0/24).
+
+    A restored guest keeps the address it had when the snapshot was saved (vm-0's subnet) until
+    systemd-networkd notices the carrier change, which does not always happen. If the old address is still
+    there after a few seconds, flush it and make networkd ask DHCP again.
+    """
+    prefix = f"10.13.{vm_id}."
+    deadline = time.monotonic() + timeout
+    renewed = False
+    while True:
+        result = agent.call("net", {"timeout": 5}, timeout=20)
+        addrs = [a for name, values in result["addr"].items() if name != "lo" for a in values]
+        if any(a.startswith(prefix) for a in addrs):
+            return {**result, "ready": True, "renewed": renewed}
+        if time.monotonic() > deadline:
+            return {**result, "ready": False, "renewed": renewed}
+        if addrs and not renewed:
+            log.info("Guest still has %s, asking DHCP for an address in %s0/24", addrs, prefix)
+            agent.call("sh", {
+                "cmd": "for i in $(ls /sys/class/net); do [ \"$i\" = lo ] && continue; "
+                       "ip -4 addr flush dev \"$i\"; networkctl reconfigure \"$i\"; done",
+                "timeout": 10,
+            }, timeout=20)
+            renewed = True
+        time.sleep(0.5)
+
+
 def main() -> int:
     """python -m drakrun.lib.linux_agent /var/run/drakrun/vm-2.sock ping '{}'"""
     sock_path, command = sys.argv[1], sys.argv[2]

@@ -294,6 +294,7 @@ def worker_verify(options: EvasionScanOptions) -> None:
                     from drakrun.lib.linux_agent import (
                         set_guest_clock as set_linux_clock,
                     )
+                    from drakrun.lib.linux_agent import wait_for_vm_network
 
                     session = connect_linux_guest_session(
                         vm.vm_name, kernel_profile_path
@@ -301,7 +302,7 @@ def worker_verify(options: EvasionScanOptions) -> None:
                     sessions.callback(session.close)
                     if not config.drakrun.no_post_restore:
                         metadata.guest_clock = set_linux_clock(session.agent)
-                    session.agent.call("net", {"timeout": 30}, timeout=45)
+                    wait_for_vm_network(session.agent, vm_id)
                 else:
                     injector = Injector(vm.vm_name, vmi_info, kernel_profile_path)
                     session = connect_guest_session(vm.vm_name, injector)

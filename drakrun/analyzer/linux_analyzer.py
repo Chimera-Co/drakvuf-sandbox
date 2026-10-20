@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional
 
 from drakrun.lib.config import NetworkConfigSection, load_config
 from drakrun.lib.install_info import InstallInfo
-from drakrun.lib.linux_agent import LinuxAgent, set_guest_clock
+from drakrun.lib.linux_agent import LinuxAgent, set_guest_clock, wait_for_vm_network
 from drakrun.lib.linux_install import (  # noqa: F401
     DESKTOP_USER,
     GUEST_WORK_DIR,
@@ -188,7 +188,7 @@ def analyze_linux_file(
             agent_info = agent.wait_ready(60)
             linux_info["agent"] = agent_info
             guest_clock = set_guest_clock(agent)
-            linux_info["network"] = agent.call("net", {"timeout": 30}, timeout=45)
+            linux_info["network"] = wait_for_vm_network(agent, vm.vm_id)
             agent.call("prepare")
 
             exec_argv = None

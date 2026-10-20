@@ -767,6 +767,10 @@ verifiers = ["chimera-vmcheck"]
     session.agent = SimpleNamespace(call=lambda *a, **kw: calls.append((a, kw)))
     session.close = lambda: closed.append(True)
     monkeypatch.setattr(
+        "drakrun.lib.linux_agent.wait_for_vm_network",
+        lambda agent, vm_id: calls.append((("net", vm_id), {})),
+    )
+    monkeypatch.setattr(
         "drakrun.evasion.linux_guest_runner.connect_linux_guest_session",
         lambda vm, kernel: session,
     )

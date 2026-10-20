@@ -117,3 +117,24 @@ def test_make_linux_profile_flattens_iov_iter(tmp_path, monkeypatch):
     fields = json.loads(target.read_text())["user_types"]["iov_iter"]["fields"]
     assert fields["iov"]["offset"] == 16
     assert (tmp_path / "kernel.orig.json").exists()
+
+
+def test_wait_for_vm_network_renews_a_stale_snapshot_address(monkeypatch):
+    from drakrun.lib import linux_agent
+
+    monkeypatch.setattr(linux_agent.time, "sleep", lambda s: None)
+    replies = iter([
+        {"addr": {"lo": ["127.0.0.1"], "ens3": ["10.13.0.2"]}},
+        {"addr": {"lo": ["127.0.0.1"], "ens3": []}},
+        {"addr": {"lo": ["127.0.0.1"], "ens3": ["10.13.1.2"]}},
+    ])
+    calls = []
+
+    class Agent:
+        def call(self, op, args=None, timeout=None):
+            calls.append(op)
+            return next(replies) if op == "net" else {"rc": 0, "stdout": ""}
+
+    result = linux_agent.wait_for_vm_network(Agent(), 1)
+    assert result["ready"] and result["renewed"]
+    assert calls == ["net", "sh", "net", "net"]

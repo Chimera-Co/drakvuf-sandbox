@@ -16,7 +16,7 @@ same containment, the same report format and the same console. Choose **Linux** 
 ```mermaid
 flowchart LR
     U["Console upload<br/>guest_os=linux"] --> W["drakrun worker<br/>analyze_linux_file"]
-    W -->|"xl restore<br/>golden snapshot"| G["Debian 12 guest<br/>kernel 6.1.0-54<br/>chimera-agent on ttyS0"]
+    W -->|"xl restore<br/>golden snapshot"| G["Debian 12 guest<br/>kernel 6.1.0-54<br/>console-helper on ttyS0"]
     W -->|"injector writefile<br/>(sample upload)"| G
     W -->|"agent: exec sample<br/>after launch gate"| G
     D["drakvuf-linuxnet<br/>procmon syscalls filetracer<br/>unixsocketmon ptracemon ebpfmon"] -. "VMI, altp2m" .-> G
@@ -27,11 +27,11 @@ flowchart LR
 
 | Part | How | Source |
 |---|---|---|
-| Guest image | Official Debian 12 nocloud qcow2, grown to 20 GB, turned into a **desktop PC**: XFCE on LightDM with autologin to an ordinary user (`arjun`, in the sudo group), Firefox ESR, LibreOffice, India locale and time zone, a home directory with dated documents, shell history and recent files, no screen lock or blanking. Also everyday server tools, regenerated SSH host keys, and the noisy timers masked (apt, man-db, fstrim, timesyncd). `PROFILE=server` builds the plain server image | `drakrun/data/linux/build-image.sh`, `desktop.sh` |
+| Guest image | Official Debian 12 nocloud qcow2, grown to 128 GB, turned into a **desktop PC**: XFCE on LightDM with autologin to an ordinary user (`arjun`, in the sudo group), Firefox ESR, LibreOffice, India locale and time zone, a home directory with dated documents, shell history and recent files, no screen lock or blanking. Also everyday server tools, regenerated SSH host keys, and the noisy timers masked (apt, man-db, fstrim, timesyncd). `PROFILE=server` builds the plain server image | `drakrun/data/linux/build-image.sh`, `desktop.sh` |
 | Kernel profile | Debian `linux-image-6.1.0-54-amd64-dbg` → `dwarf2json` → ISF JSON, passed with `-r`. The guest kernel is the same build as dom0 | DRAKVUF's documented method |
 | Profile tweak | The 12 anonymous-union members of `iov_iter` are flattened so DRAKVUF resolves them. Flattening the whole profile broke procmon, so it is limited to this struct | *ours*: `drakrun/lib/linux_profile.py` |
-| VM | HVM, `altp2m=2`, 4 vCPU, 4096 MB, stdvga, e1000 NIC, serial on a unix socket, VNC on localhost. Reuses drakrun's `VirtualMachine`, storage backend (qcow2 `vm-0.img` + overlays), snapshot restore and per-VM lock | `drakrun/data/linux/cfg-linux.template`, `drakrun/lib/linux_install.py` |
-| Guest control | `chimera-agent`: a small Python service on ttyS0 that answers ping, clock, net, prepare, stat, chmod, exec and sh. drakshell is Windows-only | *ours*: `drakrun/data/linux/chimera-agent.py`, `drakrun/lib/linux_agent.py` |
+| VM | HVM, `altp2m=2`, 4 vCPU, 4096 MB, Cirrus VGA, e1000 NIC, Acer firmware and WDC disk identity (see *Hiding the hypervisor*), serial on a unix socket, VNC on localhost. Reuses drakrun's `VirtualMachine`, storage backend (qcow2 `vm-0.img` + overlays), snapshot restore and per-VM lock | `drakrun/data/linux/cfg-linux.template`, `drakrun/lib/linux_install.py` |
+| Guest control | The agent (`chimera-agent.py`, installed as `/usr/local/sbin/console-helper`): a small Python service on ttyS0 that answers ping, clock, net, prepare, stat, chmod, exec and sh. drakshell is Windows-only | *ours*: `drakrun/data/linux/chimera-agent.py`, `drakrun/lib/linux_agent.py` |
 | Sample upload | `injector -m writefile` in the agent process; sha256 checked in the guest | upstream injector |
 | Launch gate | DRAKVUF starts first. The agent runs `/bin/true chimera-ready-<random>`, and the sample starts only after procmon logs that marker, so its first events are not lost | *ours*: `linux_analyzer.py` |
 | Telemetry | procmon, syscalls (88 syscalls, `drakrun/data/linux-syscalls.txt`), filetracer, unixsocketmon, ptracemon, ebpfmon | DRAKVUF Linux plugins |
@@ -75,6 +75,38 @@ real run:
 | Memory dumps, capa, ATT&CK TTPs | ✓ | ◐ ELF cores packaged; live test pending; no capa on cores | procdump2 |
 | Screenshots, live view, user activity | ✓ | ✓ XFCE desktop with an autologin user | screenshotter, noVNC |
 | Anti-detection hardening | ✓ H1–H3 | ✗ guest still shows Xen in DMI, CPUID and dmesg (evasion score 70.44) | – |
+
+## Hiding the hypervisor
+
+A Linux kernel that boots on Xen shows it everywhere: `/sys/hypervisor`, the Xen clocksource, "Hypervisor detected"
+in dmesg, `systemd-detect-virt`. `cpuidmon -s` during an analysis is too late, because the golden image booted long
+before. So the hypervisor is hidden from the first instruction:
+
+- `chimera-cpuid-hide` (`scripts/chimera/linux/cpuid-hide/`, a small libvmi tool) clears the CPUID hypervisor bit
+  and the Xen leaves `0x40000000`-`0x400000ff`. It only masks CPUID run in long mode: hvmloader is 32-bit and needs
+  the Xen leaves, so masking them there powers the domain off.
+- `drakrun install` and `modify-vm0 begin` create vm-0 paused, attach the tool, then unpause (`boot_hidden` in
+  `drakrun/lib/linux_install.py`). The tool is stopped before `xl save`.
+- Analyses use `cpuidmon -s`. Evasion scans attach the tool while checks run and detach it while the injector uploads
+  a file, because both need the domain's monitor ring (`drakrun/evasion/linux_guest_runner.py`).
+- `clearcpuid=hypervisor` on the kernel command line does not stop Xen detection and taints the kernel, so it is
+  not used.
+
+With this the guest kernel reports "Booting paravirtualized kernel on bare hardware", uses the TSC clocksource,
+has no `/proc/xen` and an empty `/sys/hypervisor`, and `systemd-detect-virt` prints `none`.
+
+The xl template (`drakrun/data/linux/cfg-linux.template`) also hides the emulated hardware:
+
+| Tell | Change |
+|---|---|
+| ACPI OEM "Xen" | `firmware_override` with the same Acer ACPI hvmloader as Windows |
+| DMI "Xen"/"HVM domU" | `smbios` with an Acer Predator identity (serials differ from the Windows guest) |
+| QEMU disk model and serial | `ide-hd.model` and `ide-hd.serial` of a WDC laptop disk |
+| Bochs VGA `1234:1111` | Cirrus VGA (`1013`); XFCE runs on the cirrus DRM driver |
+| Small disk | 128 GB sparse disk |
+| Names | the agent is `console-helper`, its files are in `/var/lib/console-helper` (mode 0700), samples run from `~/Downloads`; tcpdump is removed |
+
+Left: the BIOS date is the hvmloader build date, and samples run as root.
 
 ## Memory dumps
 
