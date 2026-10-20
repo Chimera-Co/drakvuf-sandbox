@@ -16,7 +16,7 @@ from .gzip_syscalls import gzip_syscalls
 from .index_logs import index_logs
 from .karton_integration import analyze_in_karton
 from .plugin_base import PostprocessPlugin
-from .process_dumps import process_dumps
+from .process_dumps import process_dumps, process_linux_dumps
 from .screenshot_metadata import screenshot_metadata
 from .split_drakmon_log import split_drakmon_log
 
@@ -50,6 +50,11 @@ POSTPROCESS_PLUGINS = [
     PostprocessPlugin(
         function=process_dumps,
         requires=[DUMPS_DIR, "memdump.log", "process_tree.json"],
+        generates=[DUMPS_ZIP],
+    ),
+    PostprocessPlugin(
+        function=process_linux_dumps,
+        requires=[DUMPS_DIR, "process_tree.json"],
         generates=[DUMPS_ZIP],
     ),
     PostprocessPlugin(function=compress_ipt, requires=[IPT_DIR], generates=[IPT_ZIP]),

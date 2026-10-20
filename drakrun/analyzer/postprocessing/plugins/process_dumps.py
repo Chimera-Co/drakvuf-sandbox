@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import os
 import shutil
@@ -11,6 +12,149 @@ from .parse_utils import parse_log
 from .plugin_base import PostprocessContext
 
 logger = logging.getLogger(__name__)
+
+
+def parse_linux_procdump(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Linux success events use SN for the on-disk procdump.<SN> filename."""
+    if data.get("Status") != "Success":
+        return None
+    index = int(data["SN"])
+    if index < 0:
+        raise ValueError("Negative procdump sequence number")
+    return {
+        "index": index,
+        "filename": f"procdump.{index}",
+        "pid": int(data["TargetPID"]),
+        "process_name": data["TargetName"],
+        "dump_reason": data["DumpReason"],
+        "size": int(data["DumpSize"]),
+        "timestamp": float(data["TimeStamp"]),
+    }
+
+
+def process_linux_dumps(context: PostprocessContext) -> None:
+    """Package ELF cores separately from Windows region dumps and their metadata."""
+    analysis_dir = context.analysis_dir
+    dumps_path = analysis_dir / DUMPS_DIR
+    config = context.config.memdump
+    tree = context.process_tree
+
+    # AgentExec records a PID, not an EventUID. Select its first newly observed
+    # instance; the initial process enumeration has ts_from == 0.
+    root = None
+    inject_path = analysis_dir / "inject.log"
+    if inject_path.exists():
+        for event in parse_log(inject_path, lambda data: data):
+            if event.get("Status") == "Success":
+                candidates = [
+                    p for p in tree.processes if p.pid == event.get("InjectedPid")
+                ]
+                root = next(
+                    (p for p in candidates if p.ts_from > 0),
+                    next(iter(candidates), None),
+                )
+                break
+    sample_seqids = set()
+    if root is not None:
+        pending = [root]
+        while pending:
+            process = pending.pop()
+            if process.seqid not in sample_seqids:
+                sample_seqids.add(process.seqid)
+                pending.extend(process.children)
+    else:
+        logger.warning(
+            "Linux dump sample tree unavailable; retaining all process dumps within size limits"
+        )
+
+    # Upstream emits Plugin=procdump, not procdump2. Accept the latter for builds
+    # that use the plugin's command-line name in their JSON output.
+    log_path = analysis_dir / "procdump.log"
+    if not log_path.exists():
+        log_path = analysis_dir / "procdump2.log"
+    events = parse_log(log_path, parse_linux_procdump) if log_path.exists() else []
+    dumps_metadata = []
+    per_process = defaultdict(list)
+    seen = set()
+    total_size = 0
+    filtered = 0
+    with zipfile.ZipFile(analysis_dir / DUMPS_ZIP, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for dump in events:
+            if dump["filename"] in seen:
+                continue
+            # print_dump_info constructs a fresh trap info with EventUID=0.
+            # Its timestamp is after the copy, possibly after procmon's exit
+            # event, so use the latest instance started by that timestamp.
+            candidates = [
+                p
+                for p in tree.processes
+                if p.pid == dump["pid"] and p.ts_from <= dump["timestamp"]
+            ]
+            process = max(candidates, key=lambda p: p.ts_from) if candidates else None
+            seqid = process.seqid if process else None
+            if root is not None and seqid not in sample_seqids:
+                filtered += 1
+                continue
+            path = dumps_path / dump["filename"]
+            if path.is_symlink() or not path.is_file():
+                logger.warning("Linux dump missing or unsafe: %s", path)
+                continue
+            size = path.stat().st_size
+            if size != dump["size"]:
+                logger.warning(
+                    "Linux dump size mismatch: %s (log=%d, file=%d)",
+                    path,
+                    dump["size"],
+                    size,
+                )
+                continue
+            if not config.min_single_dump_size <= size <= config.max_single_dump_size:
+                filtered += 1
+                continue
+            if total_size + size > config.max_total_dumps_size:
+                filtered += 1
+                continue
+            digest = hashlib.sha256()
+            with path.open("rb") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            zip_name = f"{DUMPS_DIR}/{dump['filename']}"
+            metadata = {
+                **dump,
+                "filename": zip_name,
+                "process_seqid": seqid,
+                "sha256": digest.hexdigest(),
+            }
+            dumps_metadata.append(metadata)
+            per_process[seqid if seqid is not None else -1].append(
+                {
+                    **metadata,
+                    "filename": dump["filename"],
+                    "method": "procdump2",
+                }
+            )
+            zipf.write(path, zip_name)
+            seen.add(dump["filename"])
+            total_size += size
+        if not dumps_metadata:
+            zipf.writestr(zipfile.ZipInfo(f"{DUMPS_DIR}/"), "")
+
+    shutil.rmtree(dumps_path)
+    context.update_metadata({"dumps_metadata": dumps_metadata})
+    context.update_report(
+        {
+            "memdumps": [
+                {"process_seqid": seqid, "dumps": dumps}
+                for seqid, dumps in sorted(per_process.items())
+            ]
+        }
+    )
+    logger.info(
+        "Linux dumps: packed %d files (%d bytes), filtered %d",
+        len(dumps_metadata),
+        total_size,
+        filtered,
+    )
 
 
 def process_dumps(context: PostprocessContext) -> None:

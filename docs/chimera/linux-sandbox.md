@@ -72,9 +72,60 @@ real run:
 | eBPF program load | n/a | ◐ `bpf` syscall seen; ebpfmon logs nothing | syscalls |
 | Unix socket use | n/a | ◐ path from connect/bind; unixsocketmon logs nothing | syscalls (patched) |
 | VM-detection reads (`/sys/class/dmi`, `/proc/cpuinfo`) | ✓ apimon | ✓ open events | filetracer |
-| Memory dumps, capa, ATT&CK TTPs | ✓ | ✗ (procdump2 exists but is untested) | – |
+| Memory dumps, capa, ATT&CK TTPs | ✓ | ◐ ELF cores packaged; live test pending; no capa on cores | procdump2 |
 | Screenshots, live view, user activity | ✓ | ✓ XFCE desktop with an autologin user | screenshotter, noVNC |
 | Anti-detection hardening | ✓ H1–H3 | ✗ guest still shows Xen in DMI, CPUID and dmesg (evasion score 70.44) | – |
+
+## Memory dumps
+
+Linux enables `procdump2` by default. It writes x64 ELF cores, not Windows region dumps.
+The references below are relative to the DRAKVUF source root (`chimera-console/drakvuf`).
+`src/plugins/procdump2/procdump2.cpp:110` selects the Linux implementation.
+The plugin README describes Windows hooks (`src/plugins/procdump2/README.md:8`); Linux uses `do_exit`.
+
+The command adds `--procdump-dir <analysis>/dumps`, `--procdump-use-maple-tree` for kernel 6.1,
+`--procdump-new-processes-on-finish`, and `--procdump-timeout 10`.
+Exit dumps need no extra flag (`src/plugins/procdump2/linux.cpp:795`, `:845`).
+The finish flag enumerates **all** running processes, including processes present before analysis
+(`src/plugins/procdump2/linux.cpp:853`). Its timeout is checked between dumps, after shutdown starts;
+it cannot interrupt a copy (`src/plugins/procdump2/linux.cpp:777`).
+There is no on-demand Linux PID option. The injected-PID finish setting is not used on Linux.
+Options are declared in `src/main.cpp:324`, parsed at `:918`, stored in `src/plugins/plugins.h:178`,
+and passed through `src/plugins/plugins.cpp:459`.
+`--procdump-disable-dump-on-finish` only clears the injected-PID setting (`src/main.cpp:1189`).
+Compression flags exist; we leave compression off and compress the archive once.
+
+Files are `dumps/procdump.<SN>` and `dumps/procdump.<SN>.metadata`
+(`src/plugins/procdump2/linux_private.h:176`, `src/plugins/procdump2/linux.cpp:138`).
+The cores use `ET_CORE` (`src/plugins/procdump2/linux_coredump.h:704`).
+Success events contain `TargetPID`, `TargetName`, `DumpReason` (`TerminateProcess` or `FinishAnalysis`),
+numeric `DumpSize`, `SN`, and `Status: "Success"` (`src/plugins/procdump2/linux.cpp:378`).
+Common fields include `PID`, `PPID`, `ProcessName` and `TimeStamp`. `EventUID` is zero here.
+The JSON plugin name is **`procdump`**, so splitting produces `procdump.log`, not `procdump2.log`.
+Failures and exclusions go to `procdump_fail.log` and `procdump_skip.log` (`linux.cpp:332`, `:344`).
+Sidecars contain size, process identity, compression, status, filename and sequence number; no dump reason.
+
+There is only a process-name exclusion list, no sample-tree include filter (`linux.cpp:735`).
+Postprocessing keeps the sample and its descendants from `inject.log` and `process_tree.json`.
+It matches dumps by PID and timestamp because their event IDs cannot identify a process instance.
+If the sample tree is unavailable, it warns and keeps all dumps within the limits. Unmatched seqids are null.
+It reuses `[memdump]`: 512 bytes minimum, 32 MiB per file, 500 MiB total by default.
+These are strict limits on the uncompressed files packed, **not capture-time disk limits**.
+Large cores need larger configured limits. Background processes can consume disk and finish-sweep time.
+The plugin also remembers completed PIDs, so PID reuse can suppress later exit dumps (`linux.cpp:789`).
+
+After postprocessing, expect `dumps.zip` with members `dumps/procdump.<SN>`.
+`metadata.json` contains `dumps_metadata` with filename, process name, PID, process seqid, size, SHA-256 and reason.
+`report.json` contains `memdumps` grouped by process seqid. Raw cores and sidecars are removed.
+If no core survives, the ZIP contains only `dumps/` and metadata is empty.
+Capa remains Windows-only: [ELF core support is still an open upstream request](https://github.com/mandiant/capa/issues/784).
+
+A live Xen test is still needed. Use a small process that exits and a child that sleeps past the analysis timeout.
+Check `procdump.log` for `Status: "Success"` with each dump reason and the expected `TargetPID`.
+Check the worker log for `Linux dumps: packed N files (B bytes), filtered F`, with N greater than zero.
+Check `metadata.json` for `postprocess.process_linux_dumps: "ok"` and nonempty `dumps_metadata`.
+Verify the ZIP hashes, process attribution, ELF headers with `readelf -h`, maple-tree profile offsets,
+shutdown time and peak disk use. Check `procdump_fail.log` and `drakvuf_stderr.log` for failures.
 
 ## Known gaps
 
@@ -84,7 +135,7 @@ real run:
    `/systemd/...` for `/run`. Root-filesystem paths are correct.
 3. **Background noise.** systemd-journald, systemd-hostnamed and LLMNR from systemd-resolved appear in every
    run, attributed to their own processes.
-4. **No memory dumps or TLS keys** on Linux.
+4. **Memory dumps need a live test. No TLS keys** on Linux.
 5. **The guest is not hardened against VM detection**: DMI vendor and CPUID hypervisor bit.
 
 ## Installing and changing the golden image
