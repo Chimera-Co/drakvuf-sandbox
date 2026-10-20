@@ -39,6 +39,7 @@ from .run_tools import (
     run_tcpdump,
     run_vm,
 )
+from .startup_command import fill_sample_placeholder
 from .telemetry import summarize_telemetry
 
 log = logging.getLogger(__name__)
@@ -207,6 +208,8 @@ def analyze_linux_file(
                 linux_info["upload"] = {"guest_path": guest_path, "sha256": stat["sha256"], "size": stat["size"],
                                         "injector": upload.get("Status")}
                 exec_argv = [guest_path]
+                if options.start_command:
+                    options.start_command = fill_sample_placeholder(options.start_command, guest_path)
             if isinstance(options.start_command, list) and options.start_command:
                 exec_argv = [str(a) for a in options.start_command]
             elif isinstance(options.start_command, str) and options.start_command:

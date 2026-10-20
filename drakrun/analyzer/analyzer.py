@@ -28,6 +28,7 @@ from .postprocessing import postprocess_analysis_dir
 from .run_tools import StallMonitor, run_drakvuf, run_screenshotter, run_tcpdump, run_vm
 from .telemetry import summarize_telemetry
 from .startup_command import (
+    fill_sample_placeholder,
     get_sample_filename_from_host_path,
     get_startup_method_and_argv,
     make_exec_parameters,
@@ -332,6 +333,10 @@ def analyze_file(
                 # If user provides its own method, we will stick to that one
                 if options.start_method is None:
                     options.start_method = start_method
+            else:
+                options.start_command = fill_sample_placeholder(
+                    options.start_command, str(guest_executable_path)
+                )
 
         tcpdump_file = output_dir / "dump.pcap"
         drakmon_file = output_dir / "drakmon.log"

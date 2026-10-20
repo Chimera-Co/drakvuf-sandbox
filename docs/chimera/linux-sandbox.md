@@ -115,10 +115,14 @@ privileges per command (`user` in the `exec` request). Its home has shell histor
 what activity checks look at; root's home is left empty, as on a real desktop. `chimera-vmcheck` and the agent itself
 still run as root.
 
-Memory is 5120 MB because Linux evasion checks flag 4 GiB or less. Xen admission needs the guest's memory plus
-192 MB free, so 5120 MB needs 5312 MB of the 5693 MB free with dom0 at 10 GiB. 8 GB (8384 MB needed) would never
-be admitted. The cost: with dom0 cut to 6 GiB later to run Windows and Linux together, Windows (5312) plus Linux
-needs about 10.6 GB at 5120 MB against 9.6 GB at 4096 MB.
+Memory is 4096 MB so that Windows (5120 MB) and Linux run in parallel next to a 6 GiB dom0
+(`parallel-analyses.md`). Xen admission needs each guest's memory plus 192 MB free. The cost is one PERDEDOR
+finding, `linux.env.low_ram` (4 GiB or less), which we accept. 5120 MB would clear it but not fit beside Windows.
+
+**Uptime before commit.** PERDEDOR's `linux.timing.low_uptime` flags an uptime under 10 minutes, and a restored
+snapshot keeps the uptime it had when it was committed. So `modify-vm0 commit` must run at least 600 s after the
+cold boot (the 20 Oct snapshot: 745 s, check clean; the one before, at 167 s, was flagged). Scan 20 Oct after the
+rebuild: 97.71, with only `low_ram` and `rdtsc_cpuid_jitter` (hypervisor timing, future scope) detected.
 
 Left: the BIOS date is the hvmloader build date.
 

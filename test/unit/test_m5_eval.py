@@ -410,3 +410,25 @@ def test_only_x86_64_elf_runs_in_the_linux_guest():
     head[4] = 1
     assert samples.elf_machine(bytes(head)) == "32-bit ELF"
     assert samples.elf_machine(b"MZ") == "not an ELF file"
+
+
+def test_sample_name_keeps_windows_installer_and_script_extensions():
+    assert m5.sample_name("tightvnc-setup-64bit.msi") == "tightvnc-setup-64bit.msi"
+    assert m5.sample_name("it-inventory.ps1") == "it-inventory.ps1"
+    assert m5.sample_name("logon-setup.bat") == "logon-setup.bat"
+    assert m5.sample_name("notes.txt") == "notes.txt.exe"
+
+
+def test_register_start_command_reaches_upload_fields(tmp_path):
+    reg = tmp_path / "register.csv"
+    reg.write_text(
+        "sha256,role,guest_os,start_command\n"
+        + "a" * 64 + ',benign,windows," msiexec /i ""{sample}"" /qn "\n'
+        + "b" * 64 + ",benign,linux,\n"
+    )
+    rows = m5.read_register(reg)
+    assert rows[0]["start_command"] == 'msiexec /i "{sample}" /qn'
+    fields = m5.upload_fields(rows[0], "vnc.msi", 120)
+    assert fields == {"timeout": "120", "file_name": "vnc.msi", "guest_os": "windows",
+                      "start_command": 'msiexec /i "{sample}" /qn'}
+    assert "start_command" not in m5.upload_fields(rows[1], "rclone", 120)

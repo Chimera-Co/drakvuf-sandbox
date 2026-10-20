@@ -54,6 +54,8 @@ ANALYSES_DIR = pathlib.Path("/var/lib/drakrun/analyses")
 ARMS_DIR = pathlib.Path("/var/lib/chimera-arms")
 CHIMERA_ARM = pathlib.Path(__file__).resolve().parents[1] / "arms/chimera-arm"
 ANALYSIS_WORKER = "drakrun-worker@1"  # the Windows worker; arm switches restart only it
+# Windows files the guest starts by extension (startup_command.py); anything else gets ".exe"
+WINDOWS_RUN_EXTENSIONS = (".exe", ".msi", ".ps1", ".bat", ".cmd", ".vbs", ".js")
 DATASET_DIR = pathlib.Path("/var/lib/chimera-dataset")
 ROLES = ("test", "control", "benign")
 GUEST_OSES = ("windows", "linux")
@@ -135,7 +137,7 @@ def read_register(path):
         guest_os = (row.get("guest_os") or "windows").strip().lower()
         if guest_os not in GUEST_OSES:
             raise ValueError(f"guest_os must be windows or linux: {sha}")
-        row.update(sha256=sha, role=role, guest_os=guest_os)
+        row.update(sha256=sha, role=role, guest_os=guest_os, start_command=(row.get("start_command") or "").strip())
     return rows
 
 
@@ -400,7 +402,15 @@ def sample_name(name, guest_os="windows"):
         return "update" if re.fullmatch(r"[0-9a-fA-F]{32,64}", stem) else base
     if re.fullmatch(r"[0-9a-fA-F]{32,64}", stem):
         return "setup.exe"
-    return base if base.lower().endswith(".exe") else base + ".exe"
+    return base if base.lower().endswith(WINDOWS_RUN_EXTENSIONS) else base + ".exe"
+
+
+def upload_fields(sample, name, timeout):
+    fields = {"timeout": str(timeout), "file_name": name, "guest_os": sample.get("guest_os", "windows")}
+    if sample.get("start_command"):
+        # e.g. an installer's silent switch: '"{sample}" /S'; the analyzer fills in the guest path
+        fields["start_command"] = sample["start_command"]
+    return fields
 
 
 def submit(api, sample, timeout, poll):
@@ -413,7 +423,7 @@ def submit(api, sample, timeout, poll):
     resp = requests.post(
         f"{api}/upload",
         files={"file": (name, data)},
-        data={"timeout": str(timeout), "file_name": name, "guest_os": sample.get("guest_os", "windows")},
+        data=upload_fields(sample, name, timeout),
         timeout=60,
     )
     resp.raise_for_status()

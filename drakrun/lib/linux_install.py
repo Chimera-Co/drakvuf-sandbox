@@ -44,10 +44,9 @@ DESKTOP_USER = "arjun"
 GUEST_WORK_DIR = f"/home/{DESKTOP_USER}/Downloads"
 GUEST_AGENT_DIR = "/var/lib/console-helper"
 DEFAULT_VCPUS = 4
-# 5 GB like the Windows guest: 4 GiB or less is a classic sandbox tell (the guest sees MemTotal < RAM), and
-# 5120 + 192 MB admission margin still fits the 5.6 GB Xen leaves next to the 10 GiB dom0. 8 GB would never
-# be admitted there (docs/chimera/parallel-analyses.md).
-DEFAULT_MEMORY = 5120
+# 4 GiB so Windows (5 GiB) and Linux run at the same time next to the 6 GiB dom0 (docs/chimera/parallel-analyses.md).
+# The cost: PERDEDOR's linux.env.low_ram flags 4 GiB or less; accepted, see docs/chimera/linux-sandbox.md.
+DEFAULT_MEMORY = 4096
 DEFAULT_DISK_SIZE = "128G"
 # Profile structs whose anonymous members DRAKVUF needs by name (see linux_profile.py)
 FLATTEN_STRUCTS = ["iov_iter"]
