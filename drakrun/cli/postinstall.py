@@ -14,9 +14,31 @@ log = logging.getLogger(__name__)
 
 
 @click.command(help="Finalize VM installation")
+@click.option(
+    "--guest-os",
+    "guest_os",
+    type=click.Choice(["windows", "linux"]),
+    default="windows",
+    show_default=True,
+    help="Guest operating system",
+)
+@click.option(
+    "--settle",
+    "settle_s",
+    default=120,
+    type=int,
+    show_default=True,
+    help="Linux only: seconds to let the desktop settle before the snapshot",
+)
 @check_root
-def postinstall():
+def postinstall(guest_os, settle_s):
     config = load_config()
+    if guest_os == "linux":
+        from drakrun.lib.linux_install import postinstall_linux
+
+        log.info("Linux snapshot done: %s", postinstall_linux(config.network, settle_s))
+        log.info("All right, VM setup is done.")
+        return
     install_info = InstallInfo.load(INSTALL_INFO_PATH)
     vm0 = VirtualMachine(0, install_info, config.network)
 

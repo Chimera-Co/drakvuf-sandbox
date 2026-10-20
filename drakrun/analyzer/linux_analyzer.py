@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional
 from drakrun.lib.config import NetworkConfigSection, load_config
 from drakrun.lib.install_info import InstallInfo
 from drakrun.lib.linux_agent import LinuxAgent, set_guest_clock
+from drakrun.lib.linux_install import DESKTOP_USER, LINUX_GOLDEN_DIR, LINUX_INSTALL_INFO_PATH  # noqa: F401
 from drakrun.lib.paths import PACKAGE_DATA_PATH
 
 from .analysis_metadata import AnalysisMetadata
@@ -28,6 +29,7 @@ from .run_tools import (
     StallMonitor,
     log_activity_watchdog,
     process_graceful_exit,
+    run_screenshotter,
     run_tcpdump,
     run_vm,
 )
@@ -35,7 +37,6 @@ from .telemetry import summarize_telemetry
 
 log = logging.getLogger(__name__)
 
-LINUX_GOLDEN_DIR = pathlib.Path("/var/lib/drakrun/linux/golden")
 GUEST_WORK_DIR = "/opt/chimera/work"
 # DRAKVUF plugins with a Linux implementation that produce analysis telemetry
 # (drakvuf/src/plugins/plugins.h, drakvuf_plugin_os_support)
@@ -47,6 +48,15 @@ DEFAULT_LINUX_PLUGINS = ["procmon", "syscalls", "filetracer", "unixsocketmon", "
 # Linux plugins outside the default set that a request may add
 OPTIONAL_LINUX_PLUGINS = ["cpuidmon", "rebootmon", "debugmon", "procdump2"]
 READY_TIMEOUT_S = 30
+# Desktop session of the guest (data/linux/desktop.sh): the sample gets its display, so GUI programs
+# can draw and are seen in the live view and screenshots
+SAMPLE_ENV = {
+    "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "HOME": "/root",
+    "LANG": "en_IN.UTF-8",
+    "DISPLAY": ":0",
+    "XAUTHORITY": f"/home/{DESKTOP_USER}/.Xauthority",
+}
 # DRAKVUF build with the Linux sockaddr decoder (scripts/chimera/patches/drakvuf-linuxnet-sockaddr.patch),
 # used for Linux only so the Windows pipeline keeps its validated binary
 LINUX_DRAKVUF = "/usr/local/bin/drakvuf-linuxnet"
@@ -127,7 +137,7 @@ def analyze_linux_file(
     from .analyzer import AnalysisSubstatus
 
     config = load_config()
-    install_info = InstallInfo.load(LINUX_GOLDEN_DIR / "install.json")
+    install_info = InstallInfo.load(LINUX_INSTALL_INFO_PATH)
     kernel_profile = install_info.snapshot_dir / "kernel.json"
     options = metadata.options
     options.guest_os = "linux"
@@ -192,6 +202,7 @@ def analyze_linux_file(
                                         daemon=True, name="drakvuf-watchdog")
             watchdog.start()
             with run_tcpdump(vm.get_network_info(), output_dir / "dump.pcap"), \
+                    run_screenshotter(vm_id, install_info, output_dir, enabled=not options.no_screenshotter), \
                     drakmon_file.open("wb") as out, drakvuf_err_file.open("wb") as err:
                 drakvuf = subprocess.Popen(cmdline, stdout=out, stderr=err, cwd=output_dir)
                 stall_monitor.on_stall = drakvuf.terminate
@@ -207,7 +218,7 @@ def analyze_linux_file(
                     if not linux_info["monitor_ready"]:
                         log.warning("Marker not seen in %d s; starting the sample anyway", READY_TIMEOUT_S)
                     if exec_argv:
-                        launched = agent.call("exec", {"argv": exec_argv, "cwd": GUEST_WORK_DIR})
+                        launched = agent.call("exec", {"argv": exec_argv, "cwd": GUEST_WORK_DIR, "env": SAMPLE_ENV})
                         inject = {"Plugin": "inject", "Method": "AgentExec", "Status": "Success",
                                   "ProcessName": exec_argv[0], "Arguments": " ".join(exec_argv[1:]),
                                   "InjectedPid": launched["pid"]}

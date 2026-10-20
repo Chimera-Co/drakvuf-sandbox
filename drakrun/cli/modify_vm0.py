@@ -31,8 +31,31 @@ def modify_vm0():
     default=False,
     help="Cold-boot vm-0 instead of restoring from snapshot",
 )
-def begin_modify_vm0(cold_boot):
+@click.option(
+    "--guest-os",
+    "guest_os",
+    type=click.Choice(["windows", "linux"]),
+    default="windows",
+    show_default=True,
+    help="Guest operating system",
+)
+def begin_modify_vm0(cold_boot, guest_os):
     config = load_config()
+    if guest_os == "linux":
+        from drakrun.lib.linux_install import begin_modify
+
+        install_info = begin_modify(config.network, cold_boot=cold_boot)
+        banner(
+            f"""
+        The Linux vm-0 is running for modification.
+        VNC to port 5900 on this machine to change it, then execute:
+        - 'drakrun modify-vm0 commit --guest-os linux' to apply your modification to the base image
+        - 'drakrun modify-vm0 rollback --guest-os linux' to rollback your changes
+        Your configured VNC password is:
+        {install_info.vnc_passwd}
+    """
+        )
+        return
     install_info = InstallInfo.load(INSTALL_INFO_PATH)
 
     vm0 = VirtualMachine(0, install_info, config.network)
@@ -53,8 +76,21 @@ def begin_modify_vm0(cold_boot):
 
 
 @modify_vm0.command(name="commit", help="Commit changes made during vm-0 modification")
-def commit_modify_vm0():
+@click.option(
+    "--guest-os",
+    "guest_os",
+    type=click.Choice(["windows", "linux"]),
+    default="windows",
+    show_default=True,
+    help="Guest operating system",
+)
+def commit_modify_vm0(guest_os):
     config = load_config()
+    if guest_os == "linux":
+        from drakrun.lib.linux_install import commit_modify
+
+        log.info("Linux vm-0 committed: %s", commit_modify(config.network))
+        return
     install_info = InstallInfo.load(INSTALL_INFO_PATH)
 
     vm0 = VirtualMachine(0, install_info, config.network)
@@ -85,8 +121,21 @@ def commit_modify_vm0():
 @modify_vm0.command(
     name="rollback", help="Rollback changes made during vm-0 modification"
 )
-def rollback_modify_vm0():
+@click.option(
+    "--guest-os",
+    "guest_os",
+    type=click.Choice(["windows", "linux"]),
+    default="windows",
+    show_default=True,
+    help="Guest operating system",
+)
+def rollback_modify_vm0(guest_os):
     config = load_config()
+    if guest_os == "linux":
+        from drakrun.lib.linux_install import rollback_modify
+
+        rollback_modify(config.network)
+        return
     install_info = InstallInfo.load(INSTALL_INFO_PATH)
 
     vm0 = VirtualMachine(0, install_info, config.network)

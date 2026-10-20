@@ -1,4 +1,4 @@
-"""Host side of the CHIMERA Linux guest agent (scripts/chimera/linux/guest/chimera-agent.py).
+"""Host side of the CHIMERA Linux guest agent (drakrun/data/linux/chimera-agent.py).
 
 The agent listens on the guest's first serial port, which Xen exposes on dom0 as
 /var/run/drakrun/vm-N.sock. One request line, one reply line:

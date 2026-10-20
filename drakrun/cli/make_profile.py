@@ -30,8 +30,32 @@ log = logging.getLogger(__name__)
     default=False,
     help="Don't restore VM before making profile and don't destroy after, assume it's already running",
 )
+@click.option(
+    "--guest-os",
+    "guest_os",
+    type=click.Choice(["windows", "linux"]),
+    default="windows",
+    show_default=True,
+    help="Guest operating system",
+)
+@click.option(
+    "--debug-package",
+    "debug_package",
+    type=click.Path(exists=True),
+    default=None,
+    help="Linux only: Debian linux-image-<version>-dbg .deb of the guest kernel",
+)
 @check_root
-def make_profile(vm_id, no_restore):
+def make_profile(vm_id, no_restore, guest_os, debug_package):
+    if guest_os == "linux":
+        import pathlib
+
+        from drakrun.lib.linux_install import make_linux_profile
+
+        if debug_package is None:
+            raise click.UsageError("--debug-package is required for --guest-os linux")
+        log.info("Profile successfully created: %s", make_linux_profile(pathlib.Path(debug_package)))
+        return
     config = load_config()
     install_info = InstallInfo.load(INSTALL_INFO_PATH)
 

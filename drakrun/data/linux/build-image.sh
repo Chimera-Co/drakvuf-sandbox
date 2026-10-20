@@ -1,7 +1,8 @@
 #!/bin/bash
 # Build the CHIMERA Linux golden disk from the official Debian 12 "nocloud" cloud image.
+# Run by `drakrun install --guest-os linux` (drakrun/lib/linux_install.py); standalone:
 #
-#   sudo scripts/chimera/linux/build-linux-image.sh [SRC.qcow2] [OUT.qcow2]
+#   sudo bash build-image.sh SRC.qcow2 OUT.qcow2
 #
 # SRC is debian-12-nocloud-amd64.qcow2 from https://cloud.debian.org/images/cloud/bookworm/latest/
 # (check it against SHA512SUMS there). Its kernel (6.1.0-54-amd64, 6.1.190-1) matches the
@@ -9,7 +10,9 @@
 # needs a new profile (see docs/chimera/linux-sandbox.md).
 #
 # Changes to the image:
-#   - grows the disk to $SIZE (default 12G)
+#   - grows the disk to $SIZE (default 20G)
+#   - PROFILE=desktop (default): an XFCE desktop PC with an autologin user, everyday applications and a
+#     lived-in home directory (desktop.sh); PROFILE=server: the plain server image
 #   - installs chimera-agent (serial control channel, the Linux counterpart of drakshell) on ttyS0;
 #     the serial login and kernel console move off ttyS0 so they don't mix with the agent's lines
 #   - masks timers that would start background work in the middle of an analysis
@@ -17,10 +20,13 @@
 #   - sets a hostname and creates the work directory /opt/chimera/work
 set -euo pipefail
 
-SRC=${1:-/var/lib/drakrun/linux/img/debian-12-nocloud-amd64.qcow2}
-OUT=${2:-/var/lib/drakrun/linux/img/chimera-linux-base.qcow2}
-SIZE=${SIZE:-12G}
-HOSTNAME_=${GUEST_HOSTNAME:-srv-app01}
+SRC=$1
+OUT=$2
+SIZE=${SIZE:-20G}
+PROFILE=${PROFILE:-desktop}
+DESKTOP_USER=${DESKTOP_USER:-arjun}
+DESKTOP_FULLNAME=${DESKTOP_FULLNAME:-Arjun Mehta}
+if [ "$PROFILE" = desktop ]; then HOSTNAME_=${GUEST_HOSTNAME:-$DESKTOP_USER-pc}; else HOSTNAME_=${GUEST_HOSTNAME:-srv-app01}; fi
 HERE=$(cd "$(dirname "$0")" && pwd)
 NBD=/dev/nbd0
 MNT=$(mktemp -d)
@@ -66,6 +72,9 @@ if [ -n "$PKGS" ]; then
     for t in rsa ecdsa ed25519; do
         chroot "$MNT" ssh-keygen -q -N '' -t $t -C "root@$HOSTNAME_" -f /etc/ssh/ssh_host_${t}_key
     done
+    if [ "$PROFILE" = desktop ]; then
+        bash "$HERE/desktop.sh" "$MNT" "$DESKTOP_USER" "$DESKTOP_FULLNAME"
+    fi
     chroot "$MNT" apt-get clean
     rm -rf "$MNT/var/lib/apt/lists/"*
     rm -f "$MNT/usr/sbin/policy-rc.d"
@@ -75,8 +84,8 @@ if [ -n "$PKGS" ]; then
 fi
 
 # Agent
-install -m 0755 "$HERE/guest/chimera-agent.py" "$MNT/usr/local/sbin/chimera-agent"
-install -m 0644 "$HERE/guest/chimera-agent.service" "$MNT/etc/systemd/system/chimera-agent.service"
+install -m 0755 "$HERE/chimera-agent.py" "$MNT/usr/local/sbin/chimera-agent"
+install -m 0644 "$HERE/chimera-agent.service" "$MNT/etc/systemd/system/chimera-agent.service"
 ln -sf /etc/systemd/system/chimera-agent.service "$MNT/etc/systemd/system/multi-user.target.wants/chimera-agent.service"
 
 # ttyS0 belongs to the agent: no serial getty, no kernel console there (console stays on tty0/VNC)

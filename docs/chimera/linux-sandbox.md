@@ -27,16 +27,17 @@ flowchart LR
 
 | Part | How | Source |
 |---|---|---|
-| Guest image | Official Debian 12 nocloud qcow2, grown to 12 GB. Adds everyday server packages, regenerates SSH host keys, masks the timers that make noise (apt, man-db, fstrim, timesyncd), hostname `srv-app01` | `scripts/chimera/linux/build-linux-image.sh` |
+| Guest image | Official Debian 12 nocloud qcow2, grown to 20 GB, turned into a **desktop PC**: XFCE on LightDM with autologin to an ordinary user (`arjun`, in the sudo group), Firefox ESR, LibreOffice, India locale and time zone, a home directory with dated documents, shell history and recent files, no screen lock or blanking. Also everyday server tools, regenerated SSH host keys, and the noisy timers masked (apt, man-db, fstrim, timesyncd). `PROFILE=server` builds the plain server image | `drakrun/data/linux/build-image.sh`, `desktop.sh` |
 | Kernel profile | Debian `linux-image-6.1.0-54-amd64-dbg` → `dwarf2json` → ISF JSON, passed with `-r`. The guest kernel is the same build as dom0 | DRAKVUF's documented method |
-| Profile tweak | The 12 anonymous-union members of `iov_iter` are flattened so filetracer resolves them. Flattening the whole profile broke procmon, so it is limited to this struct | *ours*: `flatten_profile.py` |
-| VM | HVM, `altp2m=2`, 2 vCPU, 2048 MB, e1000 NIC, serial on a unix socket, VNC on localhost. Reuses drakrun's `VirtualMachine`, snapshot restore and per-VM lock | `cfg-linux.template`, `make_golden.py` |
-| Guest control | `chimera-agent`: a small Python service on ttyS0 that answers ping, clock, net, prepare, stat, chmod, exec and sh. drakshell is Windows-only | *ours*: `guest/chimera-agent.py`, `drakrun/lib/linux_agent.py` |
+| Profile tweak | The 12 anonymous-union members of `iov_iter` are flattened so DRAKVUF resolves them. Flattening the whole profile broke procmon, so it is limited to this struct | *ours*: `drakrun/lib/linux_profile.py` |
+| VM | HVM, `altp2m=2`, 4 vCPU, 4096 MB, stdvga, e1000 NIC, serial on a unix socket, VNC on localhost. Reuses drakrun's `VirtualMachine`, storage backend (qcow2 `vm-0.img` + overlays), snapshot restore and per-VM lock | `drakrun/data/linux/cfg-linux.template`, `drakrun/lib/linux_install.py` |
+| Guest control | `chimera-agent`: a small Python service on ttyS0 that answers ping, clock, net, prepare, stat, chmod, exec and sh. drakshell is Windows-only | *ours*: `drakrun/data/linux/chimera-agent.py`, `drakrun/lib/linux_agent.py` |
 | Sample upload | `injector -m writefile` in the agent process; sha256 checked in the guest | upstream injector |
 | Launch gate | DRAKVUF starts first. The agent runs `/bin/true chimera-ready-<random>`, and the sample starts only after procmon logs that marker, so its first events are not lost | *ours*: `linux_analyzer.py` |
 | Telemetry | procmon, syscalls (88 syscalls, `drakrun/data/linux-syscalls.txt`), filetracer, unixsocketmon, ptracemon, ebpfmon | DRAKVUF Linux plugins |
 | Network addresses | The syscalls plugin decodes `sockaddr` for connect, sendto, sendmsg and bind (`ip:port`, IPv6, `unix:path`, netlink). It runs in a separate binary, `/usr/local/bin/drakvuf-linuxnet`; Windows keeps the validated `drakvuf` | *ours*: `scripts/chimera/patches/drakvuf-linuxnet-sockaddr.patch` |
 | Report | Same sections as Windows: process tree, modified/deleted files, connections, DNS, HTTP requests. Adds `linux.{links, permission_changes, unix_sockets, fileless_execs, network_syscalls, syscall_counts}` | `get_linux_behaviour_info.py` |
+| Live view, screenshots | Same as Windows: the console's live interaction tab (noVNC on websocket 6400+N) and the screenshotter (VNC 5900+N). The sample gets the desktop's display (`DISPLAY=:0`), so GUI programs appear | drakrun |
 | Guest clock | Uses the Xen clocksource, so it is already correct after restore; the agent records the offset | `set_guest_clock` |
 
 ## Results (20 Oct)
@@ -84,15 +85,40 @@ real run:
 4. **No memory dumps or TLS keys** on Linux.
 5. **The guest is not hardened against VM detection**: DMI vendor and CPUID hypervisor bit.
 
-## Rebuilding
+## Installing and changing the golden image
+
+The same commands as for Windows, with `--guest-os linux`:
 
 ```bash
-sudo scripts/chimera/linux/build-linux-image.sh
-sudo /opt/chimera/venv/bin/python scripts/chimera/linux/make_golden.py
+# kernel profile from Debian's debug package of the guest kernel (once per kernel)
+sudo drakrun make-profile --guest-os linux --debug-package linux-image-6.1.0-54-amd64-dbg_6.1.190-1_amd64.deb
+# build vm-0.img from the official cloud image and boot vm-0 (VNC :5900 shows the desktop)
+sudo drakrun install --guest-os linux debian-12-nocloud-amd64.qcow2      # --linux-profile server, --vcpus, --memory
+# settle, clean up, save the snapshot, check that vm-1 restores from it
+sudo drakrun postinstall --guest-os linux
+# change the golden image later (install software, change settings), like modify-vm0 on Windows
+sudo drakrun modify-vm0 begin --guest-os linux
+sudo drakrun modify-vm0 commit --guest-os linux        # or: rollback --guest-os linux
+```
+
+| | Windows | Linux |
+|---|---|---|
+| Install info | `/etc/drakrun/install.json` | `/var/lib/drakrun/linux/golden/install.json` |
+| Golden disk + snapshot | `/var/lib/drakrun/volumes/{vm-0.img,snapshot.sav}` | `/var/lib/drakrun/linux/golden/{vm-0.img,snapshot.sav}` |
+| xl template | `/etc/drakrun/cfg.template` | `/etc/drakrun/cfg-linux.template` |
+| How vm-0 is made | by hand from an ISO | `data/linux/build-image.sh` from the cloud image |
+| Kernel profile | `drakrun make-profile` (PDBs) | `drakrun make-profile --guest-os linux` (dwarf2json) |
+
+The kernel profile must match the guest kernel exactly. The image build refuses to continue if apt changed the
+kernel, and `postinstall` checks `uname -r` before saving. The previous `vm-0.img` and `snapshot.sav` are kept as
+`*.prev`.
+
+## Tests
+
+```bash
 sudo /opt/chimera/venv/bin/python scripts/chimera/linux/bench/run_linux.py SAMPLE --out-root DIR
 sudo /opt/chimera/venv/bin/python scripts/chimera/linux/bench/check_probe.py DIR/<id>
 sudo /opt/chimera/venv/bin/python scripts/chimera/linux/containment_test.py EVIDENCE_DIR
 ```
 
-The kernel profile must match the guest kernel exactly. `build-linux-image.sh` refuses to continue if apt
-changed the kernel. The bench and containment scripts need the VM slot free, so stop `drakrun-worker@1` first.
+These need the VM slot free, so stop `drakrun-worker@1` first.

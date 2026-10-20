@@ -166,7 +166,7 @@ function UploadForm() {
                     }}
                 >
                     <option value="windows">Windows 10</option>
-                    <option value="linux">Linux (Debian 12)</option>
+                    <option value="linux">Linux (Debian 12 desktop)</option>
                 </select>
             </div>
             <div className="mb-3">
@@ -419,24 +419,22 @@ function UploadForm() {
                             </label>
                         </div>
                     </div>
-                    {!isLinux && (
-                        <div className="col-md-6">
-                            <div className="form-check">
-                                <input
-                                    className="form-check-input"
-                                    id="no-screenshots"
-                                    type="checkbox"
-                                    name="no_screenshots"
-                                />
-                                <label
-                                    className="form-check-label"
-                                    htmlFor="no-screenshots"
-                                >
-                                    Disable screenshots
-                                </label>
-                            </div>
+                    <div className="col-md-6">
+                        <div className="form-check">
+                            <input
+                                className="form-check-input"
+                                id="no-screenshots"
+                                type="checkbox"
+                                name="no_screenshots"
+                            />
+                            <label
+                                className="form-check-label"
+                                htmlFor="no-screenshots"
+                            >
+                                Disable screenshots
+                            </label>
                         </div>
-                    )}
+                    </div>
                 </div>
             </Collapse>
 
