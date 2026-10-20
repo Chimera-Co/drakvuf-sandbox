@@ -232,3 +232,12 @@ def test_hash_named_samples_get_a_neutral_guest_name():
     assert m5.sample_name("%064x.exe" % 5) == "setup.exe"
     assert m5.sample_name("Invoice_0921.exe") == "Invoice_0921.exe"
     assert m5.sample_name("dir/report") == "report.exe"
+
+
+def test_tools_the_batch_calls_are_executable():
+    # m5_eval runs chimera-arm directly; a 644 copy in a fresh deploy checkout fails at the first arm switch
+    import os
+
+    scripts = pathlib.Path(m5.__file__).resolve().parents[1]
+    for tool in (scripts / "arms/chimera-arm", scripts / "containment/chimera-net-check"):
+        assert os.access(tool, os.X_OK), tool
