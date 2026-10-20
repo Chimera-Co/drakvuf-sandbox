@@ -36,7 +36,7 @@ def test_sets_clock_to_host_time_and_reports_offsets(monkeypatch):
     # Host at 1_000_000.000 s when the command is built and 1_000_000.500 s when the
     # answer arrives; the guest was 2 h behind and reads 1_000_000.400 s afterwards.
     times = iter([1_000_000.0, 1_000_000.5])
-    monkeypatch.setattr(post_restore.time, "time", lambda: next(times))
+    monkeypatch.setattr(post_restore.time, "time", lambda: next(times, 1_000_000.5))  # logging calls it too
     shell = FakeDrakshell(stdout=b"992800000 1000000400\r\n")
 
     result = post_restore.set_guest_clock(shell)

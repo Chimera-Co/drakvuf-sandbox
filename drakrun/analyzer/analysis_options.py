@@ -19,7 +19,7 @@ class AnalysisOptions(BaseModel):
     # Guest VM: entry path inside archive (e.g., "setup/setup.exe")
     guest_archive_entry_path: Optional[str] = None
     # Target directory on guest VM (where files will be placed)
-    guest_target_directory: pathlib.PureWindowsPath = pathlib.PureWindowsPath(
+    guest_target_directory: Optional[pathlib.PureWindowsPath] = pathlib.PureWindowsPath(
         "%USERPROFILE%\\Desktop\\"
     )
     # Working directory set for the sample during execution
@@ -88,9 +88,15 @@ class AnalysisOptions(BaseModel):
 
     @classmethod
     def with_config_defaults(cls, config: DrakrunConfig, **kwargs):
-        return cls(
-            **cls._apply_defaults(config, kwargs),
-        )
+        options = cls._apply_defaults(config, kwargs)
+        if options.get("guest_os") == "linux":
+            # Linux uses the agent's work directory and exec, not Windows launch settings.
+            options.update(
+                start_method=None,
+                guest_target_directory=None,
+                guest_working_directory=None,
+            )
+        return cls(**options)
 
     def to_dict(self, exclude_none=True):
         return self.model_dump(

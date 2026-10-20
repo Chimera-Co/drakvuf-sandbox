@@ -66,3 +66,13 @@ found in `process_tree.json`); events of other processes are excluded. Lists are
 
 Counts are observed attempts, not confirmed effects. The guest network is INetSim: every name resolves and every
 HTTP request gets a fake answer.
+
+For Linux, `run.guest_os` is `"linux"`. The sample is the `InjectedPid` in `inject.log`
+(`Method: "AgentExec"`); its process subtree defines the scope. `api_calls` counts syscall
+`Method` names from `syscall.log` (or `syscall.log.gz`), and `api_sequence` contains the first
+2000 names in timestamp order. `files.written` and `files.deleted` count attributed path
+entries in the report's `modified_files` and `deleted_files`; `files.paths` combines their
+filenames. These are unique paths per section, not write-event counts; `files.created` is
+zero because the report does not distinguish creation. Network features use report
+`connections` and `dns_queries`, filtered to subtree seqids. Registry fields stay empty/zero,
+as do `http_requests` and `ttps`, which have no Linux producer.

@@ -332,6 +332,9 @@ def parse_linux_exec_entry(
     process = pstree.get_process(entry["PID"])
     procname = entry.get("ImagePathName") or entry.get("FileName") or ""
     args = split_linux_commandline(entry.get("CommandLine") or "")
+    if procname in ("", "(null)"):
+        # Image without a path: execve of a memfd or of an unlinked file (fileless execution)
+        procname = f"{FILELESS_PREFIX}{args[0] if args else ''}"
     if process is None or process.ts_to is not None:
         # Not seen yet: a vfork child whose parent's kernel_clone has not returned
         new = pstree.add_process(
@@ -375,6 +378,7 @@ def parse_linux_exit_entry(pstree: ProcessTree, entry: Dict[str, Any]) -> None:
     process.exit_code_str = entry.get("ExitStatusStr")
 
 
+FILELESS_PREFIX = "[fileless] "
 LINUX_PROCMON_METHODS = {"kernel_clone", "do_execveat_common", "do_exit", "send_signal"}
 
 

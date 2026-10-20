@@ -13,6 +13,7 @@ import orjson
 
 from drakrun.lib.pcap_summary import summarize_pcap
 
+from ..process_tree import FILELESS_PREFIX
 from .plugin_base import PostprocessContext
 
 MODIFIED = {"vfs_write", "do_truncate", "vfs_truncate", "vfs_fallocate", "vfs_mknod", "vfs_mkdir"}
@@ -94,6 +95,7 @@ def get_linux_behaviour_info(context: PostprocessContext) -> None:
 
     syscall_counts: Dict[int, Counter] = defaultdict(Counter)
     net_events = []
+    unix_sockets = defaultdict(set)
     for event in read_json_lines(analysis_dir / "syscall.log"):
         seqid = seqid_of(event)
         if seqid is None:
@@ -101,7 +103,10 @@ def get_linux_behaviour_info(context: PostprocessContext) -> None:
         method = event.get("Method")
         syscall_counts[seqid][method] += 1
         if method in NET_SYSCALLS:
-            target = endpoint(event.get("addr") or event.get("dest_addr") or "")
+            addr = event.get("addr") or event.get("dest_addr") or ""
+            target = endpoint(addr)
+            if isinstance(addr, str) and addr.startswith("unix:"):
+                unix_sockets[(addr[5:], method)].add(seqid)
             if target is not None:
                 net_events.append({"method": method, "ip": target[0], "port": target[1],
                                    "ts": float(event.get("TimeStamp", 0)), "seqid": seqid})
@@ -139,6 +144,10 @@ def get_linux_behaviour_info(context: PostprocessContext) -> None:
             "links": links[:200],
             "permission_changes": perms[:200],
             "network_syscalls": net_events[:500],
+            "unix_sockets": [{"path": path, "method": method, "process_seqids": sorted(s)}
+                             for (path, method), s in sorted(unix_sockets.items())][:200],
+            "fileless_execs": [{"process_seqid": p.seqid, "pid": p.pid, "args": p.args}
+                               for p in tree.processes if p.procname.startswith(FILELESS_PREFIX)],
             "syscall_counts": {
                 str(seqid): dict(counts.most_common(MAX_SYSCALL_NAMES))
                 for seqid, counts in sorted(syscall_counts.items())

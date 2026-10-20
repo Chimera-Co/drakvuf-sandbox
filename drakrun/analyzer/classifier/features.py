@@ -1,9 +1,10 @@
-"""Extract bounded, sample-scoped features from postprocessed Windows logs.
+"""Extract bounded, sample-scoped features from postprocessed guest logs.
 
 Counters count observed events (not confirmed effects). Depth is relative to the
 sample, with depth zero for the sample itself. Unattributed events are excluded.
 """
 
+import gzip
 import heapq
 import json
 import math
@@ -52,9 +53,14 @@ def _read_json(path):
         return None
 
 
-def _json_lines(path):
+def _json_lines(path, compressed=False):
     try:
-        with path.open(encoding="utf-8", errors="replace") as stream:
+        stream = (
+            gzip.open(path, "rt", encoding="utf-8", errors="replace")
+            if compressed
+            else path.open(encoding="utf-8", errors="replace")
+        )
+        with stream:
             for line in stream:
                 try:
                     value = json.loads(line)
@@ -62,7 +68,7 @@ def _json_lines(path):
                         yield value
                 except (ValueError, RecursionError):
                     continue
-    except OSError:
+    except (OSError, EOFError):
         return
 
 
@@ -111,7 +117,7 @@ class _Scope:
         for node, _, _ in self.nodes:
             self.by_pid.setdefault(_integer(node.get("pid")), []).append(node)
 
-    def event(self, event):
+    def event(self, event, early_child=False):
         pid = _integer(event.get("PID"))
         if pid is None:
             return False
@@ -139,6 +145,17 @@ class _Scope:
                 # A PID alone cannot disambiguate reuse.
                 continue
             matches.append(node)
+        if not matches and early_child and evtid is not None:
+            # Match ProcessTree.get_process_for_evtid: children can emit events
+            # before the parent's kernel_clone returns and records their birth.
+            later = [
+                n
+                for n in candidates
+                if _integer(n.get("evtid_from")) is not None
+                and _integer(n.get("evtid_from")) > evtid
+            ]
+            if later:
+                matches = [min(later, key=lambda n: _integer(n.get("evtid_from")))]
         return len(matches) == 1 and id(matches[0]) in self.selected_ids
 
     def report_event(self, event):
@@ -172,9 +189,10 @@ def extract_features(analysis_dir) -> dict:
     }
     sample = _object(metadata.get("file"))
     options = _object(metadata.get("options"))
+    is_linux = options.get("guest_os") == "linux"
     telemetry = _object(metadata.get("telemetry"))
-    startup = _object(report.get("startup"))
-    if (
+    startup = {} if is_linux else _object(report.get("startup"))
+    if is_linux or (
         _integer(startup.get("pid")) is None
         and _integer(startup.get("process")) is None
     ):
@@ -191,7 +209,7 @@ def extract_features(analysis_dir) -> dict:
             "size_bytes": max(0, int(_number(sample.get("size_bytes")))),
         },
         "run": {
-            "guest_os": "windows",
+            "guest_os": "linux" if is_linux else "windows",
             "timeout_s": _number(
                 telemetry.get("analysis_timeout_s"), _number(options.get("timeout"))
             ),
@@ -247,8 +265,14 @@ def extract_features(analysis_dir) -> dict:
         )
 
     earliest = []
-    for index, event in enumerate(_json_lines(directory / "apimon.log")):
-        if event.get("Event") != "api_called" or not scope.event(event):
+    api_path = directory / ("syscall.log" if is_linux else "apimon.log")
+    compressed = is_linux and not api_path.exists()
+    if compressed:
+        api_path = api_path.with_name(api_path.name + ".gz")
+    for index, event in enumerate(_json_lines(api_path, compressed=compressed)):
+        if (not is_linux and event.get("Event") != "api_called") or not scope.event(
+            event, early_child=is_linux
+        ):
             continue
         name = event.get("Method")
         if not isinstance(name, str) or not name:
@@ -262,6 +286,28 @@ def extract_features(analysis_dir) -> dict:
         elif entry > earliest[0]:
             heapq.heapreplace(earliest, entry)
     features["api_sequence"] = [item[2] for item in sorted(earliest, reverse=True)]
+
+    if is_linux:
+        # Linux VFS report entries are unique paths, not individual writes.
+        for section, counter in (
+            ("modified_files", "written"),
+            ("deleted_files", "deleted"),
+        ):
+            for event in _list(report.get(section)):
+                if isinstance(event, dict) and scope.report_event(event):
+                    features["files"][counter] += 1
+                    _append_unique(features["files"]["paths"], event.get("filename"))
+        network = features["network"]
+        for event in _list(report.get("connections")):
+            if isinstance(event, dict) and scope.report_event(event):
+                network["connections"] += 1
+                ip, port = event.get("remote_ip"), event.get("remote_port")
+                if isinstance(ip, str) and port is not None:
+                    _append_unique(network["remote_endpoints"], f"{ip}:{port}")
+        for event in _list(report.get("dns_queries")):
+            if isinstance(event, dict) and scope.report_event(event):
+                _append_unique(network["dns_queries"], event.get("domain"))
+        return features
 
     files = features["files"]
     for event in _json_lines(directory / "filetracer.log"):

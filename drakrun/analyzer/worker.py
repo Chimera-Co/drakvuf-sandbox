@@ -21,6 +21,7 @@ from ..lib.s3_storage import (
 from .analysis_metadata import AnalysisMetadata, FileMetadata
 from .analysis_options import AnalysisOptions
 from .analyzer import AnalysisSubstatus, analyze_file
+from .linux_analyzer import analyze_linux_file
 
 ANALYSIS_QUEUE_NAME = "drakrun-analysis"
 _WORKER_VM_ID: Optional[int] = None
@@ -132,7 +133,10 @@ def worker_analyze(options: AnalysisOptions):
 
     job_success = True
     try:
-        extra_metadata = analyze_file(
+        analyzer = (
+            analyze_linux_file if metadata.options.guest_os == "linux" else analyze_file
+        )
+        extra_metadata = analyzer(
             vm_id, output_dir, metadata, substatus_callback=substatus_callback
         )
         job.meta.update({"extra_metadata": extra_metadata})

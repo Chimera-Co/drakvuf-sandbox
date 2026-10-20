@@ -34,6 +34,20 @@ const defaultPlugins = [
     createOption("tlsmon"),
 ];
 
+const linuxDefaultPlugins = [
+    "procmon",
+    "syscalls",
+    "filetracer",
+    "unixsocketmon",
+    "ptracemon",
+    "ebpfmon",
+].map(createOption);
+
+const linuxPlugins = [
+    ...linuxDefaultPlugins,
+    ...["cpuidmon", "rebootmon", "debugmon", "procdump2"].map(createOption),
+];
+
 const pluginPickerStyles = {
     multiValue: (styles, { data }) => {
         if (!data.__isNew__)
@@ -65,7 +79,7 @@ export function PluginList({ plugins }) {
     );
 }
 
-export function PluginPicker({ onChange, name }) {
+export function PluginPicker({ onChange, name, guestOs = "windows" }) {
     const [warning, setWarning] = useState(undefined);
     const onSelectChange = useCallback(
         (currentValue) => {
@@ -91,10 +105,13 @@ export function PluginPicker({ onChange, name }) {
         <div>
             <CreatableSelect
                 isMulti
-                options={plugins}
+                options={guestOs === "linux" ? linuxPlugins : plugins}
+                isValidNewOption={guestOs === "linux" ? () => false : undefined}
                 styles={pluginPickerStyles}
                 onChange={onSelectChange}
-                defaultValue={defaultPlugins}
+                defaultValue={
+                    guestOs === "linux" ? linuxDefaultPlugins : defaultPlugins
+                }
                 name={name}
             />
             {warning ? <div className="text-danger small">{warning}</div> : []}

@@ -73,6 +73,8 @@ function UploadForm() {
     const [error, setError] = useState();
     const [analysisTime, setAnalysisTime] = useState(10);
     const [extractArchive, setExtractArchive] = useState(false);
+    const [guestOs, setGuestOs] = useState("windows");
+    const isLinux = guestOs === "linux";
     const [extraOptionsCollapsed, setExtraOptionsCollapsed] = useState(true);
     const navigate = useNavigate();
 
@@ -91,7 +93,11 @@ function UploadForm() {
             isValid = false;
         }
 
-        if (filename && !filename.includes(".")) {
+        if (
+            form.get("guest_os") === "windows" &&
+            filename &&
+            !filename.includes(".")
+        ) {
             formErrors["form-file"] =
                 "File doesn't have proper extension. " +
                 "Consider providing 'Target file name' for correct execution.";
@@ -117,6 +123,7 @@ function UploadForm() {
             try {
                 const jobData = await uploadSample({
                     file: form.get("file"),
+                    guest_os: form.get("guest_os"),
                     timeout: form.get("timeout") * 60,
                     plugins: form.getAll("plugins"),
                     file_name: form.get("file_name"),
@@ -142,6 +149,26 @@ function UploadForm() {
     );
     return (
         <form onSubmit={submitForm} ref={formRef}>
+            <div className="mb-3">
+                <label htmlFor="guest-os" className="form-label">
+                    Guest OS
+                </label>
+                <select
+                    className="form-select"
+                    id="guest-os"
+                    name="guest_os"
+                    value={guestOs}
+                    onChange={(ev) => {
+                        setGuestOs(ev.target.value);
+                        setExtractArchive(false);
+                        setFormErrors({});
+                        setValid(true);
+                    }}
+                >
+                    <option value="windows">Windows 10</option>
+                    <option value="linux">Linux (Debian 12)</option>
+                </select>
+            </div>
             <div className="mb-3">
                 <input
                     className="form-control"
@@ -169,21 +196,27 @@ function UploadForm() {
                     name="timeout"
                 />
             </div>
-            <div className="mb-3 form-check">
-                <input
-                    className="form-check-input"
-                    id="extract-archive"
-                    type="checkbox"
-                    name="extract_archive"
-                    onChange={(ev) => {
-                        setExtractArchive(ev.target.checked);
-                        validateForm();
-                    }}
-                />
-                <label className="form-check-label" htmlFor="extract-archive">
-                    Extract archive on the VM
-                </label>
-            </div>
+            {!isLinux && (
+                <div className="mb-3 form-check">
+                    <input
+                        className="form-check-input"
+                        id="extract-archive"
+                        type="checkbox"
+                        name="extract_archive"
+                        checked={extractArchive}
+                        onChange={(ev) => {
+                            setExtractArchive(ev.target.checked);
+                            validateForm();
+                        }}
+                    />
+                    <label
+                        className="form-check-label"
+                        htmlFor="extract-archive"
+                    >
+                        Extract archive on the VM
+                    </label>
+                </div>
+            )}
             {extractArchive ? (
                 <div className="mb-3">
                     <label htmlFor="archive-entry-path" className="form-label">
@@ -227,7 +260,12 @@ function UploadForm() {
             >
                 <div className="mb-3">
                     <label className="form-label">Plugins:</label>
-                    <PluginPicker name="plugins" onChange={validateForm} />
+                    <PluginPicker
+                        key={guestOs}
+                        guestOs={guestOs}
+                        name="plugins"
+                        onChange={validateForm}
+                    />
                     <FormError errors={formErrors} field="plugins" />
                 </div>
                 <div className="mb-3">
@@ -251,24 +289,29 @@ function UploadForm() {
                     />
                     <FormError errors={formErrors} field="target-file-name" />
                 </div>
-                <div className="mb-3">
-                    <label htmlFor="target-file-path" className="form-label">
-                        Target file path
-                        <InfoPopover>
-                            Choose the location on the VM where the file will be
-                            uploaded. By default, files go to the Desktop. You
-                            can use environment variables here (e.g.,
-                            %USERPROFILE%).
-                        </InfoPopover>
-                    </label>
-                    <input
-                        type="text"
-                        className="form-control"
-                        id="target-file-path"
-                        name="file_path"
-                        placeholder="(pick automatically)"
-                    />
-                </div>
+                {!isLinux && (
+                    <div className="mb-3">
+                        <label
+                            htmlFor="target-file-path"
+                            className="form-label"
+                        >
+                            Target file path
+                            <InfoPopover>
+                                Choose the location on the VM where the file
+                                will be uploaded. By default, files go to the
+                                Desktop. You can use environment variables here
+                                (e.g., %USERPROFILE%).
+                            </InfoPopover>
+                        </label>
+                        <input
+                            type="text"
+                            className="form-control"
+                            id="target-file-path"
+                            name="file_path"
+                            placeholder="(pick automatically)"
+                        />
+                    </div>
+                )}
                 <div className="mb-3">
                     <label
                         htmlFor="custom-start-command"
@@ -276,11 +319,20 @@ function UploadForm() {
                     >
                         Start command
                         <InfoPopover>
-                            Enter a custom command line to execute the sample on
-                            the VM. This is passed directly to
-                            CreateProcess/ShellExecute, so include the correct
-                            file name. Note that environment variables are not
-                            expanded in this field.
+                            {isLinux ? (
+                                <>
+                                    Enter a shell command to execute in the
+                                    Linux guest.
+                                </>
+                            ) : (
+                                <>
+                                    Enter a custom command line to execute the
+                                    sample on the VM. This is passed directly to
+                                    CreateProcess/ShellExecute, so include the
+                                    correct file name. Note that environment
+                                    variables are not expanded in this field.
+                                </>
+                            )}
                         </InfoPopover>
                     </label>
                     <input
@@ -296,54 +348,60 @@ function UploadForm() {
                         field="custom-start-command"
                     />
                 </div>
-                <div className="mb-3">
-                    <label htmlFor="start-method" className="form-label">
-                        Start method
-                        <InfoPopover>
-                            Select the method used to launch the sample on the
-                            VM. CreateProcess requires a Windows executable (not
-                            a script). "ShellExecute with runas verb" can be
-                            used to force elevation if the sample needs higher
-                            privileges and does not self-elevate.
-                        </InfoPopover>
-                    </label>
-                    <select
-                        className="form-select"
-                        id="start-method"
-                        name="start_method"
-                    >
-                        <option value="" selected>
-                            default
-                        </option>
-                        <option value="createproc">CreateProcess</option>
-                        <option value="shellexec">ShellExecute</option>
-                        <option value="runas">
-                            ShellExecute with runas verb (force elevate)
-                        </option>
-                    </select>
-                </div>
-                <div className="mb-3">
-                    <label htmlFor="start-method" className="form-label">
-                        Start working directory
-                        <InfoPopover>
-                            Define the working directory for the sample during
-                            execution. By default, it is set to the "Target file
-                            path". Environment variables are not expanded here.
-                        </InfoPopover>
-                    </label>
-                    <input
-                        type="text"
-                        className="form-control"
-                        id="custom-start-working-dir"
-                        name="start_working_dir"
-                        onChange={validateForm}
-                        placeholder="(pick automatically)"
-                    />
-                    <FormError
-                        errors={formErrors}
-                        field="custom-start-working-dir"
-                    />
-                </div>
+                {!isLinux && (
+                    <div className="mb-3">
+                        <label htmlFor="start-method" className="form-label">
+                            Start method
+                            <InfoPopover>
+                                Select the method used to launch the sample on
+                                the VM. CreateProcess requires a Windows
+                                executable (not a script). "ShellExecute with
+                                runas verb" can be used to force elevation if
+                                the sample needs higher privileges and does not
+                                self-elevate.
+                            </InfoPopover>
+                        </label>
+                        <select
+                            className="form-select"
+                            id="start-method"
+                            name="start_method"
+                        >
+                            <option value="" selected>
+                                default
+                            </option>
+                            <option value="createproc">CreateProcess</option>
+                            <option value="shellexec">ShellExecute</option>
+                            <option value="runas">
+                                ShellExecute with runas verb (force elevate)
+                            </option>
+                        </select>
+                    </div>
+                )}
+                {!isLinux && (
+                    <div className="mb-3">
+                        <label htmlFor="start-method" className="form-label">
+                            Start working directory
+                            <InfoPopover>
+                                Define the working directory for the sample
+                                during execution. By default, it is set to the
+                                "Target file path". Environment variables are
+                                not expanded here.
+                            </InfoPopover>
+                        </label>
+                        <input
+                            type="text"
+                            className="form-control"
+                            id="custom-start-working-dir"
+                            name="start_working_dir"
+                            onChange={validateForm}
+                            placeholder="(pick automatically)"
+                        />
+                        <FormError
+                            errors={formErrors}
+                            field="custom-start-working-dir"
+                        />
+                    </div>
+                )}
                 <div className="row mb-3">
                     <div className="col-md-6">
                         <div className="form-check">
@@ -361,22 +419,24 @@ function UploadForm() {
                             </label>
                         </div>
                     </div>
-                    <div className="col-md-6">
-                        <div className="form-check">
-                            <input
-                                className="form-check-input"
-                                id="no-screenshots"
-                                type="checkbox"
-                                name="no_screenshots"
-                            />
-                            <label
-                                className="form-check-label"
-                                htmlFor="no-screenshots"
-                            >
-                                Disable screenshots
-                            </label>
+                    {!isLinux && (
+                        <div className="col-md-6">
+                            <div className="form-check">
+                                <input
+                                    className="form-check-input"
+                                    id="no-screenshots"
+                                    type="checkbox"
+                                    name="no_screenshots"
+                                />
+                                <label
+                                    className="form-check-label"
+                                    htmlFor="no-screenshots"
+                                >
+                                    Disable screenshots
+                                </label>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             </Collapse>
 

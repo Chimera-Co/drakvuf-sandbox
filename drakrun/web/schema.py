@@ -4,7 +4,7 @@ from typing import Annotated, Any, List, Optional
 from flask_openapi3 import FileStorage
 from pydantic import AfterValidator, BaseModel, Field, RootModel
 
-from drakrun.analyzer.analysis_options import StartMethod
+from drakrun.analyzer.analysis_options import GuestOS, StartMethod
 
 
 class APIErrorResponse(BaseModel):
@@ -13,6 +13,7 @@ class APIErrorResponse(BaseModel):
 
 class UploadFileForm(BaseModel):
     file: FileStorage
+    guest_os: GuestOS = Field(default="windows", description="Guest operating system")
     timeout: Optional[int] = Field(default=None, description="Analysis timeout")
     file_name: Optional[str] = Field(default=None, description="Target file name")
     file_path: Optional[str] = Field(default=None, description="Target file path")

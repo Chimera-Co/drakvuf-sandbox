@@ -116,6 +116,7 @@ export async function getAnalysisFileList({
 
 export async function uploadSample({
     file,
+    guest_os = "windows",
     timeout,
     file_name,
     file_path,
@@ -131,6 +132,7 @@ export async function uploadSample({
 }) {
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("guest_os", guest_os);
     formData.append("timeout", timeout);
     formData.append("plugins", JSON.stringify(plugins));
     if (file_name) formData.append("file_name", file_name);

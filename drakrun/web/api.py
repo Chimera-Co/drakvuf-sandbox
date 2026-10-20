@@ -96,6 +96,7 @@ def upload_sample(form: UploadFileForm):
 
         analysis_options = AnalysisOptions.with_config_defaults(
             config=config,
+            guest_os=form.guest_os,
             preset=preset,
             host_sample_path=pathlib.Path(sample_path) if sample_path else None,
             sample_filename=sample_filename,
@@ -109,11 +110,11 @@ def upload_sample(form: UploadFileForm):
             analysis_options.net_enable = False
         if no_screenshots:
             analysis_options.no_screenshotter = True
-        if form.file_path:
+        if form.guest_os == "windows" and form.file_path:
             analysis_options.guest_target_directory = pathlib.PureWindowsPath(
                 form.file_path
             )
-        if form.start_working_dir:
+        if form.guest_os == "windows" and form.start_working_dir:
             analysis_options.guest_working_directory = pathlib.PureWindowsPath(
                 form.start_working_dir
             )
