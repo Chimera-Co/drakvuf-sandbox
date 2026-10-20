@@ -448,3 +448,10 @@ def test_linux_classifier_without_inject_has_no_attributed_features(linux_contex
     )
     (directory / "report.json").write_text(json.dumps({"startup": {"process": 0}}))
     assert extract_features(directory)["processes"]["count"] == 0
+
+
+def test_screenshot_count_is_recorded_for_linux():
+    from drakrun.analyzer.postprocessing.postprocess import GUEST_OS_ONLY
+
+    # The Linux guest is a desktop; the report shows the Screenshots tab only when the count is set
+    assert "screenshot_metadata" not in GUEST_OS_ONLY

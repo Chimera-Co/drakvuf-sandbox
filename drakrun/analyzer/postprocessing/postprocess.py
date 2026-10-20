@@ -17,7 +17,6 @@ GUEST_OS_ONLY = {
     "get_modified_files_info": "windows",
     "get_socket_info": "windows",
     "generate_wireshark_key_file": "windows",
-    "screenshot_metadata": "windows",
     "get_linux_behaviour_info": "linux",
 }
 
