@@ -1,7 +1,8 @@
 """Report sections for Linux analyses, in the same shape as the Windows ones.
 
 Sources: filetracer.log (Linux VFS hooks), syscall.log (syscalls plugin; connect/sendto/bind
-addresses are decoded by the drakvuf-linuxnet build), dump.pcap (what the guest sent).
+addresses are decoded by the drakvuf-linuxnet build), dump.pcap (what the guest sent; plaintext
+HTTP request heads stand in for the WinHTTP/WinINet API view of the Windows report).
 Events of the chimera-agent process itself (the serial channel) are left out.
 """
 import gzip
@@ -128,6 +129,17 @@ def get_linux_behaviour_info(context: PostprocessContext) -> None:
             connections.append({"protocol": None, "local_ip": None, "local_port": None,
                                 "remote_ip": key[0], "remote_port": key[1], "process_seqids": sorted(seqids)})
 
+    http_requests = []
+    for request in pcap.get("http_requests", []):
+        seqids = sorted(by_endpoint.get((request["remote_ip"], request["remote_port"]), set()))
+        entry = {"verb": request["verb"], "path": request["path"], "version": request["version"],
+                 "server_name": request.get("host") or request["remote_ip"],
+                 "server_port": request["remote_port"], "remote_ip": request["remote_ip"],
+                 "process_seqid": seqids[0] if seqids else None}
+        if request.get("user_agent"):
+            entry["user_agent"] = request["user_agent"]
+        http_requests.append(entry)
+
     dns_queries = defaultdict(set)
     for query in pcap["dns_queries"]:
         senders = {ev["seqid"] for ev in net_events
@@ -140,6 +152,7 @@ def get_linux_behaviour_info(context: PostprocessContext) -> None:
         "deleted_files": [{"filename": f, "process_seqids": sorted(s)} for f, s in sorted(deleted.items())],
         "connections": connections,
         "dns_queries": [{"domain": d, "process_seqids": sorted(s)} for d, s in dns_queries.items()],
+        "http_requests": http_requests[:500],
         "linux": {
             "links": links[:200],
             "permission_changes": perms[:200],

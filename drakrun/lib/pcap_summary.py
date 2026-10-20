@@ -2,7 +2,8 @@
 
 The capture is taken on the drak bridge, before the containment DNAT, so destinations are the
 ones the guest asked for. Only what the guest sent is read: TCP SYNs (connection attempts),
-UDP datagrams, and DNS query names. Pure Python, no capture library needed.
+UDP datagrams, DNS query names, and plaintext HTTP request heads. Pure Python, no capture
+library needed.
 """
 import pathlib
 import socket
@@ -12,6 +13,29 @@ from typing import Any, Dict, List, Optional
 PCAP_MAGIC = {b"\xd4\xc3\xb2\xa1": ("<", 1e-6), b"\xa1\xb2\xc3\xd4": (">", 1e-6),
               b"\x4d\x3c\xb2\xa1": ("<", 1e-9), b"\xa1\xb2\x3c\x4d": (">", 1e-9)}
 LINKTYPE_ETHERNET = 1
+HTTP_VERBS = (b"GET", b"POST", b"HEAD", b"PUT", b"DELETE", b"OPTIONS", b"PATCH", b"CONNECT", b"TRACE")
+
+
+def http_request_head(payload: bytes) -> Optional[Dict[str, Any]]:
+    # First segment of a plaintext HTTP request: "VERB path HTTP/x.y" and a few headers
+    verb = payload.split(b" ", 1)[0]
+    if verb not in HTTP_VERBS:
+        return None
+    lines = payload.split(b"\r\n")
+    parts = lines[0].decode("ascii", "replace").split(" ")
+    if len(parts) != 3 or not parts[2].startswith("HTTP/"):
+        return None
+    request = {"verb": parts[0], "path": parts[1][:2048], "version": parts[2]}
+    for line in lines[1:40]:
+        name, sep, value = line.decode("latin-1").partition(":")
+        if not sep:
+            continue
+        name = name.strip().lower()
+        if name == "host":
+            request["host"] = value.strip()[:255]
+        elif name == "user-agent":
+            request["user_agent"] = value.strip()[:512]
+    return request
 
 
 def dns_query_name(payload: bytes) -> Optional[str]:
@@ -51,8 +75,9 @@ def read_packets(path: pathlib.Path):
 def summarize_pcap(path: pathlib.Path, guest_ip: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
     connections: Dict[tuple, Dict[str, Any]] = {}
     dns: List[Dict[str, Any]] = []
+    http: List[Dict[str, Any]] = []
     if not path.exists():
-        return {"connections": [], "dns_queries": []}
+        return {"connections": [], "dns_queries": [], "http_requests": []}
     for ts, frame in read_packets(path):
         if len(frame) < 34 or frame[12:14] != b"\x08\x00":  # IPv4 only (IPv6 is dropped by containment)
             continue
@@ -69,6 +94,10 @@ def summarize_pcap(path: pathlib.Path, guest_ip: Optional[str] = None) -> Dict[s
             if flags & 0x02 and not flags & 0x10:  # SYN without ACK
                 key = ("tcp", src, sport, dst, dport)
                 connections.setdefault(key, {"ts": ts})
+            payload = l4[(l4[12] >> 4) * 4:]
+            request = http_request_head(payload) if payload else None
+            if request is not None:
+                http.append({"ts": ts, **request, "remote_ip": dst, "remote_port": dport, "local_port": sport})
         elif proto == 17 and len(l4) >= 8:
             sport, dport = struct.unpack("!HH", l4[:4])
             key = ("udp", src, sport, dst, dport)
@@ -84,4 +113,5 @@ def summarize_pcap(path: pathlib.Path, guest_ip: Optional[str] = None) -> Dict[s
             for k, v in connections.items()
         ],
         "dns_queries": dns,
+        "http_requests": http,
     }

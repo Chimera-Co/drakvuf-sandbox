@@ -138,13 +138,16 @@ def frame(protocol, source, destination, payload):
     return ethernet + ip + payload
 
 
-def tcp(flags=2):
+def tcp(flags=2, payload=b""):
     return frame(
         6,
         "10.0.0.2",
         "203.0.113.8",
-        struct.pack("!HHIIBBHHH", 40000, 443, 0, 0, 0x50, flags, 1024, 0, 0),
+        struct.pack("!HHIIBBHHH", 40000, 443, 0, 0, 0x50, flags, 1024, 0, 0) + payload,
     )
+
+
+HTTP_HEAD = b"GET /gate.php?id=1 HTTP/1.1\r\nHost: c2.test\r\nUser-Agent: probe/1\r\n\r\n"
 
 
 def dns():
@@ -161,7 +164,7 @@ def dns():
 def write_pcap(path, endian="<", nano=False):
     magic = 0xA1B23C4D if nano else 0xA1B2C3D4
     header = struct.pack(endian + "IHHIIII", magic, 2, 4, 0, 0, 65535, 1)
-    frames = [tcp(), tcp(), tcp(0x12), tcp(0x10), dns()]
+    frames = [tcp(), tcp(), tcp(0x12), tcp(0x10), tcp(0x18, HTTP_HEAD), tcp(0x18, b"\x16\x03\x01"), dns()]
     with path.open("wb") as stream:
         stream.write(header)
         for packet in frames:
@@ -201,8 +204,12 @@ def test_pcap_tcp_syn_and_dns(tmp_path, endian, nano):
         "dns_queries": [
             dict(ts=102.25, domain="sample.test", server="8.8.8.8", local_port=40001)
         ],
+        "http_requests": [
+            dict(ts=102.25, verb="GET", path="/gate.php?id=1", version="HTTP/1.1", host="c2.test",
+                 user_agent="probe/1", remote_ip="203.0.113.8", remote_port=443, local_port=40000)
+        ],
     }
-    assert summarize_pcap(path, "10.0.0.3") == {"connections": [], "dns_queries": []}
+    assert summarize_pcap(path, "10.0.0.3") == {"connections": [], "dns_queries": [], "http_requests": []}
 
 
 @pytest.mark.parametrize("content", [None, b"", b"bad", b"\xd4\xc3\xb2\xa1"])
@@ -210,7 +217,7 @@ def test_pcap_missing_or_incomplete_header(tmp_path, content):
     path = tmp_path / "dump.pcap"
     if content is not None:
         path.write_bytes(content)
-    assert summarize_pcap(path) == {"connections": [], "dns_queries": []}
+    assert summarize_pcap(path) == {"connections": [], "dns_queries": [], "http_requests": []}
 
 
 def write_log(directory, name, events):
@@ -311,6 +318,10 @@ def test_linux_behaviour_report_and_attribution(linux_context, compressed):
         dict(path="/tmp/socket", method="connect", process_seqids=[1]),
     ]
     assert report["linux"]["fileless_execs"] == []
+    assert report["http_requests"] == [
+        dict(verb="GET", path="/gate.php?id=1", version="HTTP/1.1", server_name="c2.test",
+             server_port=443, remote_ip="203.0.113.8", process_seqid=1, user_agent="probe/1"),
+    ]
 
 
 def test_linux_fileless_exec_is_named_and_reported(linux_context):
