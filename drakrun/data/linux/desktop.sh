@@ -68,12 +68,13 @@ run_as mkdir -p "$cfg" "$HOME_/.config/autostart" "$HOME_/.config/gtk-3.0" "$HOM
     "$HOME_/Documents/College" "$HOME_/Documents/Personal" "$HOME_/Projects/expense-tracker"
 # Default panel without the first-login "default or empty panel" question
 cp "$MNT/etc/xdg/xfce4/panel/default.xml" "$MNT$cfg/xfce4-panel.xml"
-# Laptop resolution on the first connected output
+# Laptop resolution on the first connected output. Not 1366x768: on the Cirrus adapter that becomes a
+# 1360-wide VNC framebuffer whose rows are 1362 pixels apart, so every screenshot comes out sheared.
 cat > "$MNT$HOME_/.config/autostart/display.desktop" <<'EOF'
 [Desktop Entry]
 Type=Application
 Name=Display
-Exec=sh -c 'o=$(xrandr | awk "/ connected/{print \$1; exit}"); xrandr --output "$o" --mode 1366x768 || xrandr --output "$o" --mode 1280x800 || true; xset s off -dpms'
+Exec=sh -c 'o=$(xrandr | awk "/ connected/{print \$1; exit}"); xrandr --output "$o" --mode 1280x800 || xrandr --output "$o" --mode 1024x768 || true; xset s off -dpms'
 X-GNOME-Autostart-enabled=true
 EOF
 

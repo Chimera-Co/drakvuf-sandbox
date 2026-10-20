@@ -48,6 +48,8 @@ DEFAULT_VCPUS = 4
 # The cost: PERDEDOR's linux.env.low_ram flags 4 GiB or less; accepted, see docs/chimera/linux-sandbox.md.
 DEFAULT_MEMORY = 4096
 DEFAULT_DISK_SIZE = "128G"
+# Slot used to check that a new snapshot restores: drakrun-worker@2's vm-2 (docs/chimera/parallel-analyses.md)
+LINUX_CHECK_VM_ID = 2
 # Profile structs whose anonymous members DRAKVUF needs by name (see linux_profile.py)
 FLATTEN_STRUCTS = ["iov_iter"]
 
@@ -154,15 +156,16 @@ def postinstall_linux(network_conf: NetworkConfigSection, settle_s: int = 120) -
 
 
 def check_restore(install_info: InstallInfo, network_conf: NetworkConfigSection) -> Dict[str, Any]:
-    vm1 = VirtualMachine(1, install_info, network_conf)
+    # The Linux worker's slot: vm-1 belongs to the Windows worker, which may be running an analysis.
+    vm = VirtualMachine(LINUX_CHECK_VM_ID, install_info, network_conf)
     started = time.monotonic()
-    vm1.restore()
+    vm.restore()
     try:
-        with agent_for(vm1) as agent:
+        with agent_for(vm) as agent:
             pong = agent.wait_ready(60)
         return {"restore_s": round(time.monotonic() - started, 2), "agent": pong}
     finally:
-        vm1.destroy()
+        vm.destroy()
 
 
 def begin_modify(network_conf: NetworkConfigSection, cold_boot: bool = False) -> InstallInfo:
