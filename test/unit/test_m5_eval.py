@@ -241,3 +241,146 @@ def test_tools_the_batch_calls_are_executable():
     scripts = pathlib.Path(m5.__file__).resolve().parents[1]
     for tool in (scripts / "arms/chimera-arm", scripts / "containment/chimera-net-check"):
         assert os.access(tool, os.X_OK), tool
+
+
+def test_register_takes_guest_os_and_benign_role(tmp_path):
+    path = tmp_path / "register.csv"
+    path.write_text(f"sha256,path,role,guest_os\n{SHA[0]},a.zip,benign,Linux\n{SHA[1]},b.zip,test,\n")
+    rows = m5.read_register(path)
+    assert [(r["role"], r["guest_os"]) for r in rows] == [("benign", "linux"), ("test", "windows")]
+    path.write_text(f"sha256,path,role,guest_os\n{SHA[0]},a.zip,test,macos\n")
+    with pytest.raises(ValueError):
+        m5.read_register(path)
+
+
+def test_linux_samples_are_scheduled_on_the_linux_arms_only():
+    register = [{"sha256": SHA[0], "guest_os": "windows"}, {"sha256": SHA[1], "guest_os": "linux"}]
+    schedule = m5.make_schedule(register, ["A0", "H3"], 2, seed=3, linux_arms=["L"])
+    assert sorted((i["os"], i["arm"]) for i in schedule if i["sha256"] == SHA[1]) == [("linux", "L")] * 2
+    assert {i["arm"] for i in schedule if i["sha256"] == SHA[0]} == {"A0", "H3"}
+
+
+def test_linux_labels_use_linux_paths(tmp_path):
+    d = write_analysis(
+        tmp_path,
+        [proc(1, None, 1), proc(10, 1, 786), proc(11, 10, 790)],
+        {
+            "modified_files": [
+                {"filename": "/null", "process_seqids": [10]},
+                {"filename": "/proc/786/status", "process_seqids": [10]},
+                {"filename": "/tmp/.x/kworker", "process_seqids": [11]},
+                {"filename": "/etc/cron.d/update", "process_seqids": [11]},
+                {"filename": "/home/u/.config/autostart/x.desktop", "process_seqids": [11]},
+            ],
+            "connections": [{"remote_ip": "10.99.0.2", "process_seqids": [11]}],
+        },
+        regmon=(),
+    )
+    labels = m5.label_analysis(d, "linux")
+    assert labels["persistence_evidence"] == ["/etc/cron.d/update", "/home/u/.config/autostart/x.desktop"]
+    assert labels["file_drops"] == 3 and "/null" not in labels["file_drop_evidence"]
+    assert labels["connections"] == 1 and labels["payload_behaviour"]
+
+
+def test_linux_guest_names_keep_no_extension():
+    assert m5.sample_name("%064x.elf" % 5, "linux") == "update"
+    assert m5.sample_name("dir/xmrig", "linux") == "xmrig"
+
+
+def test_benign_plain_file_is_read_without_7zip(tmp_path):
+    program = tmp_path / "Bginfo64.exe"
+    program.write_bytes(b"MZ benign")
+    name, data = m5.read_sample({"sha256": "x", "path": str(program), "archive_password": ""})
+    assert (name, data) == ("Bginfo64.exe", b"MZ benign")
+
+
+def test_run_is_saved_to_the_dataset_folder_and_indexed(tmp_path):
+    import threading
+
+    analysis = tmp_path / "analysis"
+    analysis.mkdir()
+    (analysis / "features.json").write_text('{"schema": "chimera-features/1"}')
+    (analysis / "classification.json").write_text('{"label": "benign", "score": 0.1, "model": "chimera-stub"}')
+    (analysis / "sample.exe").write_bytes(b"MZ")  # never copied
+    dataset = tmp_path / "dataset"
+    sample = {"sha256": SHA[0], "role": "benign", "family": "Sysinternals"}
+    record = {"key": f"{SHA[0]}/H3/1", "sha256": SHA[0], "arm": "H3", "run": 1, "os": "windows", "payload_behaviour": False}
+    lock = threading.Lock()
+    m5.save_to_dataset(dataset, sample, record, analysis, lock)
+    m5.save_to_dataset(dataset, sample, {**record, "run": 2}, analysis, lock)
+    run_dir = dataset / "windows/benign" / SHA[0] / "H3-1"
+    assert sorted(p.name for p in run_dir.iterdir()) == ["classification.json", "features.json", "labels.json"]
+    rows = list(csv.DictReader((dataset / "index.csv").open()))
+    assert [(r["run"], r["verdict"], r["path"]) for r in rows] == [
+        ("1", "benign", f"windows/benign/{SHA[0]}/H3-1"),
+        ("2", "benign", f"windows/benign/{SHA[0]}/H3-2"),
+    ]
+    out = tmp_path / "export.tar.gz"
+    m5.main(["export", "--dataset", str(dataset), "--output", str(out)])
+    import tarfile
+
+    names = tarfile.open(out).getnames()
+    assert "chimera-dataset/index.csv" in names and not any(n.endswith(".exe") for n in names)
+
+
+@pytest.mark.parametrize(
+    "domains,drakvuf,busy",
+    [
+        ("vm-2 7", "12 drakvuf -o json -d vm-2 -t 60", False),  # a Linux analysis
+        ("vm-1 5", "", True),
+        ("", "12 drakvuf -o json -d vm-1", True),
+        ("", "12 drakvuf --no-domain", True),
+    ],
+)
+def test_arm_switch_waits_only_for_windows_slots(monkeypatch, domains, drakvuf, busy):
+    def fake_sh(*argv, check=True):
+        if argv[0] == "xl":
+            return "Name ID\nDomain-0 0\n" + (domains + "\n" if domains else "")
+        return drakvuf
+
+    monkeypatch.setattr(m5, "sh", fake_sh)
+    assert m5.windows_slots_busy() is busy
+
+
+def test_an_egress_drop_in_one_lane_stops_both(tmp_path, monkeypatch):
+    import threading
+
+    drops = iter([0, 1] + [1] * 20)  # the first run sees one new drop
+    monkeypatch.setattr(m5, "egress_drops", lambda: next(drops))
+    monkeypatch.setattr(m5, "switch_arm", lambda arm: None)
+    monkeypatch.setattr(m5, "submit", lambda *a: ("uid", "finished"))
+    monkeypatch.setattr(m5, "label_analysis", lambda d, os_: {"payload_behaviour": False})
+    monkeypatch.setattr(m5, "save_to_dataset", lambda *a: None)
+    monkeypatch.setattr(m5, "ANALYSES_DIR", tmp_path)
+    ctx = {
+        "register": {SHA[0]: {"sha256": SHA[0]}, SHA[1]: {"sha256": SHA[1]}}, "api": "", "timeout": 1, "poll": 0,
+        "results": tmp_path / "results.jsonl", "dataset": tmp_path, "lock": threading.Lock(), "stop": threading.Event(),
+    }
+    windows = m5.Lane("windows", [{"key": f"{SHA[0]}/H3/{i}", "sha256": SHA[0], "arm": "H3", "run": i, "os": "windows"} for i in (1, 2)], ctx)
+    windows.run()
+    linux = m5.Lane("linux", [{"key": f"{SHA[1]}/L/1", "sha256": SHA[1], "arm": "L", "run": 1, "os": "linux"}], ctx)
+    linux.run()
+    assert "EGRESS-DROP" in str(windows.error) and ctx["stop"].is_set()
+    assert len((tmp_path / "results.jsonl").read_text().splitlines()) == 1  # nothing ran after the drop
+
+
+def test_report_compares_arms_on_windows_malware_only(tmp_path):
+    register = tmp_path / "register.csv"
+    register.write_text(
+        "sha256,path,role,family,guest_os\n"
+        f"{SHA[0]},a,test,GuLoader,windows\n{SHA[1]},b,test,XorDDoS,linux\n{SHA[2]},c,benign,Bginfo,windows\n"
+    )
+    (tmp_path / "schedule.json").write_text(json.dumps({"register": str(register), "arms": ["A0", "H3"], "schedule": [1] * 6}))
+
+    def run(sha, arm, os_, observed):
+        return {"sha256": sha, "arm": arm, "os": os_, "payload_behaviour": observed, "telemetry_complete": True, "verdict": "benign"}
+
+    results = [run(SHA[0], "A0", "windows", False), run(SHA[0], "H3", "windows", True),
+               run(SHA[1], "L", "linux", True), run(SHA[2], "A0", "windows", False), run(SHA[2], "H3", "windows", False)]
+    (tmp_path / "results.jsonl").write_text("".join(json.dumps(r) + "\n" for r in results))
+    m5.main(["report", "--out", str(tmp_path)])
+    summary = json.loads((tmp_path / "summary.json").read_text())
+    assert summary["paired"] == 1 and summary["only_H3"] == 1
+    report = (tmp_path / "report.md").read_text()
+    assert "## Linux samples" in report and "XorDDoS" in report
+    assert "## Benign samples (false-positive check)" in report and "Bginfo" in report

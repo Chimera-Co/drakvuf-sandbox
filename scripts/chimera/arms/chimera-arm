@@ -25,13 +25,29 @@ declare -A LINKS=(
 
 die() { echo "chimera-arm: $*" >&2; exit 1; }
 
+# The VM slots restored from the arms. Other slots (vm-2: the Linux image, which
+# has its own files) may keep running while the Windows arm changes.
+read -r -a SLOTS <<< "${CHIMERA_ARM_SLOTS:-vm-0 vm-1}"
+
+in_slots() {
+    local slot
+    for slot in "${SLOTS[@]}"; do [[ "$1" == "$slot" ]] && return 0; done
+    return 1
+}
+
 require_idle() {
-    if xl list 2>/dev/null | awk 'NR>1 {print $1}' | grep -q '^vm-'; then
-        die "analysis domains are running; stop workers and destroy vm-* first"
-    fi
-    if pgrep -x drakvuf >/dev/null; then
-        die "drakvuf is running"
-    fi
+    local domain line target
+    for domain in $(xl list 2>/dev/null | awk 'NR>1 {print $1}'); do
+        in_slots "$domain" && die "$domain is running; stop its worker and destroy it first"
+    done
+    # drakvuf -d <domain>; one whose domain cannot be read counts as busy
+    while read -r line; do
+        [[ -z "$line" ]] && continue
+        target=$(sed -nE 's/.* -d ([^ ]+).*/\1/p' <<< "$line")
+        if [[ -z "$target" ]] || in_slots "$target"; then
+            die "drakvuf is running on ${target:-an unknown domain}"
+        fi
+    done <<< "$(pgrep -a -x drakvuf || true)"
 }
 
 current() { cat "$ARMS/CURRENT" 2>/dev/null || echo "(none)"; }
