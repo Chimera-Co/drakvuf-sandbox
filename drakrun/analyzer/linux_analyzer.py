@@ -21,7 +21,7 @@ from drakrun.lib.config import NetworkConfigSection, load_config
 from drakrun.lib.install_info import InstallInfo
 from drakrun.lib.linux_agent import LinuxAgent, set_guest_clock
 from drakrun.lib.linux_install import DESKTOP_USER, LINUX_GOLDEN_DIR, LINUX_INSTALL_INFO_PATH  # noqa: F401
-from drakrun.lib.paths import PACKAGE_DATA_PATH
+from drakrun.lib.paths import DUMPS_DIR, PACKAGE_DATA_PATH
 
 from .analysis_metadata import AnalysisMetadata
 from .postprocessing import postprocess_analysis_dir
@@ -44,9 +44,9 @@ LINUX_PLUGINS = {
     "procmon", "syscalls", "filetracer", "unixsocketmon", "ptracemon", "ebpfmon",
     "rebootmon", "cpuidmon", "debugmon", "procdump2",
 }
-DEFAULT_LINUX_PLUGINS = ["procmon", "syscalls", "filetracer", "unixsocketmon", "ptracemon", "ebpfmon"]
+DEFAULT_LINUX_PLUGINS = ["procmon", "syscalls", "filetracer", "unixsocketmon", "ptracemon", "ebpfmon", "procdump2"]
 # Linux plugins outside the default set that a request may add
-OPTIONAL_LINUX_PLUGINS = ["cpuidmon", "rebootmon", "debugmon", "procdump2"]
+OPTIONAL_LINUX_PLUGINS = ["cpuidmon", "rebootmon", "debugmon"]
 READY_TIMEOUT_S = 30
 # Desktop session of the guest (data/linux/desktop.sh): the sample gets its display, so GUI programs
 # can draw and are seen in the live view and screenshots
@@ -76,6 +76,7 @@ def guest_file_name(sample_filename: Optional[str]) -> str:
 
 def linux_drakvuf_cmdline(
     vm_name: str, kernel_profile: pathlib.Path, plugins: List[str], timeout: int,
+    output_dir: pathlib.Path,
     extra_args: Optional[Dict[str, Any]] = None,
 ) -> List[str]:
     binary = LINUX_DRAKVUF if pathlib.Path(LINUX_DRAKVUF).exists() else "drakvuf"
@@ -84,6 +85,15 @@ def linux_drakvuf_cmdline(
         args.extend(["-a", plugin])
     if "syscalls" in plugins:
         args.extend(["--syscall-hooks-list", (PACKAGE_DATA_PATH / "linux-syscalls.txt").as_posix()])
+    if "procdump2" in plugins:
+        dumps_dir = output_dir / DUMPS_DIR
+        dumps_dir.mkdir(exist_ok=True)
+        args.extend([
+            "--procdump-dir", dumps_dir.resolve().as_posix(),
+            "--procdump-use-maple-tree",  # Debian 12's kernel 6.1 VMAs
+            "--procdump-new-processes-on-finish",
+            "--procdump-timeout", "10",  # finish sweep; exit dumps are automatic
+        ])
     for key, value in (extra_args or {}).items():
         if value is True:
             args.append(key)
@@ -195,7 +205,7 @@ def analyze_linux_file(
                 substatus_callback(AnalysisSubstatus.analyzing, updated_options=True)
 
             cmdline = linux_drakvuf_cmdline(vm.vm_name, kernel_profile, options.plugins, timeout,
-                                            options.extra_drakvuf_args)
+                                            output_dir, options.extra_drakvuf_args)
             log.info("Starting DRAKVUF: %s", cmdline)
             stop_watchdog = threading.Event()
             watchdog = threading.Thread(target=log_activity_watchdog, args=(drakmon_file, stop_watchdog),

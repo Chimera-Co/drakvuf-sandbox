@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 GUEST_OS_ONLY = {
     "capa_analysis": "windows",
     "process_dumps": "windows",
+    "process_linux_dumps": "linux",
     "get_http_info": "windows",
     "get_modified_files_info": "windows",
     "get_socket_info": "windows",

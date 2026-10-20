@@ -16,12 +16,16 @@ from typing import Any, Dict, List, Optional
 # Artefacts that matter more than the plugin's log itself.
 EXTRA_ARTEFACTS = {
     "memdump": ["dumps.zip"],
+    "procdump2": ["dumps.zip"],
     "tlsmon": ["wireshark_key_file.txt"],
 }
 
 # Plugins whose log is not named <plugin>.log; the first file that exists counts
 # (gzip_syscalls compresses syscall.log during postprocessing).
-PLUGIN_LOGS = {"syscalls": ["syscall.log", "syscall.log.gz"]}
+PLUGIN_LOGS = {
+    "syscalls": ["syscall.log", "syscall.log.gz"],
+    "procdump2": ["procdump.log", "procdump2.log"],
+}
 
 # Plugins that only act on the guest (hidsim injects mouse input) and never write a log.
 NO_LOG_PLUGINS = {"hidsim"}
