@@ -530,3 +530,66 @@ def test_large_logs_are_consumed_only_by_line(analysis, monkeypatch):
     monkeypatch.setattr(type(analysis), "open", guarded_open)
     assert extract_features(analysis)["api_calls"] == {"Good": 1}
     assert streamed == {"apimon.log", "regmon.log", "filetracer.log", "socketmon.log"}
+
+
+def _dns_pcap(path, names, dst="10.99.0.2"):
+    import socket
+    import struct
+
+    out = [struct.pack("<IHHIIII", 0xA1B2C3D4, 2, 4, 0, 0, 65535, 1)]
+    for index, name in enumerate(names):
+        query = struct.pack("!HHHHHH", index, 0x100, 1, 0, 0, 0)
+        query += b"".join(bytes([len(p)]) + p.encode() for p in name.split(".")) + b"\x00"
+        query += struct.pack("!HH", 1, 1)
+        udp = struct.pack("!HHHH", 40000 + index, 53, 8 + len(query), 0) + query
+        ip = struct.pack(
+            "!BBHHHBBH4s4s", 0x45, 0, 20 + len(udp), 0, 0, 64, 17, 0,
+            socket.inet_aton("10.99.0.3"), socket.inet_aton(dst),
+        )
+        packet = b"\x00" * 12 + b"\x08\x00" + ip + udp
+        out.append(struct.pack("<IIII", 100 + index, 0, len(packet), len(packet)) + packet)
+    path.write_bytes(b"".join(out))
+
+
+def _udp53(local_port, remote="10.99.0.2", **extra):
+    return event(
+        Method="UdpSendMessages", RemoteIp=remote, RemotePort=53, LocalPort=local_port, **extra
+    )
+
+
+def test_windows_dns_from_pcap_only_for_sample_flows(analysis):
+    # Query i is sent from port 40000+i; only ports 40000 and 40002 belong to the sample.
+    names = ["Elevated-Yes.probe.example", "fs.microsoft.com", "elevated-yes.probe.example", "hooked.test"]
+    _dns_pcap(analysis / "dump.pcap", names)
+    write_log(
+        analysis,
+        "socketmon.log",
+        [
+            event(Method="DnsQueryEx", DnsName="hooked.TEST"),
+            _udp53(40000),
+            _udp53(40002),
+            _udp53(40001, PID=999),  # another process: not attributed
+            _udp53(40003, remote="10.99.0.9"),  # same port, different server
+        ],
+    )
+    assert extract_features(analysis)["network"]["dns_queries"] == [
+        "hooked.TEST",
+        "elevated-yes.probe.example",
+    ]
+
+
+def test_windows_dns_pcap_cap_and_missing_ports(analysis):
+    _dns_pcap(analysis / "dump.pcap", [f"h{i}.example" for i in range(150)])
+    write_log(analysis, "socketmon.log", [_udp53(40000 + i) for i in range(150)])
+    assert len(extract_features(analysis)["network"]["dns_queries"]) == 100
+    # No local port recorded, or no socketmon.log: capture names cannot be attributed.
+    write_log(analysis, "socketmon.log", [event(Method="UdpSendMessages", RemoteIp="10.99.0.2", RemotePort=53)])
+    assert extract_features(analysis)["network"]["dns_queries"] == []
+    (analysis / "socketmon.log").unlink()
+    assert extract_features(analysis)["network"]["dns_queries"] == []
+
+
+def test_windows_dns_bad_pcap(analysis):
+    write_log(analysis, "socketmon.log", [_udp53(40000)])
+    (analysis / "dump.pcap").write_bytes(b"garbage")
+    assert extract_features(analysis)["network"]["dns_queries"] == []

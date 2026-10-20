@@ -8,7 +8,10 @@ import gzip
 import heapq
 import json
 import math
+import struct
 from pathlib import Path
+
+from drakrun.lib.pcap_summary import summarize_pcap
 
 
 def _object(value):
@@ -75,6 +78,24 @@ def _json_lines(path, compressed=False):
 def _append_unique(target, value, limit=100):
     if isinstance(value, str) and value and len(target) < limit and value not in target:
         target.append(value)
+
+
+def _pcap_dns_names(directory, sample_dns_flows):
+    """DNS query names in dump.pcap sent from a socket socketmon attributes to the sample.
+
+    API hooks miss resolvers that talk to the DNS server directly (e.g. nslookup). The
+    capture also holds Windows' own background lookups, so a query is kept only when its
+    (server, guest UDP source port) matches a sample-scoped UdpSendMessages event.
+    """
+    if not sample_dns_flows:
+        return
+    try:
+        queries = summarize_pcap(directory / "dump.pcap")["dns_queries"]
+    except (OSError, struct.error, ValueError):
+        return
+    for query in queries:
+        if (query.get("server"), query.get("local_port")) in sample_dns_flows:
+            yield query.get("domain")
 
 
 class _Scope:
@@ -361,6 +382,7 @@ def extract_features(analysis_dir) -> dict:
                 registry["autorun_touched"] = True
 
     network = features["network"]
+    sample_dns_flows = set()
     socket_path = directory / "socketmon.log"
     for event in _json_lines(socket_path):
         if not scope.event(event):
@@ -376,6 +398,14 @@ def extract_features(analysis_dir) -> dict:
             ip, port = event.get("RemoteIp"), event.get("RemotePort")
             if isinstance(ip, str) and port is not None:
                 _append_unique(network["remote_endpoints"], f"{ip}:{port}")
+            local_port = _integer(event.get("LocalPort"))
+            if (
+                event.get("Method") == "UdpSendMessages"
+                and _integer(port) == 53
+                and isinstance(ip, str)
+                and local_port
+            ):
+                sample_dns_flows.add((ip, local_port))
     if not socket_path.exists():
         for event in _list(report.get("connections")):
             if isinstance(event, dict) and scope.report_event(event):
@@ -386,6 +416,12 @@ def extract_features(analysis_dir) -> dict:
         for event in _list(report.get("dns_queries")):
             if isinstance(event, dict) and scope.report_event(event):
                 _append_unique(network["dns_queries"], event.get("domain"))
+    # Merge flow-attributed capture names, ignoring case differences with the hooked names.
+    seen = {n.lower() for n in network["dns_queries"]}
+    for name in _pcap_dns_names(directory, sample_dns_flows):
+        if isinstance(name, str) and name.lower() not in seen:
+            seen.add(name.lower())
+            _append_unique(network["dns_queries"], name.lower())
     network["http_requests"] = sum(
         1
         for e in _list(report.get("http_requests"))

@@ -80,6 +80,16 @@ found in `process_tree.json`); events of other processes are excluded. Lists are
 | `network` | `dns_queries`, `connections`, `remote_endpoints` (`ip:port`, ≤100), `http_requests` |
 | `ttps` | `[{name, attack: [ATT&CK IDs]}]` from capa |
 
+`network.dns_queries` on Windows combines two sources: `DnsQueryEx` API hooks from
+`socketmon.log` and query names parsed from `dump.pcap`. The capture catches resolvers that
+talk to the DNS server directly, such as `nslookup`, which bypass the hooked API. The
+capture also contains Windows' own background lookups (update, telemetry, Bing), so a
+capture query is kept only if its server IP and guest UDP source port match a
+`UdpSendMessages` event in `socketmon.log` (`RemotePort` 53, `LocalPort` set) that is
+attributed to the sample's subtree. Without `socketmon.log`, or when socketmon records no
+local port, no capture names are added. TCP/53 is not covered. Names are deduplicated
+(case-insensitive) and capped at 100.
+
 Counts are observed attempts, not confirmed effects. The guest network is INetSim: every name resolves and every
 HTTP request gets a fake answer.
 
