@@ -49,6 +49,8 @@ flowchart LR
 | Desktop image (4 vCPU, 4096 MB) | probe 16/16 checks through the console; screenshots show the XFCE desktop; containment test all pass again (`linux-containment-desktop-2026-10-20/`) |
 | Snapshot restore | 6.96 s for the 4 GB desktop (1.55 s for the 2 GB server image; Windows 3.4–3.5 s) |
 | Evasion scan (`chimera-vmcheck`, see `linux-evasion.md`) | Runs in 20 s. Score 70.44: 17 of 34 checks see the VM (Xen in CPUID, DMI, `/sys/hypervisor`, dmesg and clocksource, QEMU disk and PCI IDs, `chimera-agent`, 20 GB disk). Activity checks pass: uptime, 141 processes, logged-in desktop user, shell history, recent files |
+| Evasion scan after hiding (PERDEDOR + `chimera-vmcheck`) | Score 97.42 (was 70.44). PERDEDOR: 4 of 37 checks detected; vmcheck: none. No hypervisor, firmware, disk, PCI, uptime or name check fires. Left: 4 GB RAM, the cloud metadata address answers (INetSim answers everything), and root (the checks' user) has no shell history and few old files. Containment C0-C6, L1 and the uplink check all pass |
+| Probe after hiding | 16/16 checks; network renewed to the vm-1 subnet after restore. Memory dumps: `dumps.zip` with 4-5 ELF cores per analysis. TLS: decrypted POST (URL, headers, user agent) and a rejected-certificate handshake with SNI and JA3 |
 | Through the console | Upload with Linux selected → worker → report, process tree and classifier verdict in the portal |
 | Windows regression after the Linux changes | BGInfo: telemetry complete, no postprocess failures, clock set, full report |
 

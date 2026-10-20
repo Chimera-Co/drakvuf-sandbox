@@ -17,7 +17,7 @@ import time
 from drakrun.analyzer.run_tools import run_vm
 from drakrun.lib.config import NetworkConfigSection, load_config
 from drakrun.lib.install_info import InstallInfo
-from drakrun.lib.linux_agent import LinuxAgent
+from drakrun.lib.linux_agent import LinuxAgent, wait_for_vm_network
 
 LINUX_GOLDEN_DIR = pathlib.Path("/var/lib/drakrun/linux/golden")
 
@@ -127,7 +127,7 @@ def main():
             agent = LinuxAgent(f"/var/run/drakrun/{vm.vm_name}.sock")
             try:
                 agent.wait_ready(60)
-                results["guest_net"] = agent.call("net", {"timeout": 30}, timeout=45)
+                results["guest_net"] = wait_for_vm_network(agent, args.vm_id)
                 out = agent.call("sh", {"cmd": "python3 - <<'EOF'\n" + GUEST_PROBES + "EOF\n", "timeout": 150},
                                  timeout=170)
             finally:
