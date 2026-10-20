@@ -67,7 +67,7 @@ def test_install_linux_uses_linux_defaults(tmp_path, monkeypatch, config):
     assert result.exit_code == 0, result.output
     source, network, kwargs = calls["install"]
     assert source == image and network is config.network
-    assert kwargs == dict(vcpus=4, memory=4096, disk_size="20G", profile="desktop", built_image=None)
+    assert kwargs == dict(vcpus=4, memory=4096, disk_size="128G", profile="desktop", built_image=None)
     assert "postinstall --guest-os linux" in calls["banner"]
 
 
