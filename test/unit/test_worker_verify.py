@@ -732,7 +732,8 @@ def test_linux_worker_restores_linux_golden_and_closes_agent(
     from types import SimpleNamespace
 
     from test_linux_evasion import raw_report
-    from test_perdedor_linux import REPO, REPORT, GUEST_REPORT
+    from test_perdedor_linux import REPO, REPORT
+    from drakrun.evasion.verifiers.base import GuestCommandResult
 
     tools = ["perdedor", "chimera-vmcheck"] if with_perdedor else ["chimera-vmcheck"]
 
@@ -761,9 +762,10 @@ verifiers = ["chimera-vmcheck"]
         files={
             "/var/lib/console-helper/linux-report.json": json.dumps(raw_report()).encode()
         },
+        # PERDEDOR's report is its stdout
+        run_result=GuestCommandResult(0, REPORT.read_bytes(), b""),
         raise_on_run=RuntimeError("agent failed") if fail_run else None,
     )
-    session.files[GUEST_REPORT] = REPORT.read_bytes()
     session.agent = SimpleNamespace(call=lambda *a, **kw: calls.append((a, kw)))
     session.close = lambda: closed.append(True)
     monkeypatch.setattr(

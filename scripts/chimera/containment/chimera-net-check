@@ -51,7 +51,9 @@ first_rule iptables filter INPUT CHIMERA_IN
 first_rule ip6tables filter INPUT CHIMERA6
 first_rule ip6tables filter FORWARD CHIMERA6
 
-rule_count iptables raw CHIMERA_RAW 3
+rule_count iptables raw CHIMERA_RAW 4
+iptables -t raw -C CHIMERA_RAW -i drak+ -d 169.254.0.0/16 -j DROP 2>/dev/null \
+    || bad "iptables raw CHIMERA_RAW: link-local drop missing"
 rule_count iptables nat CHIMERA_DNAT 4
 rule_count iptables filter CHIMERA_GUARD 7
 rule_count iptables filter CHIMERA_IN 3

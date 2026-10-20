@@ -18,7 +18,7 @@ from drakrun.evasion.verifiers.base import (
     VerifierTimeout,
 )
 from drakrun.lib import cpuid_hide
-from drakrun.lib.linux_install import GUEST_AGENT_DIR
+from drakrun.lib.linux_install import DESKTOP_USER, GUEST_AGENT_DIR
 from drakrun.lib.linux_install import GUEST_WORK_DIR as WORK_DIR
 
 # 32 KiB becomes <44 KiB base64, below the agent's 64 KiB stdout cap.
@@ -26,13 +26,22 @@ READ_CHUNK_BYTES = 32768
 
 # The agent's exec is asynchronous. This child owns the actual command's
 # deadline and process group, and publishes completion only after output closes.
+# With a user, the command runs as that account with a login-like environment;
+# the runner itself stays root, so its output files stay in the root-only directory.
 _RUNNER = """
-import json,os,signal,subprocess,sys
-argv,cwd,seconds,base=json.loads(sys.argv[1])
+import json,os,pwd,signal,subprocess,sys
+argv,cwd,seconds,base,*rest=json.loads(sys.argv[1])
+user=rest[0] if rest else None
+kw={}
+if user:
+    pw=pwd.getpwnam(user)
+    kw=dict(user=pw.pw_uid,group=pw.pw_gid,extra_groups=os.getgrouplist(user,pw.pw_gid),
+            env={'HOME':pw.pw_dir,'USER':user,'LOGNAME':user,'SHELL':pw.pw_shell,'LANG':'en_IN.UTF-8',
+                 'PATH':'/usr/local/bin:/usr/bin:/bin:/usr/games'})
 result={"timeout":False}
 with open(base+'.out','wb') as out, open(base+'.err','wb') as err:
     try:
-        p=subprocess.Popen(argv,cwd=cwd,stdout=out,stderr=err,start_new_session=True)
+        p=subprocess.Popen(argv,cwd=cwd,stdout=out,stderr=err,start_new_session=True,**kw)
     except OSError as exc:
         err.write(str(exc).encode())
         result['rc']=127
@@ -123,6 +132,9 @@ class LinuxGuestSession:
         digest = hashlib.sha256(local_path.read_bytes()).hexdigest()
         if stat["size"] != local_path.stat().st_size or stat["sha256"] != digest:
             raise RuntimeError("Linux guest upload size/hash mismatch")
+        if remote_path.startswith(WORK_DIR + "/"):
+            # A downloaded file belongs to the desktop user, who runs it
+            self._sh(f"chown -- {DESKTOP_USER}: {shlex.quote(remote_path)}")
 
     def put_tree_as_zip(self, local_dir, remote_dir):
         # Only the single checker script is needed today. Keep the protocol
@@ -166,7 +178,7 @@ class LinuxGuestSession:
         local_path.parent.mkdir(parents=True, exist_ok=True)
         local_path.write_bytes(data)
 
-    def run(self, argv, timeout, cwd=None):
+    def run(self, argv, timeout, cwd=None, user=None):
         if timeout <= 0:
             raise VerifierTimeout("Linux verifier time budget expired")
         self._hide()
@@ -180,7 +192,7 @@ class LinuxGuestSession:
                     "python3",
                     "-c",
                     _RUNNER,
-                    json.dumps([argv, cwd or WORK_DIR, timeout, base]),
+                    json.dumps([argv, cwd or WORK_DIR, timeout, base, user]),
                 ],
                 "cwd": WORK_DIR,
             },

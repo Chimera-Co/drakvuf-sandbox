@@ -40,7 +40,7 @@ log = logging.getLogger(__name__)
     "memory",
     default=None,
     type=int,
-    help="Memory per single VM (in MB)  [default: 4096]",
+    help="Memory per single VM (in MB)  [default: 4096; Linux: 5120]",
 )
 @click.option(
     "--linux-profile",

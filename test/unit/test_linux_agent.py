@@ -135,3 +135,25 @@ def test_agent_close_clears_partial_reply(channel):
     agent.close()
     assert agent.sock is None
     assert agent.buf == b""
+
+
+def test_guest_agent_exec_drops_to_the_requested_user(monkeypatch, tmp_path):
+    import importlib.util
+    from types import SimpleNamespace
+
+    from drakrun.lib.paths import PACKAGE_DATA_PATH
+
+    spec = importlib.util.spec_from_file_location("chimera_agent", PACKAGE_DATA_PATH / "linux/chimera-agent.py")
+    agent = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(agent)
+    monkeypatch.setattr(agent, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(agent.pwd, "getpwnam", lambda name: SimpleNamespace(pw_uid=1000, pw_gid=1000))
+    monkeypatch.setattr(agent.os, "getgrouplist", lambda name, gid: [1000, 27])
+    popens = []
+    monkeypatch.setattr(agent.subprocess, "Popen",
+                        lambda argv, **kw: popens.append(kw) or SimpleNamespace(pid=7))
+    assert agent.cmd_exec({"argv": ["/tmp/s"], "cwd": str(tmp_path), "user": "arjun"}) == {"pid": 7, "uid": 1000}
+    assert (popens[0]["user"], popens[0]["group"], popens[0]["extra_groups"]) == (1000, 1000, [1000, 27])
+    # Without a user the child keeps the agent's (root's) identity
+    agent.cmd_exec({"argv": ["/bin/true"], "cwd": str(tmp_path)})
+    assert "user" not in popens[1]

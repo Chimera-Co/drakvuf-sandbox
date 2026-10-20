@@ -12,6 +12,7 @@ import logging
 import pathlib
 import re
 import secrets
+import shlex
 import subprocess
 import threading
 import time
@@ -52,11 +53,14 @@ DEFAULT_LINUX_PLUGINS = ["procmon", "syscalls", "filetracer", "unixsocketmon", "
 # Linux plugins outside the default set that a request may add
 OPTIONAL_LINUX_PLUGINS = ["cpuidmon", "rebootmon", "debugmon"]
 READY_TIMEOUT_S = 30
-# Desktop session of the guest (data/linux/desktop.sh): the sample gets its display, so GUI programs
-# can draw and are seen in the live view and screenshots
+# Desktop session of the guest (data/linux/desktop.sh): the sample runs as the desktop user, like a
+# downloaded file its owner opened (with that user's home and shell history, not root's), and gets
+# the display, so GUI programs can draw and are seen in the live view and screenshots
 SAMPLE_ENV = {
-    "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-    "HOME": "/root",
+    "PATH": "/usr/local/bin:/usr/bin:/bin:/usr/games",
+    "HOME": f"/home/{DESKTOP_USER}",
+    "USER": DESKTOP_USER,
+    "LOGNAME": DESKTOP_USER,
     "LANG": "en_IN.UTF-8",
     "DISPLAY": ":0",
     "XAUTHORITY": f"/home/{DESKTOP_USER}/.Xauthority",
@@ -199,6 +203,7 @@ def analyze_linux_file(
                 if metadata.file is not None and stat["sha256"] != metadata.file.sha256:
                     raise RuntimeError(f"Uploaded sample hash mismatch: {stat['sha256']}")
                 agent.call("chmod", {"path": guest_path, "mode": 0o755})
+                agent.call("sh", {"cmd": f"chown -- {DESKTOP_USER}: {shlex.quote(guest_path)}"})
                 linux_info["upload"] = {"guest_path": guest_path, "sha256": stat["sha256"], "size": stat["size"],
                                         "injector": upload.get("Status")}
                 exec_argv = [guest_path]
@@ -236,7 +241,9 @@ def analyze_linux_file(
                     if not linux_info["monitor_ready"]:
                         log.warning("Marker not seen in %d s; starting the sample anyway", READY_TIMEOUT_S)
                     if exec_argv:
-                        launched = agent.call("exec", {"argv": exec_argv, "cwd": GUEST_WORK_DIR, "env": SAMPLE_ENV})
+                        launched = agent.call("exec", {"argv": exec_argv, "cwd": GUEST_WORK_DIR, "env": SAMPLE_ENV,
+                                                       "user": DESKTOP_USER})
+                        linux_info["sample_uid"] = launched.get("uid")
                         inject = {"Plugin": "inject", "Method": "AgentExec", "Status": "Success",
                                   "ProcessName": exec_argv[0], "Arguments": " ".join(exec_argv[1:]),
                                   "InjectedPid": launched["pid"]}

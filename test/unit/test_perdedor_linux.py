@@ -14,7 +14,7 @@ from fake_guest_session import FakeGuestSession
 from perdedor_common.validation import validate_report
 
 from drakrun.evasion.constants import ToolStatus
-from drakrun.lib.linux_install import GUEST_AGENT_DIR
+from drakrun.lib.linux_install import DESKTOP_USER
 from drakrun.lib.linux_install import GUEST_WORK_DIR as WORK_DIR
 from drakrun.evasion.scoring import compute_score
 from drakrun.evasion.verifiers import get_adapters_for_platform
@@ -24,7 +24,6 @@ from drakrun.evasion.verifiers.perdedor_linux import build_linux_zipapp
 
 REPO = Path(__file__).resolve().parents[2] / "perdedor"
 REPORT = Path(__file__).parent / "fixtures/perdedor-linux-report.json"
-GUEST_REPORT = f"{GUEST_AGENT_DIR}/perdedor-linux-report.json"
 
 
 def test_zipapp_runs_without_site_packages_or_checkout(tmp_path):
@@ -54,7 +53,7 @@ def test_zipapp_runs_without_site_packages_or_checkout(tmp_path):
 
 
 def test_linux_staging_execution_and_recorded_report(tmp_path):
-    session = FakeGuestSession(files={GUEST_REPORT: REPORT.read_bytes()})
+    session = FakeGuestSession(run_result=GuestCommandResult(0, REPORT.read_bytes(), b""))
     session.probe_command = lambda *a, **kw: pytest.fail("Linux must not probe pwsh")
     adapter = PerdedorAdapter()
     state = adapter.stage(
@@ -70,9 +69,9 @@ def test_linux_staging_execution_and_recorded_report(tmp_path):
     assert argv == [
         "python3",
         f"{WORK_DIR}/perdedor-linux.pyz",
-        "--output",
-        GUEST_REPORT,
     ]
+    # As the desktop user, like a sample, so its home and shell history are what is checked
+    assert session.run_users == [DESKTOP_USER]
     assert 0 < timeout <= 30
     assert session.get_file_calls == []
     result = adapter.collect(state)
@@ -126,9 +125,11 @@ def test_linux_errors_are_never_clean(tmp_path, mode):
         report["findings"][0]["platform"] = "windows"
     data = b"{" if mode == "json" else json.dumps(report).encode()
     session = FakeGuestSession(
-        files={} if mode == "missing" else {GUEST_REPORT: data},
         run_result=GuestCommandResult(
-            1 if mode == "nonzero" else 0, b"out", b"err", mode == "truncated"
+            1 if mode == "nonzero" else 0,
+            b"" if mode == "missing" else data,
+            b"err",
+            mode == "truncated",
         ),
         raise_on_run=(
             VerifierTimeout("deadline")
@@ -147,7 +148,7 @@ def test_linux_errors_are_never_clean(tmp_path, mode):
     )
     assert result.error
     assert compute_score([result]).chimera_score is None
-    if mode not in ("timeout", "transport", "missing"):
+    if mode not in ("timeout", "transport"):
         assert "raw/perdedor/linux-report.json" in result.raw_artifacts
 
 

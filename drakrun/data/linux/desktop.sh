@@ -107,6 +107,22 @@ w Documents/Personal/todo.txt "2026-10-17 23:48" <<'EOF'
 - fix expense tracker csv import
 - internship form (TCS / Infosys) - upload resume
 EOF
+w Documents/College/sem5-timetable.txt "2026-07-30 09:12" <<'EOF'
+MON  DBMS 9-10 | OS 10-11 | CN 11:15-12:15 | DBMS lab 2-4
+TUE  OS 9-10 | TOC 10-11 | SE 11:15-12:15
+WED  CN 9-10 | DBMS 10-11 | OS lab 2-4
+THU  TOC 9-10 | SE 10-11 | CN lab 2-4
+FRI  DBMS 9-10 | OS 10-11 | TOC 11:15-12:15 | library
+EOF
+w Documents/Personal/budget-sep-2026.csv "2026-09-30 22:41" <<'EOF'
+date,item,category,amount
+2026-09-01,Hostel mess,Food,3200
+2026-09-03,Metro card recharge,Travel,500
+2026-09-04,Airtel recharge,Phone,349
+2026-09-14,Earphones,Shopping,899
+2026-09-20,Groceries,Food,540
+2026-09-27,Train ticket home,Travel,615
+EOF
 w Projects/expense-tracker/README.md "2026-09-28 19:22" <<'EOF'
 # expense-tracker
 Small Python script to read my budget CSVs and print monthly totals per category.
@@ -124,6 +140,36 @@ for category, amount in sorted(totals.items()):
     print(f"{category:10} {amount:6}")
 EOF
 w .bash_history "2026-10-18 00:12" <<'EOF'
+sudo apt update
+sudo apt upgrade
+ls
+cd Documents/
+mkdir College Personal
+cd
+python3 --version
+sudo apt install git
+git config --global user.name "Arjun Mehta"
+git config --global init.defaultBranch main
+mkdir -p Projects/expense-tracker
+cd Projects/expense-tracker/
+git init
+nano tracker.py
+python3 tracker.py
+python3 tracker.py ~/Documents/Personal/budget-oct-2026.csv
+nano tracker.py
+python3 tracker.py ~/Documents/Personal/budget-oct-2026.csv
+cd
+cd Downloads/
+ls -lh
+unzip OS-lab-programs.zip
+cd OS-lab-programs/
+gcc fcfs.c -o fcfs
+./fcfs
+gcc rr.c -o rr && ./rr
+cd ~/Downloads
+rm -rf OS-lab-programs
+ls
+cd
 ls
 cd Projects/expense-tracker/
 python3 tracker.py ~/Documents/Personal/budget-oct-2026.csv

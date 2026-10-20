@@ -1,5 +1,6 @@
 """Containment tests for the Linux guest (the C0-C6 set of containment-results-2026-10-19.md, run
-from the Linux guest), plus L1: the guest must not reach the host's own SSH server on its LAN address.
+from the Linux guest), plus L1: the guest must not reach the host's own SSH server on its LAN address,
+and L2: link-local 169.254.0.0/16 (the cloud metadata address) gets no answer, not even INetSim's.
 
     sudo /opt/chimera/venv/bin/python containment_test.py EVIDENCE_DIR [--vm-id 1]
 
@@ -66,6 +67,8 @@ r["C5_gateway"] = gw_ip
 for port in (22, 5000, 6379):
     r[f"C5_dom0_{port}"] = tcp(gw_ip, port)
 r["L1_host_lan_ssh"] = tcp("192.168.0.125", 22, read=True)
+r["L2_metadata_http"] = http("http://169.254.169.254/latest/meta-data/")
+r["L2_link_local_tcp"] = tcp("169.254.1.1", 443)
 for name, addr in (("C6_ipv6_all_nodes", ("ff02::1%ens3", 9, 0, 0)), ("C6_ipv6_global", ("2001:db8::1", 80, 0, 0))):
     s = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM); s.settimeout(3)
     try:
@@ -85,7 +88,8 @@ def sh(cmd: str) -> str:
 
 
 def counters(path: pathlib.Path) -> dict:
-    text = sh("iptables -L CHIMERA_IN -v -x -n; ip6tables -L CHIMERA6 -v -x -n")
+    text = sh("iptables -L CHIMERA_IN -v -x -n; ip6tables -L CHIMERA6 -v -x -n; "
+              "iptables -t raw -L CHIMERA_RAW -v -x -n")
     path.write_text(text)
     totals = {}
     chain = None
@@ -94,6 +98,11 @@ def counters(path: pathlib.Path) -> dict:
             chain = line.split()[1]
             totals[chain] = 0
         elif chain and line.split() and line.split()[0].isdigit():
+            if chain == "CHIMERA_RAW":
+                # Only the link-local DROP rule; the chain also holds rpfilter and the DHCP return
+                if "169.254.0.0/16" in line.split():
+                    totals["CHIMERA_RAW_link_local"] = int(line.split()[0])
+                continue
             totals[chain] += int(line.split()[0])
     return totals
 
@@ -159,6 +168,8 @@ def main():
               and after.get("CHIMERA_IN", 0) > before.get("CHIMERA_IN", 0),
         "C6": not guest["C6_ipv6_all_nodes"]["reply"] and not guest["C6_ipv6_global"]["reply"],
         "L1": not guest["L1_host_lan_ssh"].get("banner", "").startswith("SSH-"),
+        "L2": "error" in guest["L2_metadata_http"] and not guest["L2_link_local_tcp"]["connected"]
+              and after.get("CHIMERA_RAW_link_local", 0) > before.get("CHIMERA_RAW_link_local", 0),
         "uplink_clean": uplink_packets == 0,
     }
     results["all_pass"] = all(results["pass"].values())

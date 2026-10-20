@@ -300,16 +300,17 @@ class PerdedorAdapter(VerifierAdapter):
         )
 
     def _run_linux_phases(self, session, options, scan_dir, deadline):
-        from drakrun.lib.linux_install import GUEST_AGENT_DIR, GUEST_WORK_DIR
+        from drakrun.lib.linux_install import DESKTOP_USER, GUEST_WORK_DIR
         from drakrun.evasion.verifiers.perdedor_linux import build_linux_zipapp
 
         start = time.time()
         raw = scan_dir / "raw" / TOOL_ID
         raw.mkdir(parents=True, exist_ok=True)
-        # Runs from where samples run; the report goes to the agent's directory
+        # Runs from where samples run and as the account they run as (the desktop user, whose home and
+        # shell history are what a sample sees); the report comes back on stdout, which the root-side
+        # runner keeps in the agent's own directory
         guest_app = f"{GUEST_WORK_DIR}/perdedor-linux.pyz"
-        guest_report = f"{GUEST_AGENT_DIR}/perdedor-linux-report.json"
-        argv = ["python3", guest_app, "--output", guest_report]
+        argv = ["python3", guest_app]
         result = ToolResult(
             tool=TOOL_ID,
             status=ToolStatus.error,
@@ -335,7 +336,9 @@ class PerdedorAdapter(VerifierAdapter):
             result.raw_artifacts.append(str(app.relative_to(scan_dir)))
             session.put_file(app, guest_app)
             yield
-            command = session.run(argv, timeout=max(0, deadline - time.time()))
+            command = session.run(
+                argv, timeout=max(0, deadline - time.time()), user=DESKTOP_USER
+            )
             result.exit_code, stdout, stderr = command
             result.truncated = getattr(command, "truncated", False)
             yield
@@ -346,7 +349,7 @@ class PerdedorAdapter(VerifierAdapter):
                 (raw / name).write_bytes(data)
                 result.raw_artifacts.append(str((raw / name).relative_to(scan_dir)))
             local_report = raw / "linux-report.json"
-            session.get_file(guest_report, local_report)
+            local_report.write_bytes(stdout)
             result.raw_artifacts.append(str(local_report.relative_to(scan_dir)))
             report = json.loads(read_report_bytes(local_report).decode("utf-8"))
             validate_report, _ = _load_perdedor_common()

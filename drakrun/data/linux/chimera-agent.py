@@ -16,6 +16,7 @@ import base64
 import hashlib
 import json
 import os
+import pwd
 import select
 import subprocess
 import sys
@@ -87,11 +88,20 @@ def cmd_chmod(args):
     return {}
 
 
+def user_credentials(name):
+    """Popen keyword arguments that run a child as the given account (with its supplementary groups)."""
+    pw = pwd.getpwnam(name)
+    return {"user": pw.pw_uid, "group": pw.pw_gid, "extra_groups": os.getgrouplist(name, pw.pw_gid)}
+
+
 def cmd_exec(args):
     argv = [str(a) for a in args["argv"]]
     cwd = args.get("cwd", WORK_DIR)
     os.makedirs(STATE_DIR, mode=0o700, exist_ok=True)
     out_base = os.path.join(STATE_DIR, "exec-" + str(int(time.time() * 1000)))
+    # A sample runs as the desktop user, like a downloaded file someone opened; the output files stay
+    # root's (opened here, before the child drops privileges)
+    creds = user_credentials(args["user"]) if args.get("user") else {}
     proc = subprocess.Popen(
         argv,
         cwd=cwd,
@@ -101,8 +111,9 @@ def cmd_exec(args):
         start_new_session=True,
         env=args.get("env") or {"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
                                  "HOME": "/root", "LANG": "C.UTF-8"},
+        **creds,
     )
-    return {"pid": proc.pid}
+    return {"pid": proc.pid, "uid": creds.get("user", os.getuid())}
 
 
 def cmd_sh(args):

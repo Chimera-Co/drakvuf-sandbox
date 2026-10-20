@@ -64,6 +64,9 @@ iptables-restore --noflush <<EOF
 :CHIMERA_RAW - [0:0]
 -F CHIMERA_RAW
 -A CHIMERA_RAW -i drak+ -s 0.0.0.0/32 -p udp --sport 68 --dport 67 -j RETURN
+# Link-local (169.254.0.0/16, incl. the cloud metadata address 169.254.169.254) is never routed
+# on a real LAN, so guests get no answer instead of INetSim's. Dropped before conntrack/DNAT.
+-A CHIMERA_RAW -i drak+ -d 169.254.0.0/16 -j DROP
 -A CHIMERA_RAW -i drak+ -m rpfilter --invert -j DROP
 -A CHIMERA_RAW -i $H ! -s $NIP/32 -j DROP
 $(jump raw PREROUTING CHIMERA_RAW)

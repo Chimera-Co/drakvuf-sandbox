@@ -268,7 +268,7 @@ class FakeAgent:
                 "sha256": "bad" if self.bad_hash else hashlib.sha256(data).hexdigest(),
             }
         if command == "exec":
-            argv, cwd, seconds, base = json.loads(args["argv"][-1])
+            argv, cwd, seconds, base, user = json.loads(args["argv"][-1])
             self.files[base + ".out"] = b"hello"
             self.files[base + ".err"] = b""
             self.files[base + ".done"] = b'{"rc":0,"timeout":false}'
@@ -285,7 +285,7 @@ class FakeAgent:
             data = self.files[path][int(offset) : int(offset) + int(count)]
             out = base64.b64encode(data).decode()
             return {"rc": 0, "stdout": out[:-4] if self.truncate else out, "stderr": ""}
-        assert cmd.startswith("mkdir -p -- ")
+        assert cmd.startswith(("mkdir -p -- ", "chown -- "))
         return {"rc": 0, "stdout": "", "stderr": ""}
 
 
@@ -351,6 +351,31 @@ def test_session_exec_polls_completion_and_collects_output():
     ]
     with pytest.raises(VerifierTimeout):
         session_for(agent).run(["python3"], timeout=0)
+
+
+def test_session_exec_passes_the_desktop_user_to_the_runner():
+    agent = FakeAgent()
+    session_for(agent).run(["python3", "/check.py"], timeout=2, user="arjun")
+    launched = next(args for command, args, timeout in agent.calls if command == "exec")
+    # The runner (root) keeps its output files; only the command drops to the user
+    assert json.loads(launched["argv"][-1])[4] == "arjun"
+    assert "user" not in launched
+
+
+def test_session_upload_to_downloads_belongs_to_the_desktop_user(tmp_path):
+    from drakrun.lib.linux_install import GUEST_WORK_DIR
+
+    path = tmp_path / "checker.py"
+    path.write_bytes(b"print('check')")
+    agent = FakeAgent()
+
+    def uploader(vm, kernel, pid, local, remote):
+        agent.files[remote] = local.read_bytes()
+
+    session_for(agent, uploader).put_file(path, f"{GUEST_WORK_DIR}/checker.py")
+    session_for(agent, uploader).put_file(path, "/var/lib/other/checker.py")
+    chowns = [args["cmd"] for command, args, _ in agent.calls if command == "sh" and args["cmd"].startswith("chown")]
+    assert chowns == [f"chown -- arjun: {GUEST_WORK_DIR}/checker.py"]
 
 
 @pytest.mark.parametrize("timeout", [False, True])

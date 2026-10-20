@@ -42,6 +42,7 @@ class FakeGuestSession:
         self.put_file_calls: List[Tuple[pathlib.Path, str]] = []
         self.put_tree_calls: List[Tuple[pathlib.Path, str]] = []
         self.run_calls: List[Tuple[List[str], float, Optional[str]]] = []
+        self.run_users: List[Optional[str]] = []
         self.get_file_calls: List[Tuple[str, pathlib.Path]] = []
 
     def probe_command(self, argv: List[str], timeout: float) -> Tuple[bool, str]:
@@ -59,9 +60,14 @@ class FakeGuestSession:
                 self.files[f"{remote_dir}\\{rel}".replace("/", "\\")] = p.read_bytes()
 
     def run(
-        self, argv: List[str], timeout: float, cwd: Optional[str] = None
+        self,
+        argv: List[str],
+        timeout: float,
+        cwd: Optional[str] = None,
+        user: Optional[str] = None,
     ) -> Tuple[int, bytes, bytes]:
         self.run_calls.append((argv, timeout, cwd))
+        self.run_users.append(user)
         if self.raise_on_run is not None:
             raise self.raise_on_run
         return self.run_result
