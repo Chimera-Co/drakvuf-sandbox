@@ -12,6 +12,8 @@ ExecStart=/opt/chimera/venv/bin/gunicorn --workers 2 --bind 127.0.0.1:5000 drakr
 Restart=on-failure
 RestartSec=5
 User=root
+# Uploaded samples, memory dumps and dropped files stay root-only (threat model: accidental opening on the host)
+UMask=0077
 
 [Install]
 WantedBy=multi-user.target

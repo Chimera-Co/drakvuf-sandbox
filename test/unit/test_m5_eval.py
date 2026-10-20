@@ -63,7 +63,7 @@ def test_labels_count_only_the_sample_process_tree(tmp_path):
             ],
         },
         regmon=[
-            {"PID": 3000, "Method": "NtSetValueKey", "Key": "\\REGISTRY\\USER\\S-1\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run"},
+            {"PID": 3000, "Method": "NtSetValueKey", "Key": "\\REGISTRY\\USER\\S-1\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", "ValueName": "x"},
             {"PID": 900, "Method": "NtSetValueKey", "Key": "\\REGISTRY\\MACHINE\\SOFTWARE\\MICROSOFT\\WINDOWS NT\\CURRENTVERSION\\SCHEDULE\\TASKCACHE\\TASKS\\{X}"},
         ],
     )
@@ -74,6 +74,25 @@ def test_labels_count_only_the_sample_process_tree(tmp_path):
     assert labels["file_drops"] == 1
     assert labels["persistence"] and len(labels["persistence_evidence"]) == 1
     assert labels["payload_behaviour"] and not labels["early_exit"]
+
+
+@pytest.mark.parametrize(
+    "method,key,value,expected",
+    [
+        ("NtSetValueKey", "\\REGISTRY\\USER\\S-1\\SOFTWARE\\MICROSOFT\\WINDOWS\\CURRENTVERSION\\RUN", "Updater", True),
+        ("NtSetValueKey", "\\REGISTRY\\MACHINE\\SYSTEM\\ControlSet001\\Services\\evilsvc", "ImagePath", True),
+        ("NtSetValueKey", "\\REGISTRY\\MACHINE\\SYSTEM\\CurrentControlSet\\Services\\evilsvc\\Parameters", "ServiceDll", True),
+        ("NtSetValueKey", "\\REGISTRY\\MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon", "Userinit", True),
+        ("NtSetValueKey", "\\REGISTRY\\MACHINE\\SOFTWARE\\MICROSOFT\\WINDOWS NT\\CURRENTVERSION\\SCHEDULE\\TASKCACHE\\TREE\\Upd", "Id", True),
+        # Windows' own writes seen in a real run of the probe
+        ("NtSetValueKey", "\\REGISTRY\\MACHINE\\SYSTEM\\CONTROLSET001\\SERVICES\\BAM\\STATE\\USERSETTINGS\\S-1-5-21-1", "x", False),
+        ("NtSetValueKey", "\\REGISTRY\\MACHINE\\System\\CurrentControlSet\\Services\\Tcpip\\Parameters", "Hostname", False),
+        ("NtSetValueKey", "\\REGISTRY\\MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon", "LastUsedUsername", False),
+        ("NtCreateKey", "\\REGISTRY\\USER\\S-1\\SOFTWARE\\MICROSOFT\\WINDOWS\\CURRENTVERSION\\RUN", None, False),
+    ],
+)
+def test_persistence_rules(method, key, value, expected):
+    assert m5.is_persistence_write({"Method": method, "Key": key, "ValueName": value}) is expected
 
 
 def test_quick_silent_exit_is_early_exit_without_payload(tmp_path):

@@ -44,24 +44,43 @@ ANALYSES_DIR = pathlib.Path("/var/lib/drakrun/analyses")
 ARMS_DIR = pathlib.Path("/var/lib/chimera-arms")
 CHIMERA_ARM = pathlib.Path(__file__).resolve().parents[1] / "arms/chimera-arm"
 ANALYSIS_WORKER = "drakrun-worker@1"
+# Evasion scans restore the same Windows snapshot; one starting mid-batch would
+# run on whichever arm is current and block arm switches, so it pauses for the batch.
+EVASION_WORKER = "drakrun-evasion-worker@1"
 TERMINAL = {"finished", "failed"}
 EARLY_EXIT_S = 10
 DROP_EXTENSIONS = {
     "exe", "dll", "sys", "scr", "com", "cpl", "ocx", "ps1", "psm1", "vbs", "vbe",
     "js", "jse", "wsf", "bat", "cmd", "hta", "jar", "lnk", "msi",
 }
-PERSISTENCE_KEYS = re.compile(
-    r"\\CURRENTVERSION\\(RUN|RUNONCE|RUNSERVICES|RUNSERVICESONCE|POLICIES\\EXPLORER\\RUN)(\\|$)"
-    r"|\\CURRENTVERSION\\WINLOGON(\\|$)"
-    r"|\\CURRENTCONTROLSET\\SERVICES\\"
-    r"|\\CONTROLSET\d+\\SERVICES\\"
-    r"|\\SCHEDULE\\TASKCACHE\\",
+# Persistence = a value written under an autostart location. Only NtSetValueKey counts:
+# NtCreateKey is also how Windows opens existing keys. Under Services and Winlogon
+# only the values that make something start count; Windows itself writes other
+# values there (e.g. Services\bam\State, Services\Tcpip\Parameters).
+PERSISTENCE_ANY_VALUE = re.compile(
+    r"\\CURRENTVERSION\\(RUN|RUNONCE|RUNSERVICES|RUNSERVICESONCE|POLICIES\\EXPLORER\\RUN)$"
+    r"|\\SCHEDULE\\TASKCACHE\\(TASKS|TREE)\\",
     re.IGNORECASE,
 )
+PERSISTENCE_VALUES = [
+    (re.compile(r"\\(CURRENTCONTROLSET|CONTROLSET\d+)\\SERVICES\\[^\\]+$", re.IGNORECASE), {"imagepath"}),
+    (re.compile(r"\\(CURRENTCONTROLSET|CONTROLSET\d+)\\SERVICES\\[^\\]+\\PARAMETERS$", re.IGNORECASE), {"servicedll"}),
+    (re.compile(r"\\CURRENTVERSION\\WINLOGON$", re.IGNORECASE), {"shell", "userinit", "notify"}),
+]
 PERSISTENCE_PATHS = re.compile(
     r"\\WINDOWS\\SYSTEM32\\TASKS\\|\\START MENU\\PROGRAMS\\STARTUP\\", re.IGNORECASE
 )
-REGISTRY_WRITES = {"NtSetValueKey", "NtCreateKey", "NtCreateKeyTransacted"}
+
+
+def is_persistence_write(event):
+    if event.get("Method") != "NtSetValueKey":
+        return False
+    key = (event.get("Key") or "").rstrip("\\")
+    if PERSISTENCE_ANY_VALUE.search(key):
+        return True
+    value = (event.get("ValueName") or "").lower()
+    return any(pattern.search(key) and value in names for pattern, names in PERSISTENCE_VALUES)
+
 LOOPBACK = ("127.", "0.0.0.0", "::1", "::")
 
 
@@ -182,12 +201,8 @@ def label_analysis(analysis_dir):
                     event = json.loads(line)
                 except ValueError:
                     continue
-                if (
-                    event.get("PID") in pids
-                    and event.get("Method") in REGISTRY_WRITES
-                    and PERSISTENCE_KEYS.search(event.get("Key") or "")
-                ):
-                    persistence.append(event["Key"])
+                if event.get("PID") in pids and is_persistence_write(event):
+                    persistence.append(f"{event['Key']}\\{event.get('ValueName') or ''}")
     persistence = sorted(set(persistence))
 
     sample = next((p for p in processes if p["seqid"] == root), {}) if executed else {}
@@ -391,6 +406,9 @@ def cmd_run(args):
     if results_path.exists():
         done = {json.loads(line)["key"] for line in results_path.read_text().splitlines() if line}
     original_arm = current_arm()
+    evasion_was_active = sh("systemctl", "is-active", EVASION_WORKER, check=False).strip() == "active"
+    if evasion_was_active:
+        sh("systemctl", "stop", EVASION_WORKER)
     try:
         for item in plan["schedule"]:
             if item["key"] in done:
@@ -415,6 +433,8 @@ def cmd_run(args):
                 raise SystemExit(f"CHIMERA-EGRESS-DROP during {task_uid}; batch stopped")
     finally:
         switch_arm(original_arm)
+        if evasion_was_active:
+            sh("systemctl", "start", EVASION_WORKER)
 
 
 def cmd_label(args):

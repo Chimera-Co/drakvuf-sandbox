@@ -12,6 +12,8 @@ ExecStart=/opt/chimera/venv/bin/drakrun evasion-worker --vm-id %i
 Restart=on-failure
 RestartSec=10
 User=root
+# Uploaded samples, memory dumps and dropped files stay root-only (threat model: accidental opening on the host)
+UMask=0077
 
 [Install]
 WantedBy=multi-user.target

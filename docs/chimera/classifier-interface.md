@@ -19,6 +19,22 @@ timeout_s = 60
 One Python file with one function. It runs in its own Python process (the drakrun venv, Python 3.11), CPU only,
 with no network; it may load files next to it (e.g. `model.joblib`) and import sibling modules.
 
+Packages already installed in that venv, so a model can use them without a deploy step. Pickled models
+(joblib/pickle) only load reliably with the **same versions** they were saved with, so train with these:
+
+| Package | Version |
+|---|---|
+| scikit-learn | 1.9.1 |
+| joblib | 1.6.0 |
+| lightgbm | 4.7.0 |
+| xgboost | 3.2.0 |
+| numpy | 2.4.6 |
+| scipy | 1.17.1 |
+
+Anything else must be added to the deployment venv first. Check a model before handing it over with
+`python -c "import model, json; print(model.classify(json.load(open('features.json')), '.'))"` from its
+directory, using the deployment venv's Python.
+
 ```python
 def classify(features: dict, analysis_dir: str) -> dict:
     return {

@@ -12,3 +12,4 @@ drakrun/tools/get-explorer-pid
 # local dev
 .venv/
 graphify-out/
+scripts/chimera/bench/behaviour-probe/probe.exe
