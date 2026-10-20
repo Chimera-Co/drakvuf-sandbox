@@ -125,7 +125,7 @@ def worker_verify(options: EvasionScanOptions) -> None:
 
     from rq import get_current_job
 
-    from drakrun.analyzer.post_restore import get_post_restore_command
+    from drakrun.analyzer.post_restore import get_post_restore_command, set_guest_clock
     from drakrun.analyzer.run_tools import run_vm
     from drakrun.evasion.drakvuf import verification_drakvuf
     from drakrun.evasion.guest_runner import connect_guest_session
@@ -279,6 +279,7 @@ def worker_verify(options: EvasionScanOptions) -> None:
                 if not config.drakrun.no_post_restore:
                     post_restore_cmd = get_post_restore_command(network_conf.net_enable)
                     session.drakshell.check_call(post_restore_cmd)
+                    metadata.guest_clock = set_guest_clock(session.drakshell)
 
                 substatus_callback(EvasionSubstatus.probing.value, current_tool=None)
 

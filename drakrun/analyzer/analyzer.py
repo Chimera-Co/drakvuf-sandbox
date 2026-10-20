@@ -23,7 +23,7 @@ from drakrun.lib.version_detection import get_drakvuf_version
 
 from .analysis_metadata import AnalysisMetadata
 from .analysis_options import AnalysisOptions, StartMethod
-from .post_restore import get_post_restore_command, prepare_ps_command
+from .post_restore import get_post_restore_command, prepare_ps_command, set_guest_clock
 from .postprocessing import postprocess_analysis_dir
 from .run_tools import StallMonitor, run_drakvuf, run_screenshotter, run_tcpdump, run_vm
 from .telemetry import summarize_telemetry
@@ -222,6 +222,7 @@ def analyze_file(
     drakvuf_hard_timeout = False
     stall_monitor = StallMonitor(f"vm-{vm_id}")
     drakvuf_runtime_s = None
+    guest_clock = None
     with run_vm(
         vm_id, install_info, network_conf, no_restore=options.no_vm_restore
     ) as vm:
@@ -241,6 +242,7 @@ def analyze_file(
             log.info("Running post-restore command...")
             post_restore_cmd = get_post_restore_command(network_conf.net_enable)
             drakshell.check_call(post_restore_cmd)
+            guest_clock = set_guest_clock(drakshell)
 
         if options.extract_archive:
             log.info("Running archive extraction...")
@@ -422,6 +424,7 @@ def analyze_file(
         substatus_callback(AnalysisSubstatus.postprocessing)
 
     extra_metadata = postprocess_analysis_dir(output_dir, config, metadata)
+    extra_metadata["guest_clock"] = guest_clock
     extra_metadata["telemetry"] = summarize_telemetry(
         output_dir,
         options.plugins,

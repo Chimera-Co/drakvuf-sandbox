@@ -138,6 +138,10 @@ class EvasionScanMetadata(BaseModel):
     drakmon_log_nonempty: Optional[bool] = None
     drakvuf_error: Optional[str] = None
 
+    # Result of setting the guest clock to host time after the restore
+    # (drakrun.analyzer.post_restore.set_guest_clock).
+    guest_clock: Optional[Dict[str, Any]] = None
+
     @classmethod
     def load_from_dict(cls, obj: Dict[str, Any]) -> "EvasionScanMetadata":
         return cls.model_validate(obj)
