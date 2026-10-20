@@ -21,12 +21,14 @@ import tempfile
 import time
 from typing import Any, Dict, Optional
 
+from . import cpuid_hide
 from .config import NetworkConfigSection
 from .install_info import InstallInfo
 from .linux_agent import LinuxAgent
 from .linux_profile import flatten
 from .paths import PACKAGE_DATA_PATH
 from .vm import VirtualMachine
+from .xen import xen_unpause_vm
 
 log = logging.getLogger(__name__)
 
@@ -37,6 +39,10 @@ LINUX_CFG_TEMPLATE = pathlib.Path("/etc/drakrun/cfg-linux.template")
 LINUX_KERNEL = "6.1.0-54-amd64"
 # Desktop user created by data/linux/desktop.sh
 DESKTOP_USER = "arjun"
+# Samples are saved where a downloaded file would be. The agent keeps its own files (command output) in
+# GUEST_AGENT_DIR, readable by root only, so nothing named after the sandbox is next to the sample.
+GUEST_WORK_DIR = f"/home/{DESKTOP_USER}/Downloads"
+GUEST_AGENT_DIR = "/var/lib/console-helper"
 DEFAULT_VCPUS = 4
 DEFAULT_MEMORY = 4096
 DEFAULT_DISK_SIZE = "20G"
@@ -51,7 +57,7 @@ def agent_for(vm: VirtualMachine) -> LinuxAgent:
 def prepare_for_snapshot(agent: LinuxAgent) -> Dict[str, Any]:
     """Leave nothing of the setup work in the image: work directory, journal, pending writes."""
     out = agent.call("sh", {"cmd": (
-        "rm -rf /opt/chimera/work/* /opt/chimera/work/.chimera-*; "
+        f"rm -rf {GUEST_AGENT_DIR}/*; "
         "journalctl --rotate >/dev/null 2>&1; journalctl --vacuum-time=1s >/dev/null 2>&1; "
         "systemctl --failed --no-legend --no-pager; uname -r; sync"
     ), "timeout": 60}, timeout=90)
@@ -84,6 +90,7 @@ def install_linux(
         xl_cfg_template=LINUX_CFG_TEMPLATE.as_posix(), snapshot_dir=LINUX_GOLDEN_DIR.as_posix(),
     )
     vm0 = VirtualMachine(0, install_info, network_conf)
+    cpuid_hide.stop_detached(vm0.vm_name)
     vm0.destroy()
     for name in ("vm-0.img", "snapshot.sav"):
         if (LINUX_GOLDEN_DIR / name).exists():
@@ -98,11 +105,29 @@ def install_linux(
         )
     install_info.save(LINUX_INSTALL_INFO_PATH)
     LINUX_INSTALL_INFO_PATH.chmod(0o600)
-    vm0.create()
+    boot_hidden(vm0)
     with agent_for(vm0) as agent:
         info = agent.wait_ready(300)
     log.info("vm-0 is up: %s", info)
     return install_info
+
+
+def boot_hidden(vm: VirtualMachine, cold_boot_restore: bool = False) -> None:
+    """Boot a VM with Xen hidden from CPUID from its first long-mode instruction (cpuid_hide.py).
+
+    The domain is created paused, the helper attaches, then the domain runs. The helper keeps running after
+    this command exits; postinstall / modify-vm0 commit stop it before saving.
+    """
+    if cold_boot_restore:
+        vm.restore(cold_boot=True, pause=True)
+    else:
+        vm.create(pause=True)
+    try:
+        cpuid_hide.start_detached(vm.vm_name)
+    except Exception:
+        vm.destroy()
+        raise
+    xen_unpause_vm(vm.vm_name)
 
 
 def postinstall_linux(network_conf: NetworkConfigSection, settle_s: int = 120) -> Dict[str, Any]:
@@ -119,6 +144,7 @@ def postinstall_linux(network_conf: NetworkConfigSection, settle_s: int = 120) -
         state = prepare_for_snapshot(agent)
     if state["kernel"] != LINUX_KERNEL:
         raise RuntimeError(f"Guest kernel {state['kernel']} does not match the profile ({LINUX_KERNEL})")
+    cpuid_hide.stop_detached(vm0.vm_name)
     vm0.save()
     vm0.storage.snapshot_vm0_volume()
     check_kernel_profile()
@@ -139,7 +165,11 @@ def check_restore(install_info: InstallInfo, network_conf: NetworkConfigSection)
 
 def begin_modify(network_conf: NetworkConfigSection, cold_boot: bool = False) -> InstallInfo:
     install_info = InstallInfo.load(LINUX_INSTALL_INFO_PATH)
-    VirtualMachine(0, install_info, network_conf).restore(cold_boot=cold_boot)
+    vm0 = VirtualMachine(0, install_info, network_conf)
+    if cold_boot:
+        boot_hidden(vm0, cold_boot_restore=True)
+    else:
+        vm0.restore()
     return install_info
 
 
@@ -152,6 +182,7 @@ def commit_modify(network_conf: NetworkConfigSection) -> Dict[str, Any]:
     temporary = pathlib.Path(tempfile.gettempdir()) / "linux-snapshot.sav"
     target = LINUX_GOLDEN_DIR / "snapshot.sav"
     try:
+        cpuid_hide.stop_detached(vm0.vm_name)
         vm0.save(temporary.as_posix())
         vm0.storage.commit_vm0_modify_storage()
         if target.exists():
@@ -165,6 +196,7 @@ def commit_modify(network_conf: NetworkConfigSection) -> Dict[str, Any]:
 def rollback_modify(network_conf: NetworkConfigSection) -> None:
     install_info = InstallInfo.load(LINUX_INSTALL_INFO_PATH)
     vm0 = VirtualMachine(0, install_info, network_conf)
+    cpuid_hide.stop_detached(vm0.vm_name)
     vm0.destroy()
     vm0.storage.delete_vm0_modify_storage()
 

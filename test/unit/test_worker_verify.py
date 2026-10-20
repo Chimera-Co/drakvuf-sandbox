@@ -753,7 +753,7 @@ verifiers = ["chimera-vmcheck"]
     )
     session = FakeGuestSession(
         files={
-            "/opt/chimera/work/linux-report.json": json.dumps(raw_report()).encode()
+            "/var/lib/console-helper/linux-report.json": json.dumps(raw_report()).encode()
         },
         raise_on_run=RuntimeError("agent failed") if fail_run else None,
     )

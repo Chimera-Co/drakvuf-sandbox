@@ -10,19 +10,22 @@
 # needs a new profile (see docs/chimera/linux-sandbox.md).
 #
 # Changes to the image:
-#   - grows the disk to $SIZE (default 20G)
+#   - grows the disk to $SIZE (default 128G; qcow2 is sparse, so this costs only what is written)
 #   - PROFILE=desktop (default): an XFCE desktop PC with an autologin user, everyday applications and a
 #     lived-in home directory (desktop.sh); PROFILE=server: the plain server image
-#   - installs chimera-agent (serial control channel, the Linux counterpart of drakshell) on ttyS0;
+#   - installs chimera-agent (serial control channel, the Linux counterpart of drakshell) on ttyS0, as
+#     console-helper so its name does not mark the guest as a sandbox;
 #     the serial login and kernel console move off ttyS0 so they don't mix with the agent's lines
 #   - masks timers that would start background work in the middle of an analysis
 #     (apt, man-db, e2scrub, fstrim, unattended-upgrades) and NTP (the host sets the clock)
-#   - sets a hostname and creates the work directory /opt/chimera/work
+#   - removes analysis tools a desktop does not have (tcpdump)
+#   - sets a hostname and creates the sample directory (the desktop user's Downloads) and the agent's
+#     root-only directory /var/lib/console-helper
 set -euo pipefail
 
 SRC=$1
 OUT=$2
-SIZE=${SIZE:-20G}
+SIZE=${SIZE:-128G}
 PROFILE=${PROFILE:-desktop}
 DESKTOP_USER=${DESKTOP_USER:-arjun}
 DESKTOP_FULLNAME=${DESKTOP_FULLNAME:-Arjun Mehta}
@@ -75,6 +78,8 @@ if [ -n "$PKGS" ]; then
     if [ "$PROFILE" = desktop ]; then
         bash "$HERE/desktop.sh" "$MNT" "$DESKTOP_USER" "$DESKTOP_FULLNAME"
     fi
+    # Analysis tools a desktop PC does not have (malware looks for them)
+    DEBIAN_FRONTEND=noninteractive chroot "$MNT" apt-get -q -y purge tcpdump
     chroot "$MNT" apt-get clean
     rm -rf "$MNT/var/lib/apt/lists/"*
     rm -f "$MNT/usr/sbin/policy-rc.d"
@@ -84,9 +89,9 @@ if [ -n "$PKGS" ]; then
 fi
 
 # Agent
-install -m 0755 "$HERE/chimera-agent.py" "$MNT/usr/local/sbin/chimera-agent"
-install -m 0644 "$HERE/chimera-agent.service" "$MNT/etc/systemd/system/chimera-agent.service"
-ln -sf /etc/systemd/system/chimera-agent.service "$MNT/etc/systemd/system/multi-user.target.wants/chimera-agent.service"
+install -m 0700 "$HERE/chimera-agent.py" "$MNT/usr/local/sbin/console-helper"
+install -m 0644 "$HERE/chimera-agent.service" "$MNT/etc/systemd/system/console-helper.service"
+ln -sf /etc/systemd/system/console-helper.service "$MNT/etc/systemd/system/multi-user.target.wants/console-helper.service"
 
 # ttyS0 belongs to the agent: no serial getty, no kernel console there (console stays on tty0/VNC)
 ln -sf /dev/null "$MNT/etc/systemd/system/serial-getty@ttyS0.service"
@@ -104,7 +109,12 @@ done
 echo "$HOSTNAME_" > "$MNT/etc/hostname"
 sed -i -E "s/^127\.0\.1\.1.*/127.0.1.1\t$HOSTNAME_/" "$MNT/etc/hosts"
 grep -q '^127\.0\.1\.1' "$MNT/etc/hosts" || printf '127.0.1.1\t%s\n' "$HOSTNAME_" >> "$MNT/etc/hosts"
-install -d -m 1777 "$MNT/opt/chimera/work"
+install -d -m 0700 "$MNT/var/lib/console-helper"
+if [ "$PROFILE" = desktop ]; then
+    chroot "$MNT" install -d -o "$DESKTOP_USER" -g "$DESKTOP_USER" -m 0755 "/home/$DESKTOP_USER/Downloads"
+else
+    install -d -m 0755 "$MNT/home/$DESKTOP_USER/Downloads"
+fi
 
 umount "$MNT"
 qemu-nbd --disconnect "$NBD" >/dev/null

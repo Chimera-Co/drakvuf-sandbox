@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """CHIMERA Linux guest agent: the Linux counterpart of drakshell.
 
-Runs as root from chimera-agent.service and answers requests from dom0 on the
+Installed in the guest as /usr/local/sbin/console-helper (console-helper.service). Answers requests from dom0 on the
 first serial port (/dev/ttyS0, a unix socket on the host: /var/run/drakrun/vm-N.sock).
 
 Protocol, one line each way (ASCII):
@@ -24,7 +24,10 @@ import time
 import tty
 
 PORT = "/dev/ttyS0"
-WORK_DIR = "/opt/chimera/work"
+# Samples go where a downloaded file would be (GUEST_WORK_DIR in drakrun/lib/linux_install.py); the agent's own
+# files go to a root-only directory so nothing next to the sample names the sandbox
+WORK_DIR = "/home/arjun/Downloads"
+STATE_DIR = "/var/lib/console-helper"
 REQUEST = b"@@C> "
 REPLY = "@@C< "
 MAX_LINE = 1 << 20
@@ -65,7 +68,7 @@ def cmd_net(args):
 
 def cmd_prepare(args):
     os.makedirs(WORK_DIR, exist_ok=True)
-    os.chmod(WORK_DIR, 0o1777)
+    os.makedirs(STATE_DIR, mode=0o700, exist_ok=True)
     return {"work_dir": WORK_DIR}
 
 
@@ -87,7 +90,8 @@ def cmd_chmod(args):
 def cmd_exec(args):
     argv = [str(a) for a in args["argv"]]
     cwd = args.get("cwd", WORK_DIR)
-    out_base = os.path.join(cwd, ".chimera-" + str(int(time.time() * 1000)))
+    os.makedirs(STATE_DIR, mode=0o700, exist_ok=True)
+    out_base = os.path.join(STATE_DIR, "exec-" + str(int(time.time() * 1000)))
     proc = subprocess.Popen(
         argv,
         cwd=cwd,

@@ -7,6 +7,8 @@ memory = {{ MEMORY }}
 vcpus = {{ VCPUS }}
 maxvcpus = {{ VCPUS }}
 type = "hvm"
+# hvmloader with Acer ACPI OEM IDs instead of "Xen" (same build as the Windows guest)
+firmware_override = "/usr/local/lib/xen/boot/hvmloader-chimera-acpi"
 boot = "c"
 hap = 1
 acpi = 1
@@ -17,13 +19,24 @@ vnc = 1
 vnclisten = "127.0.0.1:{{ VM_ID }},websocket=127.0.0.1:{{ VNC_PORT }}"
 vncpasswd = "{{ VNC_PASS }}"
 altp2m = 2
-shadow_memory = 64
+shadow_memory = 128
 cpuid = "host,htt=0"
 # Emulated IDE disk and e1000 NIC: no Xen PV drivers in the guest
 xen_platform_pci = 0
 viridian = 0
-vga = "stdvga"
+# Cirrus (PCI 1013) instead of the Bochs/QEMU stdvga (1234:1111)
+vga = "cirrus"
 vif = [ 'type=ioemu,model=e1000,mac=00:1b:21:3a:5c:0{{ VM_ID }},bridge={{ BRIDGE_NAME }}' ]
 disk = [ {{ DISKS }} ]
-# ttyS0 carries the chimera-agent control channel
+# ttyS0 carries the guest agent's control channel
 serial = [ "unix:/var/run/drakrun/{{ VM_NAME }}.sock,server,nowait" ]
+# Firmware and disk identity of a real laptop; serials differ from the Windows guest
+smbios = [ "bios_vendor=INSYDE Corp.", "bios_version=V1.20",
+           "system_manufacturer=Acer", "system_product_name=Predator PHN16-71",
+           "system_version=V1.20", "system_serial_number=NHQ90ASDG12NUWE3K7P1Q",
+           "baseboard_manufacturer=RPL", "baseboard_product_name=Compass_RTX",
+           "baseboard_version=V1.20", "baseboard_serial_number=NBQEZMV2L3VV48XRTKC2",
+           "enclosure_manufacturer=Acer", "enclosure_serial_number=NHQYVG4TUZHZJ9QWE4R1AD",
+           "battery_manufacturer=SMP", "battery_device_name=AP21D8M",
+           "oem=Acer System", "oem=OemString3", "oem=OemString4", "oem=OemString5", "oem=OemString6" ]
+device_model_args_hvm = [ "-global", "ide-hd.model=WDC WD10SPZX-21Z10T0", "-global", "ide-hd.serial=WD-WXDC7194FC21" ]

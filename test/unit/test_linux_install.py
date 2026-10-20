@@ -43,7 +43,7 @@ def test_prepare_for_snapshot_cleans_and_reports_kernel():
     state = linux_install.prepare_for_snapshot(agent)
     assert state == {"kernel": "6.1.0-54-amd64", "failed_units": ["cron.service loaded failed failed"]}
     command = agent.calls[0][1]["cmd"]
-    assert "rm -rf /opt/chimera/work/*" in command and "journalctl --vacuum-time" in command
+    assert "rm -rf /var/lib/console-helper/*" in command and "journalctl --vacuum-time" in command
 
 
 def test_install_linux_uses_linux_defaults(tmp_path, monkeypatch, config):

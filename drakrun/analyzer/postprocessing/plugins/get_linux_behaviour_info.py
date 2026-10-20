@@ -12,6 +12,7 @@ from typing import Dict, Iterator, Optional
 
 import orjson
 
+from drakrun.lib.linux_install import GUEST_AGENT_DIR
 from drakrun.lib.pcap_summary import summarize_pcap
 
 from ..process_tree import FILELESS_PREFIX
@@ -74,8 +75,8 @@ def get_linux_behaviour_info(context: PostprocessContext) -> None:
     for event in read_json_lines(analysis_dir / "filetracer.log"):
         method = event.get("Method")
         name = event.get("FileName") or ""
-        if "/.chimera-" in name:
-            continue  # the agent's capture of the sample's stdout/stderr
+        if name.startswith(f"{GUEST_AGENT_DIR}/") or "/.chimera-" in name:
+            continue  # the agent's capture of the sample's stdout/stderr (older images: .chimera-* in the work dir)
         seqid = seqid_of(event)
         if seqid is None:
             continue

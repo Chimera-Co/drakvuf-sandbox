@@ -228,7 +228,7 @@ def test_verifier_run_preserves_raw_and_errors(tmp_path, mode):
             {}
             if mode == "missing"
             else {
-                "/opt/chimera/work/linux-report.json": (
+                "/var/lib/console-helper/linux-report.json": (
                     b"{" if mode == "bad-json" else json.dumps(raw_report()).encode()
                 )
             }
@@ -244,7 +244,7 @@ def test_verifier_run_preserves_raw_and_errors(tmp_path, mode):
     assert session.put_file_calls[0][0] == SCRIPT
     assert session.run_calls[0][0][:2] == [
         "python3",
-        "/opt/chimera/work/chimera-vmcheck.py",
+        "/home/arjun/Downloads/vmcheck.py",
     ]
     if mode not in ("missing", "timeout"):
         assert "raw/chimera-vmcheck/linux-report.json" in result.raw_artifacts
@@ -414,3 +414,51 @@ def test_guest_runner_launch_error_publishes_nonzero_result(tmp_path):
     result = json.loads(Path(base + ".done").read_text())
     assert result == {"rc": 127, "timeout": False}
     assert b"No such file" in Path(base + ".err").read_bytes()
+
+
+def test_session_pauses_cpuid_hiding_for_injector_uploads(monkeypatch, tmp_path):
+    from drakrun.evasion import linux_guest_runner
+    from drakrun.lib import cpuid_hide
+
+    events = []
+    monkeypatch.setattr(cpuid_hide, "available", lambda: True)
+    monkeypatch.setattr(
+        cpuid_hide, "attach", lambda vm: events.append(("attach", vm)) or object()
+    )
+    monkeypatch.setattr(cpuid_hide, "detach", lambda p: events.append(("detach",)))
+
+    payload = tmp_path / "check.py"
+    payload.write_bytes(b"print(1)\n")
+    digest = __import__("hashlib").sha256(payload.read_bytes()).hexdigest()
+
+    class Agent:
+        def call(self, op, args=None, timeout=None):
+            if op == "stat":
+                return {"size": payload.stat().st_size, "sha256": digest}
+            if op == "sh":
+                return {"rc": 0, "stdout": ""}
+            raise AssertionError(op)
+
+        def close(self):
+            events.append(("close",))
+
+    session = linux_guest_runner.LinuxGuestSession(
+        "vm-1",
+        tmp_path / "kernel.json",
+        Agent(),
+        {"pid": 1},
+        uploader=lambda *a: events.append(("upload",)),
+        hide_cpuid=True,
+    )
+    session._hide()
+    session.put_file(payload, "/home/arjun/Downloads/check.py")
+    session._hide()
+    session.close()
+    assert events == [
+        ("attach", "vm-1"),
+        ("detach",),
+        ("upload",),
+        ("attach", "vm-1"),
+        ("detach",),
+        ("close",),
+    ]

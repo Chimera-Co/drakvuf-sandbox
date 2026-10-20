@@ -1,9 +1,9 @@
 [Unit]
-Description=CHIMERA guest agent (serial control channel for the sandbox host)
+Description=Serial console helper
 ConditionPathExists=/dev/ttyS0
 
 [Service]
-ExecStart=/usr/local/sbin/chimera-agent
+ExecStart=/usr/local/sbin/console-helper
 Restart=always
 RestartSec=1
 

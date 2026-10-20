@@ -100,7 +100,7 @@ class VirtualMachine:
             self._network_info = NetworkInfo.load(network_info_path)
         return self._network_info
 
-    def create(self, iso_path: Optional[str] = None) -> None:
+    def create(self, iso_path: Optional[str] = None, pause: bool = False) -> None:
         disks = [self.storage.get_vm_disk_path(self.vm_id)]
         if iso_path is not None:
             iso_disk = f"file:{iso_path},{FIRST_CDROM_DRIVE}:cdrom,r"
@@ -109,9 +109,9 @@ class VirtualMachine:
         self._network_info = start_vm_network(self.vm_id, self.network_conf)
 
         vm_conf_path = self._generate_vm_conf(disks)
-        xen_create_vm(self.vm_name, vm_conf_path.as_posix())
+        xen_create_vm(self.vm_name, vm_conf_path.as_posix(), pause=pause)
 
-    def restore(self, snapshot_path: Optional[str] = None, cold_boot=False) -> None:
+    def restore(self, snapshot_path: Optional[str] = None, cold_boot=False, pause: bool = False) -> None:
         if not cold_boot and snapshot_path is None:
             snapshot_path = (
                 Path(self.install_info.snapshot_dir) / "snapshot.sav"
@@ -135,9 +135,9 @@ class VirtualMachine:
         vm_conf_path = self._generate_vm_conf(disks)
         log.info(f"Restoring VM {self.vm_name}")
         if not cold_boot:
-            xen_restore_vm(self.vm_name, vm_conf_path.as_posix(), snapshot_path)
+            xen_restore_vm(self.vm_name, vm_conf_path.as_posix(), snapshot_path, pause=pause)
         else:
-            xen_create_vm(self.vm_name, vm_conf_path.as_posix())
+            xen_create_vm(self.vm_name, vm_conf_path.as_posix(), pause=pause)
 
     def save(self, snapshot_path: Optional[str] = None) -> None:
         if snapshot_path is None:

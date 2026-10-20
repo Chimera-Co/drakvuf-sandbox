@@ -17,10 +17,12 @@ from drakrun.evasion.verifiers.base import (
     ReportTooLarge,
     VerifierTimeout,
 )
+from drakrun.lib import cpuid_hide
+from drakrun.lib.linux_install import GUEST_AGENT_DIR
+from drakrun.lib.linux_install import GUEST_WORK_DIR as WORK_DIR
 
 # 32 KiB becomes <44 KiB base64, below the agent's 64 KiB stdout cap.
 READ_CHUNK_BYTES = 32768
-WORK_DIR = "/opt/chimera/work"
 
 # The agent's exec is asynchronous. This child owns the actual command's
 # deadline and process group, and publishes completion only after output closes.
@@ -51,16 +53,34 @@ os.rename(base+'.done.tmp',base+'.done')
 
 
 class LinuxGuestSession:
-    def __init__(self, vm_name, kernel_profile, agent, agent_info, uploader=None):
+    def __init__(
+        self, vm_name, kernel_profile, agent, agent_info, uploader=None, hide_cpuid=False
+    ):
         self.vm_name = vm_name
         self.kernel_profile = pathlib.Path(kernel_profile)
         self.agent = agent
         self.agent_info = agent_info
         self.uploader = uploader
         self.drakvuf_attached = False
+        # Checks run with Xen masked in CPUID, as during analyses (cpuidmon -s).
+        # The injector needs the monitor ring, so uploads pause the hider.
+        self.hide_cpuid = hide_cpuid and cpuid_hide.available()
+        self._hider = None
+
+    def _hide(self):
+        if self.hide_cpuid and self._hider is None:
+            self._hider = cpuid_hide.attach(self.vm_name)
+
+    def _unhide(self):
+        if self._hider is not None:
+            hider, self._hider = self._hider, None
+            cpuid_hide.detach(hider)
 
     def close(self):
-        self.agent.close()
+        try:
+            self._unhide()
+        finally:
+            self.agent.close()
 
     def _sh(self, cmd, timeout=30):
         try:
@@ -91,6 +111,7 @@ class LinuxGuestSession:
             from drakrun.analyzer.linux_analyzer import upload_sample
 
             uploader = upload_sample
+        self._unhide()
         uploader(
             self.vm_name,
             self.kernel_profile,
@@ -148,7 +169,8 @@ class LinuxGuestSession:
     def run(self, argv, timeout, cwd=None):
         if timeout <= 0:
             raise VerifierTimeout("Linux verifier time budget expired")
-        base = f"{WORK_DIR}/.evasion-{uuid.uuid4().hex}"
+        self._hide()
+        base = f"{GUEST_AGENT_DIR}/evasion-{uuid.uuid4().hex}"
         # The runner kills its child process group at the guest-side deadline.
         deadline = time.monotonic() + timeout
         self.agent.call(
@@ -196,7 +218,9 @@ def connect_linux_guest_session(vm_name, kernel_profile):
     try:
         info = agent.wait_ready(60)
         agent.call("prepare")
-        return LinuxGuestSession(vm_name, kernel_profile, agent, info)
+        return LinuxGuestSession(
+            vm_name, kernel_profile, agent, info, hide_cpuid=True
+        )
     except BaseException:
         agent.close()
         raise

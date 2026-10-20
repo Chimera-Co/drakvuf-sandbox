@@ -8,6 +8,7 @@ import time
 
 from drakrun.evasion.constants import Category, CheckStatus, Severity, ToolStatus
 from drakrun.evasion.models import NormalizedCheck, ToolResult
+from drakrun.lib.linux_install import GUEST_AGENT_DIR, GUEST_WORK_DIR
 from drakrun.lib.paths import PACKAGE_DATA_PATH
 from drakrun.evasion.verifiers.base import (
     VerifierAdapter,
@@ -123,8 +124,9 @@ class LinuxVmcheckAdapter(VerifierAdapter):
         start = time.time()
         raw = scan_dir / "raw" / TOOL_ID
         raw.mkdir(parents=True, exist_ok=True)
-        script = "/opt/chimera/work/chimera-vmcheck.py"
-        output = "/opt/chimera/work/linux-report.json"
+        # The checker is the "sample": it runs from where samples run; its report goes to the agent's directory
+        script = f"{GUEST_WORK_DIR}/vmcheck.py"
+        output = f"{GUEST_AGENT_DIR}/linux-report.json"
         argv = ["python3", script, "--output", output]
         result = ToolResult(
             tool=TOOL_ID,

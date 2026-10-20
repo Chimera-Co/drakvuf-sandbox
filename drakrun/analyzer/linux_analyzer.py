@@ -20,7 +20,12 @@ from typing import Any, Dict, List, Optional
 from drakrun.lib.config import NetworkConfigSection, load_config
 from drakrun.lib.install_info import InstallInfo
 from drakrun.lib.linux_agent import LinuxAgent, set_guest_clock
-from drakrun.lib.linux_install import DESKTOP_USER, LINUX_GOLDEN_DIR, LINUX_INSTALL_INFO_PATH  # noqa: F401
+from drakrun.lib.linux_install import (  # noqa: F401
+    DESKTOP_USER,
+    GUEST_WORK_DIR,
+    LINUX_GOLDEN_DIR,
+    LINUX_INSTALL_INFO_PATH,
+)
 from drakrun.lib.paths import PACKAGE_DATA_PATH
 
 from .analysis_metadata import AnalysisMetadata
@@ -37,7 +42,6 @@ from .telemetry import summarize_telemetry
 
 log = logging.getLogger(__name__)
 
-GUEST_WORK_DIR = "/opt/chimera/work"
 # DRAKVUF plugins with a Linux implementation that produce analysis telemetry
 # (drakvuf/src/plugins/plugins.h, drakvuf_plugin_os_support)
 LINUX_PLUGINS = {
@@ -142,8 +146,11 @@ def analyze_linux_file(
     options = metadata.options
     options.guest_os = "linux"
     options.plugins = linux_plugins(options.plugins)
-    # Configured extra DRAKVUF arguments are for the Windows guest (e.g. -s, CPUID hiding)
-    options.extra_drakvuf_args = None
+    # The configured extra DRAKVUF arguments are for the Windows guest. Linux always hides Xen from CPUID
+    # (cpuidmon -s), as the golden image was booted with it hidden (lib/cpuid_hide.py)
+    if "cpuidmon" not in options.plugins:
+        options.plugins.append("cpuidmon")
+    options.extra_drakvuf_args = {"-s": True}
     timeout = options.timeout or config.drakrun.default_timeout
 
     network_conf = NetworkConfigSection(
@@ -211,7 +218,8 @@ def analyze_linux_file(
                 with process_graceful_exit(drakvuf):
                     started = time.monotonic()
                     # Launch gate: a marker command must appear in procmon before the sample runs
-                    marker = f"chimera-ready-{secrets.token_hex(6)}"
+                    # (a random argument only: the sample can list processes too)
+                    marker = secrets.token_hex(8)
                     agent.call("exec", {"argv": ["/bin/true", marker]})
                     linux_info["monitor_ready"] = wait_for_marker(drakmon_file, marker, READY_TIMEOUT_S)
                     linux_info["monitor_ready_s"] = round(time.monotonic() - started, 1)
