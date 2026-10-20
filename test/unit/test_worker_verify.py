@@ -725,18 +725,24 @@ def test_drakvuf_teardown_failure_never_collects(instrumented_scan):
 
 
 @pytest.mark.parametrize("fail_run", [False, True])
+@pytest.mark.parametrize("with_perdedor", [False, True])
 def test_linux_worker_restores_linux_golden_and_closes_agent(
-    worker_module, config_factory, monkeypatch, tmp_path, fail_run
+    worker_module, config_factory, monkeypatch, tmp_path, fail_run, with_perdedor
 ):
     from types import SimpleNamespace
 
     from test_linux_evasion import raw_report
+    from test_perdedor_linux import REPO, REPORT, GUEST_REPORT
+
+    tools = ["perdedor", "chimera-vmcheck"] if with_perdedor else ["chimera-vmcheck"]
 
     config = config_factory("""
 [sandbox.linux-test]
 platform = "linux"
 verifiers = ["chimera-vmcheck"]
 """)
+    config.sandbox["linux-test"].verifiers = tools
+    config.evasion.perdedor.repo_path = REPO
     config.drakrun.no_post_restore = True
     _patch_load_config(monkeypatch, config)
     install_paths, closed, calls = [], [], []
@@ -757,6 +763,7 @@ verifiers = ["chimera-vmcheck"]
         },
         raise_on_run=RuntimeError("agent failed") if fail_run else None,
     )
+    session.files[GUEST_REPORT] = REPORT.read_bytes()
     session.agent = SimpleNamespace(call=lambda *a, **kw: calls.append((a, kw)))
     session.close = lambda: closed.append(True)
     monkeypatch.setattr(
@@ -770,9 +777,7 @@ verifiers = ["chimera-vmcheck"]
     job = FakeJob()
     monkeypatch.setattr("rq.get_current_job", lambda: job)
     worker_module.worker_verify(
-        EvasionScanOptions(
-            sandbox_id="linux-test", guest_os="linux", tools=["chimera-vmcheck"]
-        )
+        EvasionScanOptions(sandbox_id="linux-test", guest_os="linux", tools=tools)
     )
     report = json.loads((tmp_path / job.id / "evasion.json").read_text())
     assert str(install_paths[0]) == "/var/lib/drakrun/linux/golden/install.json"
@@ -780,7 +785,11 @@ verifiers = ["chimera-vmcheck"]
     assert calls[0][0][0] == "net"
     assert report["options"]["guest_os"] == "linux"
     assert report["tool_results"][0]["status"] == ("error" if fail_run else "ok")
-    assert report["score"]["state"] == ("incomplete" if fail_run else "fail")
+    assert report["score"]["state"] == (
+        "incomplete" if fail_run else "pass" if with_perdedor else "fail"
+    )
+    assert report["score"]["primary_tool"] == tools[0]
+    assert [r["tool"] for r in report["tool_results"]] == tools
     assert "chimera-vmcheck" in (tmp_path / job.id / "report.html").read_text()
 
 

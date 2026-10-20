@@ -1,7 +1,10 @@
 # Linux sandbox evasion verification
 
-Linux scans run the bundled `chimera-vmcheck` Python 3 standard-library script
-inside a disposable Debian guest. They use the existing `drakrun-evasion` queue
+Linux scans run PERDEDOR and `chimera-vmcheck` inside a disposable Debian guest.
+Both use Python 3 and the standard library. PERDEDOR supplies the primary score.
+`chimera-vmcheck` supplies corroborating evidence. Both tools are selected by
+default in the console, as PERDEDOR and al-khaser are on Windows.
+Scans use the existing `drakrun-evasion` queue
 and `drakrun evasion-worker` process, separately from analysis results. No tool
 or package download is performed by a scan.
 
@@ -12,7 +15,7 @@ With the console API and evasion worker already running, submit:
 ```sh
 curl --fail-with-body -sS http://127.0.0.1:5000/api/evasion/scans \
   -H 'Content-Type: application/json' \
-  -d '{"sandbox_id":"linux","guest_os":"linux","tools":["chimera-vmcheck"],"profile":"full"}'
+  -d '{"sandbox_id":"linux","guest_os":"linux","tools":["perdedor","chimera-vmcheck"],"profile":"full"}'
 ```
 
 The API returns `{"scan_id":"..."}`. Open `/evasion/<scan_id>` in the console,
@@ -24,9 +27,15 @@ requires authentication, supply the same credentials as for other API calls.
 The registry advertises a built-in sandbox named `linux` when
 `/var/lib/drakrun/linux/golden/install.json` exists and no Linux sandbox is
 explicitly configured. An explicit Linux sandbox must declare
-`verifiers = ["chimera-vmcheck"]`; use that sandbox's id in the command above.
+`verifiers = ["perdedor", "chimera-vmcheck"]`; use that sandbox's id in the command above.
 `GET /api/evasion/sandboxes` lists the actual ids and available tools.
 `GET /api/evasion/tools?guest_os=linux` lists Linux adapters.
+
+Initialize the vendored `perdedor` submodule on the host. Set
+`[evasion.perdedor].repo_path` to its absolute checkout path, as for Windows.
+No PERDEDOR source or package installation is needed in the golden image.
+Select Linux in the console and confirm both tools are checked. After a scan,
+the report must show `perdedor` as `score.primary_tool` and both tool results.
 
 The worker needs an unused VM slot, just as Windows evasion does. If it is not
 already running, an operator with the usual host permissions can start it with
@@ -40,7 +49,14 @@ its tools, loads the Linux golden `install.json`, and restores it through
 `run_vm`. It uses `install_info.snapshot_dir/kernel.json` for injection.
 The serial agent is prepared, the guest clock is synchronized unless disabled,
 and network readiness is checked using the existing Linux agent protocol.
-The verifier uploads the bundled script with the Linux analyzer's
+The host builds `perdedor-linux.pyz` for each scan from the vendored
+`perdedor_linux` and `perdedor_common` Python sources. Its entry point runs the
+Linux agent's full suite and writes JSON to the requested output path. This
+uses the same scan runner as `perdedor test linux`. The optional native
+CPUID/RDTSC helper is omitted. Those four probes report skipped. No compiler,
+pip, network access or source extraction is needed in the guest.
+
+The verifiers upload the zipapp and bundled vmcheck script with the Linux analyzer's
 `upload_sample` injector writefile integration, targeting the live agent PID;
 the session verifies the uploaded file's size and SHA-256.
 
@@ -55,6 +71,8 @@ the verifier fails.
 Artifacts use the existing scan directory and download API:
 
 - `raw/chimera-vmcheck/command.txt`, `stdout.txt`, `stderr.txt`, `linux-report.json`;
+- `raw/perdedor/perdedor-linux.pyz`, `command.txt`, `agent-stdout.txt`,
+  `agent-stderr.txt`, `linux-report.json`;
 - `metadata.json`, normalized `evasion.json`, `report.html`, and the artifact ZIP.
 
 Linux `with_drakvuf=true` is currently rejected. The optional Windows evasion
@@ -62,12 +80,17 @@ instrumentation path remains available for Windows; these Linux checks measure
 the restored guest without an attached DRAKVUF monitor. Uploading via injector
 happens before checker execution.
 
-Old requests and stored scans default to Windows. Their serialization, Windows
-adapters, scoring and report rendering keep the historical defaults.
+Old requests and stored scans default to Windows. Their serialization and
+report rendering keep the historical defaults.
 
 ## Checks and expected Xen findings
 
-The raw JSON is `{tool, version, total, detected, checks}`. Every check has a
+PERDEDOR uses its shared report schema on both platforms. Its finding ids,
+categories, status, severity, evidence and remediation are preserved. The host
+uses the same schema validator and normaliser as for Windows. It also rejects
+duplicate ids and non-finite scores. Raw reports remain available for download.
+
+The vmcheck raw JSON is `{tool, version, total, detected, checks}`. Every check has a
 stable `id`, a group `category`, a boolean `detected`, `evidence`, `technique`, and
 an availability `status` (`ok` or `skipped`). Detection means an indicator was
 found, not that virtualization or malicious instrumentation has been proven.
@@ -118,17 +141,25 @@ specifications provide the analogous low-resource, sleep and activity families.
 
 ## Normalization and scoring
 
-The adapter retains the raw report and maps CPU/firmware/devices/virtualization/
+The vmcheck adapter retains the raw report and maps CPU/firmware/devices/virtualization/
 resources/tools/sandbox groups to `environment_artifact`, activity to
 `behavioural_interaction`, sleep to `timing`, and anti-debug probes to
 `design_specific`. Group names remain in normalized evidence.
 
-`chimera-vmcheck` is the Linux primary. It uses the existing scoring function:
+PERDEDOR is primary on Linux and Windows. Its applicable findings use the
+existing scoring function:
 
 `score = 100 * (1 - sum(weights of detected applicable checks) / applicable_count)`
 
-Resource, activity, analysis-tool and timing heuristics use severity `low`
-(weight 0.15); other checks use `high` (0.65). Skipped/error checks are excluded.
+PERDEDOR supplies each finding's severity. Weights are info 0.05, low 0.15,
+medium 0.35, high 0.65 and critical 1.0. `chimera-vmcheck` counts and evidence
+remain visible but do not change PERDEDOR's score. A failed PERDEDOR run does
+not fall back to vmcheck.
+
+Scans that select only `chimera-vmcheck`, including old stored reports, keep
+their previous score. Its resource, activity, analysis-tool and timing
+heuristics use low severity (0.15). Other checks use high severity (0.65).
+Skipped/error checks are excluded for either primary.
 A failed/timed-out/malformed run, zero applicable checks, or fewer than half
 applicable checks yields `incomplete` with no numeric score. Default thresholds
 remain pass at 90 and warn at 70. This is a heuristic checklist score, not a

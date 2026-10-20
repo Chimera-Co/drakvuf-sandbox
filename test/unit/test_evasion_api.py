@@ -189,10 +189,8 @@ def test_list_sandboxes_is_capability_driven(client):
     windows_tools = {t["id"] for t in by_id["win10"]["available_tools"]}
     assert windows_tools == {"perdedor", "alkhaser"}
 
-    # Neither adapter currently declares linux support - the API must not
-    # fabricate availability just because the sandbox opted in to both
-    # verifier ids; capability comes from the adapter, not the config.
-    assert by_id["linux-test"]["available_tools"] == []
+    # Linux supports PERDEDOR, but must still filter out Windows-only al-khaser.
+    assert [t["id"] for t in by_id["linux-test"]["available_tools"]] == ["perdedor"]
 
 
 def test_list_tools_exposes_real_option_schemas(client):
@@ -618,7 +616,7 @@ def test_scan_artifacts_zip_unknown_scan_is_404(client, scan_dir):
 
 @pytest.mark.parametrize(
     "guest_os,expected",
-    [("windows", {"perdedor", "alkhaser"}), ("linux", {"chimera-vmcheck"})],
+    [("windows", {"perdedor", "alkhaser"}), ("linux", {"perdedor", "chimera-vmcheck"})],
 )
 def test_tools_filtered_by_os(client, guest_os, expected):
     response = client.get(f"/api/evasion/tools?guest_os={guest_os}")
@@ -664,3 +662,31 @@ def test_legacy_scan_options_keep_windows_default():
     options = EvasionScanOptions(sandbox_id="win10", tools=["perdedor"])
     assert options.guest_os == "windows"
     assert "guest_os" not in options.to_dict()
+
+
+def test_linux_scan_offers_and_accepts_both_tools(
+    client, evasion_api_module, monkeypatch
+):
+    evasion_api_module.config.sandbox["linux-test"].verifiers = [
+        "perdedor",
+        "chimera-vmcheck",
+    ]
+    captured = {}
+    monkeypatch.setattr(
+        evasion_api_module, "enqueue_verification", lambda **kw: captured.update(kw)
+    )
+    sandbox = next(
+        s for s in client.get("/api/evasion/sandboxes").json if s["id"] == "linux-test"
+    )
+    tools = [t["id"] for t in sandbox["available_tools"]]
+    assert tools == ["perdedor", "chimera-vmcheck"]
+    response = client.post(
+        "/api/evasion/scans",
+        json={
+            "sandbox_id": sandbox["id"],
+            "guest_os": "linux",
+            "tools": tools,
+        },
+    )
+    assert response.status_code == 200
+    assert captured["options"].tools == tools

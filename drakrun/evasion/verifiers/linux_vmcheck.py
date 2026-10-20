@@ -120,11 +120,13 @@ class LinuxVmcheckAdapter(VerifierAdapter):
         return normalized
 
     def _run_phases(self, session, options, scan_dir, deadline, *, instrumented=False):
+        from drakrun.evasion.linux_guest_runner import WORK_DIR
+
         start = time.time()
         raw = scan_dir / "raw" / TOOL_ID
         raw.mkdir(parents=True, exist_ok=True)
-        script = "/opt/chimera/work/chimera-vmcheck.py"
-        output = "/opt/chimera/work/linux-report.json"
+        script = f"{WORK_DIR}/chimera-vmcheck.py"
+        output = f"{WORK_DIR}/linux-report.json"
         argv = ["python3", script, "--output", output]
         result = ToolResult(
             tool=TOOL_ID,

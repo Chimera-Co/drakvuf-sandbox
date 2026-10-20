@@ -121,12 +121,13 @@ describe("SandboxEvasion", () => {
         expect([...args.tools].sort()).toEqual(["alkhaser", "perdedor"]);
         expect(args.profile).toBe("full");
     });
-    it("switches OS and submits only the Linux tool", async () => {
+    it("switches OS and selects both Linux tools by default", async () => {
         evasionApi.getSandboxes.mockResolvedValue([
             WINDOWS_SANDBOX,
             {
                 ...LINUX_SANDBOX,
                 available_tools: [
+                    WINDOWS_SANDBOX.available_tools[0],
                     {
                         id: "chimera-vmcheck",
                         display_name: "CHIMERA Linux VM check",
@@ -144,13 +145,15 @@ describe("SandboxEvasion", () => {
         expect(
             await screen.findByText("CHIMERA Linux VM check"),
         ).toBeInTheDocument();
-        expect(screen.queryByText("PERDEDOR")).not.toBeInTheDocument();
+        expect(screen.getByLabelText("PERDEDOR")).toBeChecked();
+        expect(screen.getByLabelText("CHIMERA Linux VM check")).toBeChecked();
+        expect(screen.queryByText("al-khaser")).not.toBeInTheDocument();
         fireEvent.click(screen.getByText("Start scan"));
         await waitFor(() =>
             expect(evasionApi.createScan).toHaveBeenCalledWith({
                 sandboxId: "linux-test",
                 guestOs: "linux",
-                tools: ["chimera-vmcheck"],
+                tools: ["perdedor", "chimera-vmcheck"],
                 profile: "full",
                 toolOptions: {},
             }),

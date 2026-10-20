@@ -24,51 +24,65 @@ function makeScan({ score, toolResults }) {
 }
 
 describe("EvasionReport", () => {
-    it("makes the CHIMERA-score-vs-tool-native distinction visually obvious", () => {
-        const scan = makeScan({
-            score: {
-                chimera_score: 100.0,
-                state: "pass",
-                primary_tool: "perdedor",
-                per_category: { timing: 100.0 },
-                tool_scores: {
-                    perdedor: {
-                        status: "ok",
-                        raw_score: "1/1",
-                        detected: 0,
-                        errored: 0,
-                        skipped: 0,
-                        weighted_score: 100.0,
+    it.each(["windows", "linux"])(
+        "shows the primary and corroborating results on %s",
+        (platform) => {
+            const scan = makeScan({
+                score: {
+                    chimera_score: 100.0,
+                    state: "pass",
+                    primary_tool: "perdedor",
+                    per_category: { timing: 100.0 },
+                    tool_scores: {
+                        perdedor: {
+                            status: "ok",
+                            raw_score: "1/1",
+                            detected: 0,
+                            errored: 0,
+                            skipped: 0,
+                            weighted_score: 100.0,
+                        },
+                        alkhaser: {
+                            status: "ok",
+                            raw_score: "0/1",
+                            detected: 1,
+                            errored: 0,
+                            skipped: 0,
+                        },
                     },
-                    alkhaser: {
-                        status: "ok",
-                        raw_score: "0/1",
-                        detected: 1,
-                        errored: 0,
-                        skipped: 0,
-                    },
+                    rationale: [
+                        "CHIMERA score is perdedor's own severity-weighted score.",
+                    ],
                 },
-                rationale: [
-                    "CHIMERA score is perdedor's own severity-weighted score.",
+                toolResults: [
+                    { tool: "perdedor", status: "ok", checks: [] },
+                    { tool: "alkhaser", status: "ok", checks: [] },
                 ],
-            },
-            toolResults: [
-                { tool: "perdedor", status: "ok", checks: [] },
-                { tool: "alkhaser", status: "ok", checks: [] },
-            ],
-        });
+            });
 
-        render(<EvasionReport scan={scan} />);
+            if (platform === "linux") {
+                scan.sandbox.platform = "linux";
+                scan.options.guest_os = "linux";
+                scan.options.tools = ["perdedor", "chimera-vmcheck"];
+                scan.tool_results[1].tool = "chimera-vmcheck";
+                scan.score.tool_scores["chimera-vmcheck"] =
+                    scan.score.tool_scores.alkhaser;
+                delete scan.score.tool_scores.alkhaser;
+            }
+            render(<EvasionReport scan={scan} />);
 
-        expect(screen.getByText("100.0")).toBeInTheDocument();
-        // Only PERDEDOR (primary_tool) is tagged as the CHIMERA score's
-        // source - al-khaser's detection must never be implied to
-        // contribute to it.
-        expect(screen.getByText("CHIMERA score source")).toBeInTheDocument();
-        expect(
-            screen.getByText(/not scored \(corroborating evidence only\)/),
-        ).toBeInTheDocument();
-    });
+            expect(screen.getByText("100.0")).toBeInTheDocument();
+            // Only PERDEDOR (primary_tool) is tagged as the CHIMERA score's
+            // source - al-khaser's detection must never be implied to
+            // contribute to it.
+            expect(
+                screen.getByText("CHIMERA score source"),
+            ).toBeInTheDocument();
+            expect(
+                screen.getByText(/not scored \(corroborating evidence only\)/),
+            ).toBeInTheDocument();
+        },
+    );
 
     it("shows an explicit incomplete state instead of a manufactured score", () => {
         const scan = makeScan({
