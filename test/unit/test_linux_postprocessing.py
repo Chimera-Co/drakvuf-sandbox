@@ -204,12 +204,13 @@ def test_pcap_tcp_syn_and_dns(tmp_path, endian, nano):
         "dns_queries": [
             dict(ts=102.25, domain="sample.test", server="8.8.8.8", local_port=40001)
         ],
+        "tls_handshakes": [],
         "http_requests": [
             dict(ts=102.25, verb="GET", path="/gate.php?id=1", version="HTTP/1.1", host="c2.test",
                  user_agent="probe/1", remote_ip="203.0.113.8", remote_port=443, local_port=40000)
         ],
     }
-    assert summarize_pcap(path, "10.0.0.3") == {"connections": [], "dns_queries": [], "http_requests": []}
+    assert summarize_pcap(path, "10.0.0.3") == {"connections": [], "dns_queries": [], "http_requests": [], "tls_handshakes": []}
 
 
 @pytest.mark.parametrize("content", [None, b"", b"bad", b"\xd4\xc3\xb2\xa1"])
@@ -217,7 +218,7 @@ def test_pcap_missing_or_incomplete_header(tmp_path, content):
     path = tmp_path / "dump.pcap"
     if content is not None:
         path.write_bytes(content)
-    assert summarize_pcap(path) == {"connections": [], "dns_queries": [], "http_requests": []}
+    assert summarize_pcap(path) == {"connections": [], "dns_queries": [], "http_requests": [], "tls_handshakes": []}
 
 
 def write_log(directory, name, events):

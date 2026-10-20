@@ -69,6 +69,8 @@ class DrakrunConfigSection(BaseModel):
     # DRAKVUF -F (Xen fast singlestep). Upstream leaves it off by default;
     # drakrun has always passed it. Switchable to test the apimon crash.
     fast_singlestep: bool = True
+    # INetSim terminates TLS for both guest OSes. Unreadable logs are optional.
+    inetsim_service_log: pathlib.Path = pathlib.Path("/var/log/chimera-inetsim/service.log")
 
 
 class DrakrunDefaultsPresetSection(BaseModel):
