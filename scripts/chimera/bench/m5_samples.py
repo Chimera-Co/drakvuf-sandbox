@@ -2,9 +2,11 @@
 """
 CHIMERA M5 sample shortlist and download from MalwareBazaar (abuse.ch).
 
-  shortlist  query MalwareBazaar *metadata* by evasion tags and pick one recent
-             Windows EXE per family, plus control samples; writes shortlist.csv
-             for the team to review. Nothing is downloaded.
+  shortlist  query MalwareBazaar *metadata* for families documented to check for
+             VMs/sandboxes and pick the newest Windows EXE of each, plus control
+             samples; writes shortlist.csv for the team to review. Nothing is
+             downloaded. About 20 small queries: abuse.ch rate-limits heavy use
+             and its terms forbid high-volume harvesting, so do not loop this.
   download   operator only, after the mentor's written sign-off and the team's
              review: fetch the reviewed shortlist as MalwareBazaar's
              password-protected ZIPs into a root-only directory and write the
@@ -31,7 +33,17 @@ import sys
 API = "https://mb-api.abuse.ch/api/v1/"
 KEY_FILE = pathlib.Path("/etc/chimera/abusech-auth-key")
 ZIP_PASSWORD = "infected"  # MalwareBazaar's published password for every sample ZIP
-EVASION_TAGS = ["anti-vm", "anti-sandbox", "vm-detection", "evasive", "antivm", "anti-analysis"]
+# MalwareBazaar's evasion tags are rare (2 recent EXEs tagged anti-vm, Oct 2026), so
+# samples are chosen by family; the tags only rank samples within a family.
+EVASION_TAGS = ["anti-vm", "anti-sandbox", "vm-detection", "evasive", "antivm", "anti-analysis", "vmprotect"]
+# Families with publicly documented VM/sandbox checks (vendor and research write-ups);
+# names as MalwareBazaar's "signature" field spells them.
+VM_AWARE_FAMILIES = [
+    "GuLoader", "Rhadamanthys", "AgentTesla", "Formbook", "SmokeLoader", "Vidar", "LummaStealer",
+    "DarkGate", "PrivateLoader", "Amadey", "Stealc", "RedLineStealer", "Latrodectus", "PureLogsStealer",
+    "QuasarRAT", "SnakeKeylogger", "ValleyRAT", "XLoader", "CryptBot", "Socks5Systemz", "Pikabot",
+    "WarzoneRAT", "MassLogger", "BumbleBee", "MeduzaStealer",
+]
 # Families that spread by themselves over networks or infect other files.
 # Containment is fail-closed, but they are not needed to answer the question.
 EXCLUDED_FAMILIES = {
@@ -40,7 +52,8 @@ EXCLUDED_FAMILIES = {
 }
 EXCLUDED_TAGS = {"worm", "wormable", "file-infector", "infector", "ransomware"}
 # Common families used as controls; samples carrying an evasion tag are skipped.
-CONTROL_FAMILIES = ["AsyncRAT", "njrat", "Remcos", "XWorm", "DCRat"]
+# Team to confirm each has no reported environment checks (XWorm left out: it spreads over USB).
+CONTROL_FAMILIES = ["AsyncRAT", "njrat", "RemcosRAT", "DCRat", "NanoCore"]
 FIELDS = ["sha256", "role", "family", "tags", "file_name", "first_seen", "source_url"]
 
 
@@ -79,13 +92,17 @@ def eligible(entry, since):
 
 
 def pick(entries, count, role, taken):
-    """One sample per family (its most recent), families with the most evasion tags first."""
+    """One sample per family: the one with the most evasion tags, then the newest."""
     best = {}
+
+    def rank(e):
+        return (len(_tags(e) & set(EVASION_TAGS)), e["first_seen"])
+
     for entry in entries:
-        family = entry["signature"].strip()
-        if family.lower() in taken:
+        family = entry["signature"].strip().lower()  # MalwareBazaar spells some families two ways (Stealc/StealC)
+        if family in taken:
             continue
-        if family not in best or entry["first_seen"] > best[family]["first_seen"]:
+        if family not in best or rank(entry) > rank(best[family]):
             best[family] = entry
     ranked = sorted(best.values(), key=lambda e: e["first_seen"], reverse=True)
     ranked.sort(key=lambda e: -len(_tags(e) & set(EVASION_TAGS)))  # stable: newest first within a tag count
@@ -106,10 +123,10 @@ def pick(entries, count, role, taken):
     return rows
 
 
-def shortlist(fetch_tag, fetch_family, count, controls, since):
-    evasive = [e for tag in EVASION_TAGS for e in fetch_tag(tag) if eligible(e, since)]
+def shortlist(fetch_family, count, controls, since):
+    vm_aware = [e for family in VM_AWARE_FAMILIES for e in fetch_family(family) if eligible(e, since)]
     taken = set()
-    rows = pick(evasive, count, "test", taken)
+    rows = pick(vm_aware, count, "test", taken)
     control_entries = [
         e
         for family in CONTROL_FAMILIES
@@ -132,8 +149,7 @@ def cmd_shortlist(args):
     key, session = auth_key(), requests.Session()
     since = (datetime.date.today() - datetime.timedelta(days=args.since_days)).isoformat()
     rows = shortlist(
-        lambda tag: query(session, key, query="get_taginfo", tag=tag, limit="1000"),
-        lambda family: query(session, key, query="get_siginfo", signature=family, limit="200"),
+        lambda family: query(session, key, query="get_siginfo", signature=family, limit="100"),
         args.count,
         args.controls,
         since,
@@ -196,7 +212,7 @@ def main(argv=None):
     sub = parser.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("shortlist")
     p.add_argument("--out", default="/var/lib/chimera-samples")
-    p.add_argument("--count", type=int, default=28)
+    p.add_argument("--count", type=int, default=len(VM_AWARE_FAMILIES))
     p.add_argument("--controls", type=int, default=5)
     p.add_argument("--since-days", type=int, default=180)
     p.set_defaults(func=cmd_shortlist)

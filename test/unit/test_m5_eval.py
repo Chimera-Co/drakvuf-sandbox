@@ -142,20 +142,19 @@ def entry(sha, family, tags, first_seen="2026-10-01 10:00:00", file_type="exe"):
 
 
 def test_shortlist_one_per_family_drops_worms_and_old_or_non_exe():
-    by_tag = {
-        "anti-vm": [
-            entry(SHA[0], "Lumma", ["anti-vm"], "2026-09-01 00:00:00"),
-            entry(SHA[1], "Lumma", ["anti-vm", "evasive"], "2026-10-01 00:00:00"),
+    by_family = {
+        "GuLoader": [
+            entry(SHA[0], "GuLoader", ["exe"], "2026-10-05 00:00:00"),
+            entry(SHA[1], "GuLoader", ["anti-vm", "evasive"], "2026-10-01 00:00:00"),
             entry("a" * 64, "WannaCry", ["anti-vm"]),
             entry("b" * 64, "Agent", ["anti-vm", "worm"]),
             entry("c" * 64, "OldFam", ["anti-vm"], "2025-01-01 00:00:00"),
             entry("d" * 64, "DllFam", ["anti-vm"], file_type="dll"),
+            entry("f" * 64, "guloader", ["exe"], "2026-10-09 00:00:00"),  # same family, other spelling
         ],
-    }
-    by_family = {
         "AsyncRAT": [entry(SHA[2], "AsyncRAT", ["rat"]), entry("e" * 64, "AsyncRAT", ["rat", "anti-vm"], "2026-10-10 00:00:00")],
     }
-    rows = samples.shortlist(lambda t: by_tag.get(t, []), lambda f: by_family.get(f, []), 10, 5, "2026-04-01")
+    rows = samples.shortlist(lambda f: by_family.get(f, []), 10, 5, "2026-04-01")
     assert [(r["sha256"], r["role"]) for r in rows] == [(SHA[1], "test"), (SHA[2], "control")]
     assert rows[0]["source_url"].endswith(f"/{SHA[1]}/")
 
