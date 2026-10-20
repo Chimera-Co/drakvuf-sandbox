@@ -397,6 +397,7 @@ def test_linux_shortlist_takes_recent_elf_and_skips_spreading_bots():
     }
     rows = samples.linux_shortlist(lambda f: by_family.get(f, []), "2026-04-01")
     assert [(r["sha256"], r["role"], r["guest_os"]) for r in rows] == [(SHA[0], "test", "linux"), (SHA[3], "control", "linux")]
+    assert samples.LINUX_PER_FAMILY == 2
 
 
 def test_only_x86_64_elf_runs_in_the_linux_guest():

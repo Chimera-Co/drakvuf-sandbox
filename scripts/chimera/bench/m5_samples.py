@@ -7,7 +7,7 @@ CHIMERA M5 sample shortlist and download from MalwareBazaar (abuse.ch).
              samples; writes shortlist.csv for the team to review. Nothing is
              downloaded. About 20 small queries: abuse.ch rate-limits heavy use
              and its terms forbid high-volume harvesting, so do not loop this.
-  linux-shortlist  the same for the Linux sandbox: up to two ELF candidates per
+  linux-shortlist  the same for the Linux sandbox: up to three ELF candidates per
              Linux family (about 9 queries), added to shortlist.csv with guest_os linux
   download   operator only, after the mentor's written sign-off and the team's
              review: fetch the reviewed shortlist as MalwareBazaar's
@@ -152,10 +152,13 @@ def shortlist(fetch_family, count, controls, since):
     return rows
 
 
-def linux_shortlist(fetch_family, since, per_family=2):
-    """Up to two ELF samples per Linux family: MalwareBazaar's metadata does not
-    give the CPU, so the download keeps only x86-64 ones and a second candidate
-    stands in for an ARM or MIPS build."""
+LINUX_PER_FAMILY = 2  # kept after download; Linux has no arm comparison, so runs are cheap
+
+
+def linux_shortlist(fetch_family, since, per_family=LINUX_PER_FAMILY + 1):
+    """Up to three ELF candidates per Linux family: MalwareBazaar's metadata does
+    not give the CPU, so the download keeps the first two x86-64 ones and the
+    third stands in for an ARM or MIPS build."""
     rows = []
     for families, role in ((LINUX_FAMILIES, "test"), (LINUX_CONTROL_FAMILIES, "control")):
         for family in families:
@@ -295,8 +298,8 @@ def cmd_download(args):
     linux_taken = {}
     for row in rows:
         guest_os = row.get("guest_os") or "windows"
-        if guest_os == "linux" and linux_taken.get(row["family"], 0) >= 1:
-            continue  # the family already has an x86-64 sample
+        if guest_os == "linux" and linux_taken.get(row["family"], 0) >= LINUX_PER_FAMILY:
+            continue  # the family already has enough x86-64 samples
         path = zips / f"{row['sha256']}.zip"
         if not path.exists():
             resp = session.post(
