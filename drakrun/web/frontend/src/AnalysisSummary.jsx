@@ -286,7 +286,19 @@ function HTTPRow({ httpRequest }) {
                 ) : (
                     []
                 )}
-                {httpRequest["process_seqid"] ? (
+                {httpRequest["postdata"] ? (
+                    <div>
+                        <b>POST data: </b>
+                        <pre>{httpRequest["postdata"]}</pre>
+                    </div>
+                ) : null}
+                {httpRequest["matched"] === false ? (
+                    <div className="text-warning">
+                        Unmatched INetSim session:{" "}
+                        {httpRequest.unmatched_reason}
+                    </div>
+                ) : null}
+                {httpRequest["process_seqid"] != null ? (
                     <div>
                         <b>Process: </b>
                         <SummaryProcessBadge
@@ -316,6 +328,63 @@ function SummaryHTTPSection() {
                     <HTTPRow httpRequest={httpReq} key={`httpreq-${idx}`} />
                 ))}
             </ul>
+        </SummarySection>
+    );
+}
+
+function SummaryTLSSection() {
+    const summary = useAnalysisSummary();
+    if (!summary.tls_requests && !summary.tls_failures) return [];
+    const requests = summary.tls_requests || [];
+    const failures = summary.tls_failures || [];
+    return (
+        <SummarySection
+            header="HTTPS requests (decrypted by INetSim)"
+            badgeType="primary"
+            badgeValue={requests.length}
+        >
+            <ul style={{ overflow: "auto" }}>
+                {requests.map((request, idx) => (
+                    <HTTPRow httpRequest={request} key={`tlsreq-${idx}`} />
+                ))}
+            </ul>
+            {failures.length > 0 && (
+                <>
+                    <h6>Failed handshakes ({failures.length})</h6>
+                    <ul style={{ overflow: "auto" }}>
+                        {failures.map((failure, idx) => (
+                            <li
+                                className="mb-2 p-2 border-bottom"
+                                key={`tlsfail-${idx}`}
+                            >
+                                <div className="font-monospace">
+                                    {failure.sni ||
+                                        failure.remote_ip ||
+                                        "Unknown host"}
+                                </div>
+                                <div>{failure.error}</div>
+                                <details>
+                                    <summary>
+                                        TLS error ({failure.service})
+                                    </summary>
+                                    <pre>{failure.tls_error}</pre>
+                                </details>
+                                {failure.process_seqid != null && (
+                                    <SummaryProcessBadge
+                                        processId={failure.process_seqid}
+                                    />
+                                )}
+                                {failure.matched === false && (
+                                    <div className="text-warning">
+                                        Unmatched INetSim session:{" "}
+                                        {failure.unmatched_reason}
+                                    </div>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                </>
+            )}
         </SummarySection>
     );
 }
@@ -641,6 +710,7 @@ export function AnalysisSummary({ analysisSummary, setSelectedProcess }) {
             <SummaryYaraSection />
             <SummaryDNSSection />
             <SummaryHTTPSection />
+            <SummaryTLSSection />
             <SummaryCrackedURLs />
             <SummaryConnectionsSection />
             <SummaryModifiedFilesSection />

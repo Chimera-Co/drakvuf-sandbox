@@ -12,6 +12,7 @@ from .get_http_info import get_http_info
 from .get_modified_files_info import get_modified_files_info
 from .get_socket_info import get_socket_info
 from .get_ttps_info import get_ttps_info
+from .get_tls_info import get_tls_info
 from .gzip_syscalls import gzip_syscalls
 from .index_logs import index_logs
 from .karton_integration import analyze_in_karton
@@ -86,6 +87,12 @@ POSTPROCESS_PLUGINS = [
     PostprocessPlugin(
         function=get_linux_behaviour_info,
         requires=["process_tree.json"],
+        generates=[],
+    ),
+    PostprocessPlugin(
+        function=get_tls_info,
+        requires=["dump.pcap"],
+        # Always rebuild tls_sessions.json AND the in-memory report on reprocessing.
         generates=[],
     ),
     PostprocessPlugin(

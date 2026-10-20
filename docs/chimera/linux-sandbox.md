@@ -66,7 +66,7 @@ real run:
 | Network connections per process | ✓ socketmon | ✓ decoded connect/sendto + pcap | syscalls (patched) |
 | DNS queries per process | ✓ | ✓ | pcap + sendto |
 | HTTP requests | ✓ WinHTTP/WinINet hooks | ✓ plaintext HTTP from the pcap | pcap |
-| TLS contents | ✓ tlsmon keys | ✗ | – |
+| TLS contents | ✓ tlsmon keys; INetSim requests | ◐ INetSim requests for accepting clients; ClientHello SNI/JA3 otherwise | INetSim service log + pcap |
 | ptrace (anti-debug, injection) | n/a | ✓ | ptracemon |
 | Fileless execution (memfd) | n/a | ✓ shown as `[fileless] argv0` | procmon |
 | eBPF program load | n/a | ◐ `bpf` syscall seen; ebpfmon logs nothing | syscalls |
@@ -126,6 +126,22 @@ Check the worker log for `Linux dumps: packed N files (B bytes), filtered F`, wi
 Check `metadata.json` for `postprocess.process_linux_dumps: "ok"` and nonempty `dumps_metadata`.
 Verify the ZIP hashes, process attribution, ELF headers with `readelf -h`, maple-tree profile offsets,
 shutdown time and peak disk use. Check `procdump_fail.log` and `drakvuf_stderr.log` for failures.
+
+## TLS contents
+
+INetSim logs decrypted requests from clients that accept its certificate. Both Windows and Linux reports
+show these requests and TLS errors. `tls_sessions.json` keeps the sessions and ClientHello metadata from
+`dump.pcap`, including SNI, ALPN, offered TLS version and JA3. Pinned or validating clients expose only
+ClientHello metadata such as SNI and JA3. They do not expose request contents through INetSim.
+
+Sessions match the pcap by source port and time. Linux reuses connection process attribution. Windows uses
+socketmon connections when available. Ambiguous matches and rewritten source ports stay unmatched.
+TCP gaps, out-of-order packets and IP fragments can prevent ClientHello extraction.
+
+The worker must be able to read the host-local INetSim service log. Set `drakrun.inetsim_service_log` in the
+TOML config, or `drakrun__drakrun__inetsim_service_log` in its environment, to change the default
+`/var/log/chimera-inetsim/service.log`. Missing or unreadable logs produce a warning. ClientHello metadata
+still appears. Log rotation can remove old sessions before reprocessing.
 
 ## Known gaps
 
