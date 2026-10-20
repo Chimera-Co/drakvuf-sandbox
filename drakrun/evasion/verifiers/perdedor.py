@@ -301,7 +301,10 @@ class PerdedorAdapter(VerifierAdapter):
 
     def _run_linux_phases(self, session, options, scan_dir, deadline):
         from drakrun.lib.linux_install import DESKTOP_USER, GUEST_WORK_DIR
-        from drakrun.evasion.verifiers.perdedor_linux import build_linux_zipapp
+        from drakrun.evasion.verifiers.perdedor_linux import (
+            build_linux_helper,
+            build_linux_zipapp,
+        )
 
         start = time.time()
         raw = scan_dir / "raw" / TOOL_ID
@@ -335,6 +338,18 @@ class PerdedorAdapter(VerifierAdapter):
                 return result
             result.raw_artifacts.append(str(app.relative_to(scan_dir)))
             session.put_file(app, guest_app)
+            helper = raw / "perdedor-cpuid"
+            if build_linux_helper(pathlib.Path(repo_path), helper):
+                guest_helper = f"{GUEST_WORK_DIR}/perdedor-cpuid"
+                session.put_file(helper, guest_helper)
+                argv = [
+                    "sh",
+                    "-c",
+                    f"chmod 755 {guest_helper} && "
+                    f"PERDEDOR_CPUID_HELPER={guest_helper} exec python3 {guest_app}",
+                ]
+                result.command = shlex.join(argv)
+                (raw / "command.txt").write_text(result.command, encoding="utf-8")
             yield
             command = session.run(
                 argv, timeout=max(0, deadline - time.time()), user=DESKTOP_USER

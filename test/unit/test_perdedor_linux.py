@@ -52,7 +52,10 @@ def test_zipapp_runs_without_site_packages_or_checkout(tmp_path):
     assert by_id["linux.timing.rdtsc_cpuid_jitter"]["status"] == "skipped"
 
 
-def test_linux_staging_execution_and_recorded_report(tmp_path):
+def test_linux_staging_execution_and_recorded_report(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "drakrun.evasion.verifiers.perdedor_linux.build_linux_helper", lambda repo, out: False
+    )
     session = FakeGuestSession(run_result=GuestCommandResult(0, REPORT.read_bytes(), b""))
     session.probe_command = lambda *a, **kw: pytest.fail("Linux must not probe pwsh")
     adapter = PerdedorAdapter()
@@ -92,6 +95,23 @@ def test_linux_staging_execution_and_recorded_report(tmp_path):
         assert check.tool == "perdedor"
     assert compute_score([result]).chimera_score == report["summary"]["weighted_score"]
     assert "raw/perdedor/linux-report.json" in result.raw_artifacts
+
+
+@pytest.mark.skipif(not __import__("shutil").which("cc"), reason="needs a host C compiler")
+def test_linux_scan_ships_a_static_cpuid_helper(tmp_path):
+    session = FakeGuestSession(run_result=GuestCommandResult(0, REPORT.read_bytes(), b""))
+    adapter = PerdedorAdapter()
+    state = adapter.stage(session, {"guest_os": "linux", "repo_path": str(REPO)}, tmp_path, time.time() + 30)
+    helper = f"{WORK_DIR}/perdedor-cpuid"
+    assert [remote for _, remote in session.put_file_calls] == [f"{WORK_DIR}/perdedor-linux.pyz", helper]
+    adapter.execute(state)
+    argv = session.run_calls[0][0]
+    assert argv[:2] == ["sh", "-c"]
+    assert f"PERDEDOR_CPUID_HELPER={helper} exec python3 {WORK_DIR}/perdedor-linux.pyz" in argv[2]
+    local = tmp_path / "raw/perdedor/perdedor-cpuid"
+    # Static, so it runs in a guest whatever its libc; no args is the usage exit (1)
+    assert b"statically linked" in subprocess.run(["file", str(local)], capture_output=True).stdout
+    assert subprocess.run([str(local)], capture_output=True).returncode == 1
 
 
 @pytest.mark.parametrize(
