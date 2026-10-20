@@ -1,6 +1,6 @@
 # CHIMERA Threat Model
 
-**Version:** 1.0 (2026-10-19) · **Scope:** the single-host CHIMERA deployment (Xen dom0 + DRAKVUF + drakrun + web UI) used for the capstone evaluation.
+**Version:** 1.1 (2026-10-21) · **Scope:** the single-host CHIMERA deployment (Xen dom0 + DRAKVUF + drakrun + web UI, a Windows 10 and a Debian 12 guest) used for the capstone evaluation.
 **Status of controls** is marked **[in place]**, **[planned]** (in `containment-proposal.md`), or **[gap]** (accepted or out of scope). Evidence references point to `RECON-2026-10-19.md` (workspace root) and source lines in this repo.
 
 CHIMERA deliberately executes hostile code. The platform is therefore itself a security-sensitive system: **assume every byte the guest produces is attacker-controlled, and assume the guest is fully compromised from the first instruction of the sample.**
@@ -13,7 +13,7 @@ CHIMERA deliberately executes hostile code. The platform is therefore itself a s
 flowchart LR
     A["Analyst browser"] -->|"B1: HTTP :5000, VNC ws :640x"| W["drak-web<br/>(gunicorn, 127.0.0.1)"]
     W --> R[("Redis / RQ")] --> K["drakrun worker<br/>(root, dom0)"]
-    K -->|"B2: hypervisor boundary<br/>Xen 4.19.2 + qemu-xen"| G["Guest domU<br/>Windows 10 — HOSTILE"]
+    K -->|"B2: hypervisor boundary<br/>Xen 4.19.2 + qemu-xen"| G["Guest domUs<br/>Windows 10, Debian 12 — HOSTILE"]
     G -->|"B3: network, bridge drakN"| F["dom0 iptables<br/>CHIMERA chains"] --> I["INetSim netns"]
     G -->|"B4: drakshell, injector, VMI reads,<br/>plugin logs, PCAP, memdumps"| P["parsers / postprocessors<br/>(root)"]
     P -->|"B5: reports"| A
@@ -60,34 +60,37 @@ Out of scope: hardware/firmware attacks, hypervisor 0-days by well-resourced act
 - **Residual:** a hypervisor 0-day isn't mitigable at capstone scale. Mitigation is blast-radius reduction (T2, T7) and minimising sensitive data reachable from dom0.
 
 ### T2 Network escape / attacks on third parties (A1 → B3)
-- **Current state (critical):** `net_enable=true` + `out_interface=default` → MASQUERADE through Wi-Fi plus FORWARD ACCEPT in both directions (`drakrun/lib/networking.py:289-301`); host FORWARD policy ACCEPT; `ip_forward` left at 1 after any run (`networking.py:294`); the per-analysis `no_internet` option adds no DROP. Guests can reach the Internet and the LAN.
-- **Controls in place:** guest → dom0 INPUT dropped except DHCP (and gateway DNS) (`networking.py:277-287`); inter-bridge forwarding dropped (`networking.py:137`).
-- **Planned:** INetSim in an isolated network namespace; all guest IPv4 DNAT'ed to INetSim; a `CHIMERA_GUARD` FORWARD chain at position 1 that fails closed; FORWARD policy DROP; IPv6 dropped on `drak+`; verification tests C1–C8 with PCAP evidence.
+- **State on 2026-10-19 (fixed since):** drakrun's default networking masqueraded guests through the Wi-Fi, so guests could reach the Internet and the LAN.
+- **Controls in place:** INetSim in an isolated network namespace; all guest IPv4 DNAT'ed to INetSim; a `CHIMERA_GUARD` FORWARD chain at position 1 that fails closed; IPv6 dropped on `drak+`; reverse-path filtering against spoofed sources; guest → dom0 INPUT dropped except DHCP; inter-bridge forwarding dropped; every analysis worker refuses to start unless `chimera-net-check --require-inetsim` passes. Verified by tests C-1 to C13 on 2026-10-19, all passed, including deliberate fail-closed cases (`containment-results-2026-10-19.md`).
+- **Operational:** Wi-Fi off and no cable during real-sample batches.
 - **Residual:** covert channels through timing/telemetry aren't addressed. INetSim's canned responses can reveal a fake Internet (an evasion concern, not a containment one).
 
 ### T3 INetSim compromise and pivot (A3)
 - **Vector:** INetSim (Perl) parses hostile protocol traffic.
-- **Planned:** run it inside its own network namespace whose only link is a veth to dom0; FORWARD and INPUT drop anything the namespace initiates; run it as an unprivileged user (to verify after install); mask any host-wide INetSim service the package ships.
+- **Controls in place:** it runs inside its own network namespace whose only link is a veth to dom0; FORWARD and INPUT drop anything the namespace initiates (test C9); its services run as the unprivileged `inetsim` user with no capabilities and NoNewPrivs (test C13).
 - **Residual:** a namespace shares the dom0 kernel, so a kernel exploit from INetSim reaches dom0. A separate domU would be stronger, but free RAM (~5.6 GiB) doesn't allow it alongside the Windows guest.
 
 ### T4 Hostile guest output parsed as root (A1 → B4)
 - **Vector:** drakshell stdout/stderr, PERDEDOR JSON, al-khaser logs, DRAKVUF plugin logs (strings come from guest memory), memdumps, PCAPs (packet dissectors are a classic attack surface).
 - **Gaps (verified in review):** unbounded guest stdout accumulation (`drakrun/evasion/guest_runner.py:234`); whole-file reads before JSON parsing (`drakrun/evasion/verifiers/perdedor.py:247`); PERDEDOR `summary.weighted_score` inserted unescaped into its native HTML (`perdedor/common/python/perdedor_common/report.py:100`); validation doesn't check the expected check inventory, so a forged report can score high (`drakrun/evasion/scoring.py:108`, `perdedor_common/validation.py:25`).
-- **Planned:** byte caps on every guest-sourced stream/file; schema plus expected-inventory validation; HTML escaping; treat a non-zero tool exit as not-OK.
+- **In place:** an 8 MiB cap on guest command output streams (`guest_runner.py`, `MAX_STREAM_BYTES`).
+- **Planned:** byte caps on the remaining guest-sourced files; schema plus expected-inventory validation; HTML escaping; treat a non-zero tool exit as not-OK.
 - **Rule:** never open PCAPs or dumps with desktop tools on dom0 as root. Analyse copies as an unprivileged user.
 
 ### T5 Evidence integrity / spoofing (A1, A4 → asset 3)
 - **Gaps:** "finished" doesn't imply complete telemetry, because the DRAKVUF return code is unchecked and postprocess errors are swallowed (`drakrun/analyzer/analyzer.py:395`, `drakrun/analyzer/postprocessing/postprocess.py:32`); analysis and evasion workers can target the same VM (`drakrun/evasion/worker.py:86` vs `drakrun/analyzer/worker.py:164`); `evasion.json` keeps "started" (`drakrun/evasion/worker.py:300-342`).
-- **Planned:** per-VM lock; per-plugin "produced / empty / failed" status; record image hash, config hash and plugin list in each analysis's metadata; SHA-256 manifest of artefacts at completion.
+- **In place:** each analysis records `metadata.telemetry` (DRAKVUF return code, hard timeout, VM stall, per-plugin produced / missing status), and the evaluation excludes runs whose telemetry is incomplete.
+- **Planned:** per-VM lock; record image hash, config hash and plugin list in each analysis's metadata; SHA-256 manifest of artefacts at completion.
 
 ### T6 Web/API and management exposure (A2, A4 → B1)
-- **Current state:** Flask API, `/rq` dashboard and VNC have no app-level auth; VNC bound to `0.0.0.0` (`/etc/drakrun/cfg.template`); upstream docs suggest `-b 0.0.0.0:5000`; system dnsmasq is an open resolver on `0.0.0.0:53`.
-- **Planned:** bind web and VNC to 127.0.0.1 (remote access only via SSH tunnel); disable the system dnsmasq (the host resolver is the router, so nothing depends on it).
+- **Controls in place (checked 2026-10-21):** the web UI/API, VNC and its websocket listen on 127.0.0.1 only; no TCP port listens on any other address; the system dnsmasq is disabled (drakrun's per-VM DHCP listens only on the guest bridge).
+- **Gap:** the API, `/rq` dashboard and VNC have no app-level authentication; acceptable because they are reachable only from the host itself.
 - **Residual:** any local user on dom0 can use the UI. For the capstone that is the single operator.
 
 ### T7 Privilege escalation through orchestration (A4, A5 → B6)
 - **Vector:** a root worker importing code from a user-writable tree (`/home/shreyas/...`) means anything that can write as the user can get root.
-- **Planned:** deploy a tagged commit into a root-owned venv (e.g. `/opt/chimera-venv`); never run the root worker from the editable dev tree; pin dependencies; review submodule bumps.
+- **In place:** the root workers run from a root-owned deployment (`/opt/chimera/src`, `/opt/chimera/venv`), never from the editable dev tree.
+- **Planned:** pin dependencies; review submodule bumps.
 - **Repo is PUBLIC:** never commit samples, private-source sample hashes, credentials, VNC passwords, `/etc/drakrun/*.json`, analysis outputs, or internal network details.
 
 ### T8 Resource exhaustion (A1, A4)
@@ -99,6 +102,10 @@ Out of scope: hardware/firmware attacks, hypervisor 0-days by well-resourced act
 - **Gaps:** restore failure happens before the cleanup `try/finally` (`drakrun/analyzer/run_tools.py:130`), and 3/8 historical runs failed restore. Network state is saved late, so leftover bridges/rules can survive. A hard-killed worker leaves a domain running.
 - **Planned:** move restore inside cleanup; startup reconciliation (destroy stray `vm-N`, delete stray `drakN`, assert `CHIMERA_GUARD` exists before accepting jobs); the recovery procedure in §6.
 - **Golden image:** `vm-0.img` is only ever a backing file. Keep an offline copy and a SHA-256 of `vm-0.img` and `snapshot.sav`, and verify before each experiment batch.
+
+### T11 Linux samples on a Linux host (A1, asset 1)
+- **Vector:** dom0 also runs Linux, so a Linux (ELF) sample could run on the host if it were ever executed outside the guest, e.g. by opening or extracting it on dom0.
+- **Controls in place:** samples stay in MalwareBazaar's encrypted archives in a root-only folder; the evaluation runner decrypts each in memory, checks its SHA-256 and submits it straight to the guest; nothing on dom0 executes it; the Linux guest runs as its own HVM domain behind the same network containment as Windows (rule 4 below).
 
 ### T10 Thermal / hardware availability (operational)
 - Sustained analyses raise temperatures. The fan daemon (`acer-fan-control.service`) depends on an out-of-tree kernel module that breaks on kernel updates (seen 2026-10-19). Check `systemctl is-active acer-fan-control` before long batches.
@@ -125,3 +132,4 @@ If a guest is seen reaching anything other than INetSim (the `CHIMERA-EGRESS` dr
 | Date | Change | By |
 |---|---|---|
 | 2026-10-19 | Initial version from the Phase-1 recon and Codex review | Claude (team review pending) |
+| 2026-10-21 | v1.1: containment, INetSim isolation, localhost-only services and root-owned deployment marked in place after checking the live host; Linux guest added (T11) | Claude (team review pending) |
