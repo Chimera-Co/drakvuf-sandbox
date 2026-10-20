@@ -1,0 +1,68 @@
+# Classifier interface
+
+Every finished analysis can be handed to a malware classifier. The sandbox extracts behaviour features, runs the
+model, and stores its verdict next to the report. Code: `drakrun/analyzer/classifier/`, postprocess plugin
+`classify_sample` (runs after `generate_report`).
+
+## Turning it on
+
+```toml
+# /etc/drakrun/config.toml
+[classifier]
+enabled = true                                   # default false
+model_path = "/etc/drakrun/classifier/model.py"  # unset or missing file: the built-in stub
+timeout_s = 60
+```
+
+## The model file
+
+One Python file with one function. It runs in its own Python process (the drakrun venv, Python 3.11), CPU only,
+with no network; it may load files next to it (e.g. `model.joblib`) and import sibling modules.
+
+```python
+def classify(features: dict, analysis_dir: str) -> dict:
+    return {
+        "label": "malicious",          # "malicious" | "suspicious" | "benign" | "unknown"
+        "score": 0.93,                 # 0..1
+        "family": "AgentTesla",        # or None
+        "model": "chimera-rf",
+        "model_version": "1.0",
+        "explanation": ["many registry autorun writes"],
+    }
+```
+
+An exception, a timeout, or an invalid result (missing key, label outside the list, score outside 0..1 or a bool)
+is recorded as `{"schema": "chimera-verdict/1", "label": "unknown", "error": "..."}`; the analysis itself never
+fails because of the model. Extra keys in the result are dropped.
+
+`stub_model.py` (`model: "chimera-stub"`) is a placeholder heuristic, not a trained model, and says so in its
+explanation.
+
+## Outputs
+
+| Where | What |
+|---|---|
+| `<analysis>/features.json` | the model's input, schema `chimera-features/1` |
+| `<analysis>/classification.json` | the verdict, schema `chimera-verdict/1` |
+| `metadata.json` → `classification` | same verdict, also in `GET /api/status/<id>` |
+| `GET /api/features/<id>`, `GET /api/classification/<id>` | the two files (404 if absent) |
+
+## `chimera-features/1`
+
+All behaviour is scoped to the sample's own process and its descendants (the process started by the injector,
+found in `process_tree.json`); events of other processes are excluded. Lists are capped.
+
+| Key | Content |
+|---|---|
+| `sample` | `sha256`, `file_name`, `file_type`, `size_bytes` |
+| `run` | `guest_os`, `timeout_s`, `complete`, `vm_stalled`, `drakvuf_errors` (from the telemetry summary) |
+| `processes` | `count`, `max_depth` (0 = sample only), `names` (≤50), `command_lines` (≤50), `exited_early` |
+| `api_calls` | `{api_name: count}` from apimon; only the APIs in `drakrun/data/hooks.txt` can appear |
+| `api_sequence` | first 2000 API names in time order |
+| `files` | `created`, `written`, `deleted` counts, `paths` (≤100) |
+| `registry` | `set_value`, `create_key`, `delete` counts, `keys` (≤100), `autorun_touched` |
+| `network` | `dns_queries`, `connections`, `remote_endpoints` (`ip:port`, ≤100), `http_requests` |
+| `ttps` | `[{name, attack: [ATT&CK IDs]}]` from capa |
+
+Counts are observed attempts, not confirmed effects. The guest network is INetSim: every name resolves and every
+HTTP request gets a fake answer.

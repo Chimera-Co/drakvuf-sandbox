@@ -423,8 +423,21 @@ def analyze_file(
     if substatus_callback is not None:
         substatus_callback(AnalysisSubstatus.postprocessing)
 
+    telemetry = summarize_telemetry(
+        output_dir,
+        options.plugins,
+        drakvuf_returncode,
+        drakvuf_hard_timeout,
+        drakvuf_runtime_s=drakvuf_runtime_s,
+        analysis_timeout_s=options.timeout,
+        vm_stalled=stall_monitor.stalled,
+        vm_max_stall_s=stall_monitor.max_stall_s,
+    )
+    # Classifiers need the final telemetry while postprocessing is running.
+    metadata.model_extra["telemetry"] = telemetry
     extra_metadata = postprocess_analysis_dir(output_dir, config, metadata)
     extra_metadata["guest_clock"] = guest_clock
+    # Log splitting/compression changes artifact availability during postprocessing.
     extra_metadata["telemetry"] = summarize_telemetry(
         output_dir,
         options.plugins,

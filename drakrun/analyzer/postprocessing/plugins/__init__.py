@@ -2,6 +2,7 @@ from drakrun.lib.paths import DUMPS_DIR, DUMPS_ZIP, IPT_DIR, IPT_ZIP
 
 from .build_process_tree import build_process_tree
 from .capa_plugin.capa_processor import capa_analysis
+from .classify_sample import classify_sample
 from .compress_ipt import compress_ipt
 from .generate_html_report import generate_html_report
 from .generate_report import generate_report
@@ -86,6 +87,7 @@ POSTPROCESS_PLUGINS = [
         requires=[],
         generates=[],
     ),
+    PostprocessPlugin(function=classify_sample, requires=[], generates=[]),
     PostprocessPlugin(
         function=generate_html_report,
         requires=["report.json"],

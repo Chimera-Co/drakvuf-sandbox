@@ -34,6 +34,9 @@ def run_postprocessing(context: PostprocessContext):
     outcomes = {}
     for plugin in POSTPROCESS_PLUGINS:
         plugin_name = plugin.function.__name__
+        if plugin_name == "classify_sample" and not context.config.classifier.enabled:
+            outcomes[plugin_name] = "skipped"
+            continue
         if not check_plugin_requirements(context.analysis_dir, plugin):
             outcomes[plugin_name] = "skipped"
             continue

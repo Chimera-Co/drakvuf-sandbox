@@ -82,6 +82,12 @@ class CapaConfigSection(BaseModel):
     worker_pool_processes: int = 4
 
 
+class ClassifierConfigSection(BaseModel):
+    enabled: bool = False
+    model_path: Optional[pathlib.Path] = None
+    timeout_s: float = Field(default=60, gt=0, allow_inf_nan=False)
+
+
 class MemdumpConfigSection(BaseModel):
     # Maximum total size of collected, uncompressed dumps
     max_total_dumps_size: int = 500 * 1024 * 1024
@@ -176,6 +182,7 @@ class DrakrunConfig(BaseSettings):
     network: NetworkConfigSection
     drakrun: DrakrunConfigSection
     capa: CapaConfigSection = CapaConfigSection()
+    classifier: ClassifierConfigSection = Field(default_factory=ClassifierConfigSection)
     memdump: MemdumpConfigSection = MemdumpConfigSection()
     karton: KartonConfigSection = KartonConfigSection()
     s3: Optional[S3StorageConfigSection] = None

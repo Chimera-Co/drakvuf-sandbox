@@ -1,5 +1,5 @@
 import uuid
-from typing import Annotated, List, Optional
+from typing import Annotated, Any, List, Optional
 
 from flask_openapi3 import FileStorage
 from pydantic import AfterValidator, BaseModel, Field, RootModel
@@ -51,6 +51,9 @@ class UploadAnalysisResponse(BaseModel):
 class AnalysisResponse(BaseModel):
     id: str = Field(description="Unique analysis ID")
     status: str = Field(description="Analysis status")
+    classification: Optional[dict[str, Any]] = Field(
+        default=None, description="Classifier verdict, including model errors"
+    )
     time_started: Optional[str] = Field(
         default=None, description="Analysis start time in ISO format"
     )

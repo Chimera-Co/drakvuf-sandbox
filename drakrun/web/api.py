@@ -351,6 +351,23 @@ def report(path: AnalysisRequestPath):
     )
 
 
+@api.get("/classification/<task_uid>", responses={404: APIErrorResponse})
+def classification(path: AnalysisRequestPath):
+    return send_analysis_file(
+        path.task_uid,
+        "classification.json",
+        mimetype="application/json",
+        s3_config=config.s3,
+    )
+
+
+@api.get("/features/<task_uid>", responses={404: APIErrorResponse})
+def features(path: AnalysisRequestPath):
+    return send_analysis_file(
+        path.task_uid, "features.json", mimetype="application/json", s3_config=config.s3
+    )
+
+
 @api.get("/logs/<task_uid>")
 def list_logs(path: AnalysisRequestPath):
     task_uid = path.task_uid

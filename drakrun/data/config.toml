@@ -10,3 +10,9 @@ net_enable = false
 [drakrun]
 default_timeout = 300
 plugins = ["apimon", "clipboardmon", "exmon", "filetracer", "memdump", "procmon", "regmon", "socketmon", "tlsmon"]
+
+[classifier]
+enabled = false
+# Unset or missing model_path uses the labelled demonstration stub.
+# model_path = "/etc/drakrun/classifier/model.py"
+timeout_s = 60
