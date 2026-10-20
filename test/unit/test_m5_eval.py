@@ -192,3 +192,24 @@ def test_downloaded_register_is_readable_by_the_runner(tmp_path):
         writer.writeheader()
         writer.writerow(dict(zip(fields, [SHA[0].upper(), "z.zip", "control", "AsyncRAT", "rat", "infected", "", "u", "2026-10-20T00:00:00+00:00"])))
     assert m5.read_register(path)[0]["sha256"] == SHA[0]
+
+
+@pytest.mark.skipif(not __import__("shutil").which("7z"), reason="needs host 7-Zip")
+def test_read_sample_decrypts_aes_zip_in_memory(tmp_path):
+    import hashlib
+    import subprocess
+
+    payload = tmp_path / "Columnised.exe"
+    payload.write_bytes(b"MZ not really a program")
+    archive = tmp_path / "s.zip"
+    subprocess.run(["7z", "a", "-tzip", "-mem=AES256", "-pinfected", str(archive), str(payload)], check=True, capture_output=True)
+    payload.unlink()
+    sha = hashlib.sha256(b"MZ not really a program").hexdigest()
+    name, data = m5.read_sample({"sha256": sha, "path": str(archive), "archive_password": "infected"})
+    assert (name, hashlib.sha256(data).hexdigest()) == ("Columnised.exe", sha)
+
+
+def test_hash_named_samples_get_a_neutral_guest_name():
+    assert m5.sample_name("%064x.exe" % 5) == "setup.exe"
+    assert m5.sample_name("Invoice_0921.exe") == "Invoice_0921.exe"
+    assert m5.sample_name("dir/report") == "report.exe"

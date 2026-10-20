@@ -251,6 +251,7 @@ def cmd_download(args):
                 "tags": row["tags"],
                 "archive_password": ZIP_PASSWORD,
                 "entry": "",
+                "file_name": row.get("file_name", ""),
                 "source_url": row["source_url"],
                 "retrieved": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             }

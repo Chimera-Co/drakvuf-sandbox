@@ -14,7 +14,11 @@ and must stay outside the repository.
 
 Register columns (CSV, header required):
   sha256, path (password-protected ZIP), role (test|control), family, tags,
-  archive_password, entry (path inside the archive, optional)
+  archive_password, entry (path inside the archive, optional), file_name (optional)
+
+Each sample is decrypted in memory with the host's 7-Zip, its SHA-256 checked
+against the register, and submitted as a plain file, so A0 (no 7-Zip in the
+guest) and H3 get identical input.
 
 Run as root with the deployment venv, for example:
   sudo /opt/chimera/venv/bin/python scripts/chimera/bench/m5_eval.py plan \
@@ -26,6 +30,7 @@ Run as root with the deployment venv, for example:
 import argparse
 import csv
 import datetime
+import hashlib
 import json
 import math
 import pathlib
@@ -296,18 +301,46 @@ def switch_arm(arm):
     time.sleep(10)
 
 
+def read_sample(sample):
+    """The executable from the sample's password-protected ZIP, decrypted in
+    memory with the host's 7-Zip (MalwareBazaar ZIPs use AES, which neither
+    the stdlib nor PowerShell's Expand-Archive in the A0 guest can open)."""
+    password = ["-p" + sample["archive_password"]] if sample.get("archive_password") else ["-p"]
+    listing = sh("7z", "l", "-slt", *password, sample["path"])
+    entries = [
+        line.split(" = ", 1)[1]
+        for line in listing.splitlines()
+        if line.startswith("Path = ") and line.split(" = ", 1)[1] != sample["path"]
+    ]
+    entry = sample.get("entry") or (entries[0] if len(entries) == 1 else None)
+    if not entry:
+        raise RuntimeError(f"{sample['sha256']}: archive has {len(entries)} entries; set entry in the register")
+    data = subprocess.run(["7z", "x", "-so", *password, sample["path"], entry], capture_output=True, check=True).stdout
+    return sample_name(sample.get("file_name") or entry), data
+
+
+def sample_name(name):
+    """Guest file name: the submitted name, unless it is just a hash (itself a sandbox tell)."""
+    base = re.split(r"[\\/]", name)[-1]
+    stem = base.rsplit(".", 1)[0]
+    if re.fullmatch(r"[0-9a-fA-F]{32,64}", stem):
+        return "setup.exe"
+    return base if base.lower().endswith(".exe") else base + ".exe"
+
+
 def submit(api, sample, timeout, poll):
     import requests
 
-    data = {"timeout": str(timeout), "extract_archive": "true"}
-    if sample.get("archive_password"):
-        data["archive_password"] = sample["archive_password"]
-    if sample.get("entry"):
-        data["archive_entry_path"] = sample["entry"]
-    with open(sample["path"], "rb") as f:
-        resp = requests.post(
-            f"{api}/upload", files={"file": (pathlib.Path(sample["path"]).name, f)}, data=data, timeout=60
-        )
+    name, data = read_sample(sample)
+    digest = hashlib.sha256(data).hexdigest()
+    if digest != sample["sha256"]:
+        raise RuntimeError(f"archive content {digest} does not match register {sample['sha256']}")
+    resp = requests.post(
+        f"{api}/upload",
+        files={"file": (name, data)},
+        data={"timeout": str(timeout), "file_name": name},
+        timeout=60,
+    )
     resp.raise_for_status()
     task_uid = resp.json()["task_uid"]
     deadline = time.monotonic() + timeout + 1800
