@@ -186,9 +186,17 @@ Results (5 scans each, all complete and attached, 501–562 s; evidence `m4-h3-2
   In an idle modify session the same tasks ran within 5 minutes and stopped. H3b was committed after that, and
   the detection is gone. `wait-idle.ps1` now waits for 4 quiet 30 s windows. On H3b it reported idle within
   2 minutes.
-- **Guest clock (found here, not fixed):** inside every analysis the guest clock is the snapshot's (al-khaser's
-  guest log and PERDEDOR's report were 2 h 11 min behind the host on the H2c scans). drakrun does not set the
-  guest time after restoring, so the gap grows as the snapshot ages.
+- **Guest clock (fixed 20 Oct, `50dc244`):** inside every analysis the guest clock was the snapshot's (al-khaser's
+  guest log and PERDEDOR's report were 2 h 11 min behind the host on the H2c scans); drakrun did not set the guest
+  time after restoring, so the gap grew as the snapshot aged. drakrun documents a `Set-Date` step in
+  `vm-post-restore.ps1`, but the deployed override did not have it, and DRAKVUF itself has no clock sync. Both
+  analyzers now set the guest clock to host time over drakshell right after the post-restore script and record
+  `guest_clock` (`offset_before_s`, `offset_after_s`) in the metadata; a failure is recorded, not raised.
+  Five scans on H3 (`m4-clock-2026-10-20/`): all finished, PERDEDOR 100.0, guest time within 1 s of the host.
+  **Side effect, parked:** the jump forward makes Windows run its overdue scheduled tasks during the scan, so
+  al-khaser's `nt_yield_execution` is back (5/5, 21 detections instead of 20) and scans take about 2 min longer.
+  Correct time matters more than that one check; options (re-settle the snapshot with the clock jumped, or
+  disable the overdue tasks) are not decided yet.
 
 ## 8. Sources
 - Xen 4.19.2 `xl.cfg` manual on this host: `smbios`, `xen_platform_pci`, `viridian`, `cpuid`, `device_model_args_hvm`.
