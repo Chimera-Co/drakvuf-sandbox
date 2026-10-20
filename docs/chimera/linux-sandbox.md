@@ -46,7 +46,9 @@ flowchart LR
 |---|---|
 | Reliability: 30 runs of the benign probe (`bench/probe.c`), dynamic and static builds alternating | **30/30** pass all 16 checks (process tree, exit codes, file create/rename/chmod/symlink/delete, TCP and DNS attributed to the process, telemetry complete, launch gate). Run time 74.7–77.3 s for a 60 s analysis |
 | Containment from the Linux guest (`containment_test.py`, evidence in `/var/lib/chimera-evidence/linux-containment-2026-10-20/`) | **All pass.** C0 checker before and after. C1 DNS → 10.99.0.2. C2/C3 HTTP by name and by IP, UDP DNS to 8.8.8.8, all answered by INetSim. C4 LAN router → INetSim page. C5 dom0 :22/:5000/:6379 refused, CHIMERA_IN +20. C6 IPv6 dropped, CHIMERA6 +20. L1 host SSH on the LAN address refused. **0 guest packets on the uplink** |
-| Snapshot restore | 1.55 s (Windows: 3.4–3.5 s) |
+| Desktop image (4 vCPU, 4096 MB) | probe 16/16 checks through the console; screenshots show the XFCE desktop; containment test all pass again (`linux-containment-desktop-2026-10-20/`) |
+| Snapshot restore | 6.96 s for the 4 GB desktop (1.55 s for the 2 GB server image; Windows 3.4–3.5 s) |
+| Evasion scan (`chimera-vmcheck`, see `linux-evasion.md`) | Runs in 20 s. Score 70.44: 17 of 34 checks see the VM (Xen in CPUID, DMI, `/sys/hypervisor`, dmesg and clocksource, QEMU disk and PCI IDs, `chimera-agent`, 20 GB disk). Activity checks pass: uptime, 141 processes, logged-in desktop user, shell history, recent files |
 | Through the console | Upload with Linux selected → worker → report, process tree and classifier verdict in the portal |
 | Windows regression after the Linux changes | BGInfo: telemetry complete, no postprocess failures, clock set, full report |
 
@@ -71,8 +73,8 @@ real run:
 | Unix socket use | n/a | ◐ path from connect/bind; unixsocketmon logs nothing | syscalls (patched) |
 | VM-detection reads (`/sys/class/dmi`, `/proc/cpuinfo`) | ✓ apimon | ✓ open events | filetracer |
 | Memory dumps, capa, ATT&CK TTPs | ✓ | ✗ (procdump2 exists but is untested) | – |
-| Screenshots, user activity | ✓ | n/a (server guest) | – |
-| Anti-detection hardening | ✓ H1–H3 | ✗ guest still shows Xen in DMI and CPUID (out of scope for 31 Oct) | – |
+| Screenshots, live view, user activity | ✓ | ✓ XFCE desktop with an autologin user | screenshotter, noVNC |
+| Anti-detection hardening | ✓ H1–H3 | ✗ guest still shows Xen in DMI, CPUID and dmesg (evasion score 70.44) | – |
 
 ## Known gaps
 

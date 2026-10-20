@@ -80,6 +80,9 @@ Evidence paths under `/var/lib/chimera-evidence/` are on the CHIMERA host (root-
 | 11:40 | Extended probe (ptrace, eBPF, unix socket, memfd exec, cron/systemd persistence, VM-detection reads): ptracemon, memfd exec, persistence and reads are seen; ebpfmon and unixsocketmon are silent (syscalls covers both). Fileless execs are now named, unix socket paths are reported | `d2f41bb` |
 | 11:43–11:47 | First Linux analysis **through the console** (report, process tree, stub verdict). Windows regression after the change (BGInfo): complete, no postprocess failures | – |
 | 11:55 | Linux report gets HTTP requests from the pcap, attributed by connect(); verified on a console run | `linux-sandbox.md` |
+| 12:47 | Linux guest in the drakrun lifecycle: `install`, `postinstall`, `modify-vm0`, `make-profile` take `--guest-os linux`. Golden image is now an XFCE desktop (autologin user, Firefox, LibreOffice, lived-in home), 4 vCPU / 4096 MB, restore 6.96 s. Screenshots and live view work for Linux; probe 16/16 and containment all pass on the desktop | `68caace`, `linux-containment-desktop-2026-10-20/` |
+| 12:58 | Codex: parallel analyses (per-OS RQ queues, worker binding, Xen memory admission under a host lock, optional vCPU pinning) and the Linux evasion lane (`chimera-vmcheck`). Deployed; evasion worker enabled at boot. Sidebar: Verification Runs before Sandbox Evasion | `5a4574b`, `bbc77f8` |
+| 12:58–13:03 | Live checks after deploy: Linux evasion scan finished in 20 s, score 70.44 (17/34 checks see Xen/QEMU). Linux probe through the console 16/16 from `drakrun-analysis-linux`, then BGInfo from `drakrun-analysis` on the same worker, both complete with screenshots | `linux-sandbox.md` |
 
 ## Decisions
 - **Downloads and real malware stay operator-initiated** (VC++ redistributable, app installers for guest realism, malware samples).
