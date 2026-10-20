@@ -15,6 +15,9 @@ RestartSec=10
 User=root
 # Uploaded samples, memory dumps and dropped files stay root-only (threat model: accidental opening on the host)
 UMask=0077
+# DRAKVUF handles every trapped guest event: if its pages were swapped out the guest would stall.
+# Desktop applications on the host swap instead.
+MemorySwapMax=0
 
 [Install]
 WantedBy=multi-user.target

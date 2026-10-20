@@ -29,6 +29,8 @@ from rq.job import Job
 
 from drakrun.evasion.constants import (
     EVASION_QUEUE_NAME,
+    EVASION_QUEUE_NAMES,
+    LINUX_EVASION_QUEUE_NAME,
     LOG_FILENAME,
     METADATA_FILENAME,
     EvasionSubstatus,
@@ -39,6 +41,7 @@ from drakrun.evasion.sandbox_registry import SandboxDefinition, resolve_sandbox
 from drakrun.lib.config import DrakrunConfig, RedisConfigSection, load_config
 
 _WORKER_VM_ID: Optional[int] = None
+_WORKER_GUEST_OS: str = "any"
 
 
 def _admin_options_for_tool(tool_id: str, config: DrakrunConfig) -> dict:
@@ -83,23 +86,39 @@ def get_redis_connection(config: RedisConfigSection) -> Redis:
     )
 
 
-def evasion_worker_main(vm_id: int, burst: bool = False) -> None:
-    """Start an RQ worker listening on EVASION_QUEUE_NAME only.
+def evasion_queue_for_guest_os(guest_os: str) -> str:
+    if guest_os == "windows":
+        return EVASION_QUEUE_NAME
+    if guest_os == "linux":
+        return LINUX_EVASION_QUEUE_NAME
+    raise ValueError(f"Invalid evasion guest OS: {guest_os}")
 
-    Mirrors drakrun.analyzer.worker.worker_main exactly (same vm_id global
-    assignment, same config/connection loading, same Worker construction),
-    but against this module's own _WORKER_VM_ID and EVASION_QUEUE_NAME so it
-    never touches or competes with the analysis worker's queue. burst=True
-    processes whatever is already queued and returns instead of blocking
-    forever, for one-shot Phase-G smoke testing.
+
+def evasion_worker_main(vm_id: int, burst: bool = False, guest_os: Optional[str] = None) -> None:
+    """Start an RQ worker listening on the evasion queues only.
+
+    Mirrors drakrun.analyzer.worker.worker_main (same vm_id global
+    assignment, same config/connection loading, same guest OS binding), but
+    against this module's own globals and the evasion queues so it never
+    touches or competes with the analysis worker's queues. A worker bound to
+    one guest OS listens only to that OS's queue; "any" (the default) listens
+    to both, Windows first. burst=True processes whatever is already queued
+    and returns instead of blocking forever, for one-shot smoke testing.
     """
-    global _WORKER_VM_ID
+    global _WORKER_VM_ID, _WORKER_GUEST_OS
     _WORKER_VM_ID = vm_id
+    _WORKER_GUEST_OS = guest_os or "any"
+    if _WORKER_GUEST_OS not in ("windows", "linux", "any"):
+        raise ValueError(f"Invalid evasion worker guest OS: {_WORKER_GUEST_OS}")
     config = load_config()
     hostname = config.drakrun.worker_hostname or socket.gethostname()
 
     worker = Worker(
-        queues=[EVASION_QUEUE_NAME],
+        queues=(
+            list(EVASION_QUEUE_NAMES)
+            if _WORKER_GUEST_OS == "any"
+            else [evasion_queue_for_guest_os(_WORKER_GUEST_OS)]
+        ),
         name=f"drakrun-evasion-worker@{hostname}:vm-{vm_id}",
         connection=get_redis_connection(config.redis),
     )
@@ -157,6 +176,11 @@ def worker_verify(options: EvasionScanOptions) -> None:
     # Old RQ jobs may hold a pickled pre-guest_os options instance. Rebuild
     # from its stored fields so newly added defaults also apply to those jobs.
     options = EvasionScanOptions.model_validate(options.to_dict())
+    if _WORKER_GUEST_OS != "any" and options.guest_os != _WORKER_GUEST_OS:
+        raise RuntimeError(
+            f"Evasion worker vm-{vm_id} is bound to {_WORKER_GUEST_OS}; "
+            f"refusing {options.guest_os} scan"
+        )
     job = get_current_job()
     config = load_config()
 
@@ -521,7 +545,7 @@ def enqueue_verification(
     result_ttl: int,
     job_timeout: int,
 ) -> Job:
-    queue = Queue(name=EVASION_QUEUE_NAME, connection=connection)
+    queue = Queue(name=evasion_queue_for_guest_os(sandbox.platform), connection=connection)
     return queue.enqueue(
         worker_verify,
         options,
@@ -536,21 +560,23 @@ def enqueue_verification(
 
 
 def get_scans_list(connection: Redis) -> List[Job]:
-    queue = Queue(name=EVASION_QUEUE_NAME, connection=connection)
-    jobs = list(queue.get_jobs())
-    for job_registry in [
-        queue.started_job_registry,
-        queue.finished_job_registry,
-        queue.failed_job_registry,
-    ]:
-        job_ids = job_registry.get_job_ids()
-        jobs.extend(
-            [
-                job
-                for job in Job.fetch_many(job_ids, connection=connection)
-                if job is not None
-            ]
-        )
+    jobs = []
+    for name in EVASION_QUEUE_NAMES:
+        queue = Queue(name=name, connection=connection)
+        jobs.extend(queue.get_jobs())
+        for job_registry in [
+            queue.started_job_registry,
+            queue.finished_job_registry,
+            queue.failed_job_registry,
+        ]:
+            job_ids = job_registry.get_job_ids()
+            jobs.extend(
+                [
+                    job
+                    for job in Job.fetch_many(job_ids, connection=connection)
+                    if job is not None
+                ]
+            )
     return sorted(jobs, key=lambda job: job.enqueued_at, reverse=True)
 
 

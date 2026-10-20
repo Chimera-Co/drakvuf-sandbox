@@ -64,13 +64,46 @@ def worker_module(monkeypatch):
     return worker
 
 
-def test_evasion_worker_main_listens_on_evasion_queue_only(worker_module):
+def test_evasion_worker_main_listens_on_evasion_queues_only(worker_module):
     worker_module.evasion_worker_main(vm_id=2, burst=True)
 
     assert len(FakeWorker.instances) == 1
     fake_worker = FakeWorker.instances[0]
-    assert fake_worker.queues == [worker_module.EVASION_QUEUE_NAME]
-    assert worker_module.EVASION_QUEUE_NAME != "drakrun-analysis"
+    assert fake_worker.queues == ["drakrun-evasion", "drakrun-evasion-linux"]
+    assert not {"drakrun-analysis", "drakrun-analysis-linux"} & set(fake_worker.queues)
+
+
+@pytest.mark.parametrize(
+    "guest_os,queue", [("windows", "drakrun-evasion"), ("linux", "drakrun-evasion-linux")]
+)
+def test_bound_evasion_worker_listens_to_its_os_queue(worker_module, guest_os, queue):
+    # Two bound workers on two VM slots run a Windows and a Linux scan at the same time
+    worker_module.evasion_worker_main(vm_id=2, burst=True, guest_os=guest_os)
+    assert FakeWorker.instances[0].queues == [queue]
+    assert worker_module._WORKER_GUEST_OS == guest_os
+
+
+def test_evasion_worker_rejects_unknown_guest_os(worker_module):
+    with pytest.raises(ValueError):
+        worker_module.evasion_worker_main(vm_id=1, burst=True, guest_os="macos")
+
+
+def test_scans_are_queued_by_sandbox_platform(worker_module, monkeypatch):
+    queued = []
+
+    class FakeQueue:
+        def __init__(self, name, connection):
+            self.name = name
+
+        def enqueue(self, *args, **kwargs):
+            queued.append(self.name)
+
+    monkeypatch.setattr(worker_module, "Queue", FakeQueue)
+    for platform in ("windows", "linux"):
+        sandbox = types.SimpleNamespace(platform=platform, to_dict=lambda: {})
+        options = types.SimpleNamespace(to_dict=lambda exclude_none=False: {})
+        worker_module.enqueue_verification("id", sandbox, options, None, 60, 60)
+    assert queued == ["drakrun-evasion", "drakrun-evasion-linux"]
 
 
 def test_evasion_worker_main_forwards_burst_flag(worker_module):
@@ -115,6 +148,7 @@ def test_cli_evasion_worker_help(monkeypatch):
     assert result.exit_code == 0
     assert "--vm-id" in result.output
     assert "--burst" in result.output
+    assert "--guest-os" in result.output
 
 
 def test_cli_main_registers_evasion_worker():

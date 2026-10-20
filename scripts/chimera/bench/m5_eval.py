@@ -44,9 +44,9 @@ ANALYSES_DIR = pathlib.Path("/var/lib/drakrun/analyses")
 ARMS_DIR = pathlib.Path("/var/lib/chimera-arms")
 CHIMERA_ARM = pathlib.Path(__file__).resolve().parents[1] / "arms/chimera-arm"
 ANALYSIS_WORKER = "drakrun-worker@1"
-# Evasion scans restore the same Windows snapshot; one starting mid-batch would
-# run on whichever arm is current and block arm switches, so it pauses for the batch.
-EVASION_WORKER = "drakrun-evasion-worker@1"
+# Evasion scans restore the same snapshots; one starting mid-batch would run on
+# whichever arm is current and block arm switches, so they pause for the batch.
+EVASION_WORKERS = ["drakrun-evasion-worker@1", "drakrun-evasion-worker@2"]
 TERMINAL = {"finished", "failed"}
 EARLY_EXIT_S = 10
 DROP_EXTENSIONS = {
@@ -406,9 +406,9 @@ def cmd_run(args):
     if results_path.exists():
         done = {json.loads(line)["key"] for line in results_path.read_text().splitlines() if line}
     original_arm = current_arm()
-    evasion_was_active = sh("systemctl", "is-active", EVASION_WORKER, check=False).strip() == "active"
-    if evasion_was_active:
-        sh("systemctl", "stop", EVASION_WORKER)
+    evasion_active = [w for w in EVASION_WORKERS if sh("systemctl", "is-active", w, check=False).strip() == "active"]
+    for worker in evasion_active:
+        sh("systemctl", "stop", worker)
     try:
         for item in plan["schedule"]:
             if item["key"] in done:
@@ -433,8 +433,8 @@ def cmd_run(args):
                 raise SystemExit(f"CHIMERA-EGRESS-DROP during {task_uid}; batch stopped")
     finally:
         switch_arm(original_arm)
-        if evasion_was_active:
-            sh("systemctl", "start", EVASION_WORKER)
+        for worker in evasion_active:
+            sh("systemctl", "start", worker)
 
 
 def cmd_label(args):

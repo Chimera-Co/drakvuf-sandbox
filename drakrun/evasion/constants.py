@@ -9,6 +9,10 @@ needs ``EVASION_QUEUE_NAME`` to register the second queue, while
 import enum
 
 EVASION_QUEUE_NAME = "drakrun-evasion"
+# Linux scans have their own queue so a Linux-bound worker on its own VM slot can run
+# them while a Windows scan runs on another slot (see docs/chimera/parallel-analyses.md).
+LINUX_EVASION_QUEUE_NAME = "drakrun-evasion-linux"
+EVASION_QUEUE_NAMES = (EVASION_QUEUE_NAME, LINUX_EVASION_QUEUE_NAME)
 
 # Directory layout inside a scan directory. Raw tool output is preserved
 # verbatim under RAW_SUBDIR even when parsing fails, because independently

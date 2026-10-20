@@ -29,9 +29,27 @@ the Windows queue.
 
 | Instance | VM slot | Queue | Guest image | vCPUs | pCPUs |
 | --- | --- | --- | --- | ---: | --- |
-| drakrun-worker@1 | vm-1 | drakrun-analysis | Windows | 4 | 8-11 |
-| drakrun-worker@2 | vm-2 | drakrun-analysis-linux | Linux | 4 | 12-15 |
-| dom0 | Domain-0 | — | Host services | 8 | 0-7 |
+| drakrun-worker@1 | vm-1 | drakrun-analysis | Windows | 4 | 16-19 |
+| drakrun-worker@2 | vm-2 | drakrun-analysis-linux | Linux | 4 | 20-23 |
+| drakrun-evasion-worker@1 | vm-1 | drakrun-evasion | Windows | 4 | 16-19 |
+| drakrun-evasion-worker@2 | vm-2 | drakrun-evasion-linux | Linux | 4 | 20-23 |
+| dom0 | Domain-0 | — | Host services | 8 | 0,2,4,…,14 |
+
+The pCPU numbers are those of this host (Xen booted with `smt=0`): the eight
+P-cores are the even pCPUs 0-14 (the odd ones are their parked hyperthreads)
+and the eight E-cores are 16-23. dom0 is pinned to the P-cores with
+`dom0_max_vcpus=8 dom0_vcpus_pin=1`; each guest gets four E-cores.
+
+Verification scans are split the same way: Windows scans go to the
+`drakrun-evasion` queue and Linux scans to `drakrun-evasion-linux`, chosen by
+the sandbox's platform. `drakrun evasion-worker --guest-os windows|linux|any`
+binds a worker to one queue (`any`, the default, listens to both, Windows
+first). Without the binding a single evasion worker runs the two kinds one
+after the other. The drop-ins in `scripts/chimera/systemd/parallel/` bind
+evasion worker 1 to Windows on vm-1 and 2 to Linux on vm-2. An analysis
+worker and an evasion worker on the same slot still take turns (per-VM lock).
+Scans queued before this change sit on `drakrun-evasion`; a Windows-bound
+worker refuses a Linux one, so resubmit it.
 
 The equivalent config is `vm_guest_os = {1 = "windows", 2 = "linux"}`.
 The example instance drop-ins in `scripts/chimera/systemd/parallel/` set these
@@ -51,27 +69,34 @@ use vm-1 for Windows evasion verification in this layout.
 
 | Allocation | GiB | MiB |
 | --- | ---: | ---: |
-| dom0 target | 7 | 7168 |
-| Windows guest | 5 | 5120 |
-| Linux guest | 5 | 5120 |
-| Nominal total | **17** | **17408** |
+| dom0 | 6 | 6144 |
+| Windows guest (H1-H3 arms; A0 is 4096) | 5 | 5120 |
+| Linux guest | 4 | 4096 |
+| Nominal total | **15** | **15360** |
 
-This is more than a nominal 16 GiB host **before Xen overhead**, so with a 7 GiB
-dom0 both guests cannot run together. The Linux guest has 5 GB because evasion
-checks flag 4 GiB or less; at 4096 MB the total would be exactly 16 GiB, still
-without headroom. Admission requires guest memory plus 192 MB
-(64 MB shadow memory + 128 MB margin): Windows needs 5312 MB free and Linux
-5312 MB free immediately before restore. Xen, device models, host services and
-other domains need additional headroom. The current 10 GiB dom0 allocation
-cannot support both guests together. The owner must choose a smaller dom0
-allocation (for example, 6–6.5 GiB, after checking host service usage), reduce
-guest RAM with compatible snapshots, or accept serialized admission. Check
-actual `xl info` and concurrent restore behavior instead of relying on the sum.
+Xen reports 16103 MiB of total memory on this 16 GiB host; Xen itself and the
+two guests' shadow pools (128 MiB each) take the rest. With both guests
+running, `xl info` showed about 315 MiB free. Admission requires guest memory
+plus 192 MB, so the second guest may wait a few seconds for the first restore's
+temporary memory to be released.
 
-`dom0_mem` is a Xen **boot parameter** changed by the owner through the host's
-bootloader configuration, followed by its normal regeneration/reboot procedure.
-This code does not change it. Keep `dom0_max_vcpus=8 dom0_vcpus_pin` for the
-0-7 dom0 CPU plan; verify the actual affinity with `xl vcpu-list Domain-0`.
+The Linux guest has 4096 MB. Its kernel reserves about 212 MiB, so the guest
+sees about 3880 MiB, which PERDEDOR's `linux.env.low_ram` check (4 GiB or
+less) reports as detected. This was accepted to fit both guests; at 5120 MB
+the check passes but both guests no longer fit next to a 6 GiB dom0.
+
+`dom0_mem=6144M,max:6144M` is set in `GRUB_CMDLINE_XEN_DEFAULT` and applies at
+the next boot. It was also applied live by ballooning dom0
+(`xl mem-set 0 6144m`); if that fails with "memory_dynamic_max must be less
+than or equal to memory_static_max", xenstore's
+`/local/domain/0/memory/static-max` was 0 and must first be set (in KiB) to
+the current dom0 size or more. Verify the CPU pinning with
+`xl vcpu-list Domain-0`.
+
+Swap: the guests have none (Xen paging conflicts with altp2m, and an in-guest
+pagefile would change the snapshots). The host may swap desktop programs, but
+the worker units set `MemorySwapMax=0`: DRAKVUF handles every trapped guest
+event, and a swapped-out DRAKVUF page would stall the guest.
 
 `run_vm` uses `/var/run/drakrun/admission.lock` for both analysis and evasion
 workers. Under that lock it reads `xl info`'s `free_memory` in MB, checks the
@@ -101,18 +126,19 @@ lock and can still consume memory concurrently.
 Set an optional `cpus` string in the image's install JSON:
 
 ```json
-"cpus": "8-11"
+"cpus": "16-19"
 ```
 
-Use `"12-15"` in `/var/lib/drakrun/linux/golden/install.json`. The Windows
-image uses `/etc/drakrun/install.json`. These settings apply to every slot
+Use `"20-23"` in `/var/lib/drakrun/linux/golden/install.json`. The Windows
+image uses `/etc/drakrun/install.json`, a symlink into the current arm, so set
+it in every arm's `install.json` under `/var/lib/chimera-arms/`. These settings apply to every slot
 restored from that install file, including vm-0 operations. Omit `cpus` or
 use JSON `null` to keep the previous affinity behavior. CPU lists accept ranges
 and commas, e.g. `"8,10-11"`.
 
 The renderer replaces `{{ CPUS }}` in a template line such as
 `cpus = "{{ CPUS }}"`. When the placeholder is absent it appends
-`cpus = "8-11"`, so existing templates need no changes. When affinity is unset,
+`cpus = "16-19"`, so existing templates need no changes. When affinity is unset,
 the placeholder line is omitted. Existing templates without that placeholder
 render byte-for-byte as before when affinity is unset.
 
@@ -144,8 +170,8 @@ slot are ready. Set the affinity values, preserving all other install fields:
 import json
 from pathlib import Path
 for filename, cpus in [
-    ("/etc/drakrun/install.json", "8-11"),
-    ("/var/lib/drakrun/linux/golden/install.json", "12-15"),
+    *((str(p), "16-19") for p in Path("/var/lib/chimera-arms").glob("*/install.json")),
+    ("/var/lib/drakrun/linux/golden/install.json", "20-23"),
 ]:
     path = Path(filename)
     data = json.loads(path.read_text())
@@ -157,9 +183,14 @@ install -d /etc/systemd/system/drakrun-worker@1.service.d
 install -d /etc/systemd/system/drakrun-worker@2.service.d
 install -m 0644 scripts/chimera/systemd/parallel/drakrun-worker@1.service.d/guest-os.conf /etc/systemd/system/drakrun-worker@1.service.d/guest-os.conf
 install -m 0644 scripts/chimera/systemd/parallel/drakrun-worker@2.service.d/guest-os.conf /etc/systemd/system/drakrun-worker@2.service.d/guest-os.conf
+for n in 1 2; do
+    install -d /etc/systemd/system/drakrun-evasion-worker@$n.service.d
+    install -m 0644 scripts/chimera/systemd/parallel/drakrun-evasion-worker@$n.service.d/guest-os.conf /etc/systemd/system/drakrun-evasion-worker@$n.service.d/guest-os.conf
+done
 systemctl daemon-reload
 systemctl restart drakrun-web.service
 systemctl enable --now drakrun-worker@1.service drakrun-worker@2.service
+systemctl enable --now drakrun-evasion-worker@1.service drakrun-evasion-worker@2.service
 systemctl status drakrun-worker@1.service drakrun-worker@2.service --no-pager
 xl info
 ```
@@ -182,7 +213,7 @@ journalctl -u drakrun-worker@1.service -u drakrun-worker@2.service -n 100 --no-p
 ```
 
 If admission times out, inspect Xen free memory and the dom0 budget. The gate
-does not promise that a nominal 7 + 5 + 4 GiB allocation can run concurrently.
+does not promise that a nominal 6 + 5 + 4 GiB allocation can run concurrently.
 Restart the Windows evasion service on vm-1 when needed; it shares that slot's
 exclusive lock with analyses.
 
