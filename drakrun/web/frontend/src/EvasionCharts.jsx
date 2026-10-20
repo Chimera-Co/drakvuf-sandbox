@@ -13,6 +13,7 @@ import {
     YAxis,
     CartesianGrid,
     Tooltip,
+    Legend,
 } from "recharts";
 import { formatDate } from "./formatUtils.js";
 
@@ -121,39 +122,82 @@ export function CategoryRadar({ perCategory }) {
     );
 }
 
+// One line per sandbox: Windows blue, Linux orange, others from the palette
+const PLATFORM_COLORS = { windows: "#1e6fa8", linux: "#e07b1a" };
+const EXTRA_COLORS = ["#2a9d5c", "#8e44ad", "#c0392b", "#7f8c8d"];
+
+function sandboxSeries(runs) {
+    const series = new Map();
+    for (const r of runs) {
+        const sandbox = r.sandbox || {};
+        const key = sandbox.id || sandbox.platform || "unknown";
+        if (!series.has(key)) {
+            const name = sandbox.display_name || sandbox.id || "Unknown sandbox";
+            series.set(key, {
+                key,
+                name: sandbox.platform ? `${name} (${sandbox.platform})` : name,
+                platform: sandbox.platform,
+            });
+        }
+    }
+    const used = new Set();
+    let extra = 0;
+    for (const s of series.values()) {
+        const preferred = PLATFORM_COLORS[s.platform];
+        if (preferred && !used.has(preferred)) {
+            s.color = preferred;
+        } else {
+            s.color = EXTRA_COLORS[extra++ % EXTRA_COLORS.length];
+        }
+        used.add(s.color);
+    }
+    return [...series.values()];
+}
+
 export function ScoreTrend({ runs }) {
-    const data = (runs || [])
+    const scored = (runs || [])
         .filter((r) => typeof r.score?.chimera_score === "number")
         .slice()
-        .sort((a, b) => new Date(a.time_started) - new Date(b.time_started))
-        .map((r) => ({
-            time: r.time_started,
-            score: r.score.chimera_score,
-        }));
-    if (data.length === 0) {
+        .sort((a, b) => new Date(a.time_started) - new Date(b.time_started));
+    if (scored.length === 0) {
         return (
             <div className="text-muted small">
                 No completed runs with a CHIMERA score yet.
             </div>
         );
     }
+    const series = sandboxSeries(scored);
+    const keyOf = (r) => r.sandbox?.id || r.sandbox?.platform || "unknown";
+    const data = scored.map((r) => ({
+        time: new Date(r.time_started).getTime(),
+        [keyOf(r)]: r.score.chimera_score,
+    }));
     return (
-        <ResponsiveContainer width="100%" height={220}>
+        <ResponsiveContainer width="100%" height={240}>
             <LineChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                     dataKey="time"
-                    tickFormatter={(t) => formatDate(t).slice(0, 10)}
+                    type="number"
+                    scale="time"
+                    domain={["dataMin", "dataMax"]}
+                    tickFormatter={(t) => formatDate(new Date(t)).slice(0, 10)}
                 />
                 <YAxis domain={[0, 100]} />
-                <Tooltip labelFormatter={(t) => formatDate(t)} />
-                <Line
-                    type="monotone"
-                    dataKey="score"
-                    stroke="#1e6fa8"
-                    dot
-                    connectNulls
-                />
+                <Tooltip labelFormatter={(t) => formatDate(new Date(t))} />
+                <Legend />
+                {series.map((s) => (
+                    <Line
+                        key={s.key}
+                        type="monotone"
+                        dataKey={s.key}
+                        name={s.name}
+                        stroke={s.color}
+                        strokeWidth={2}
+                        dot={{ r: 3, fill: s.color }}
+                        connectNulls
+                    />
+                ))}
             </LineChart>
         </ResponsiveContainer>
     );
