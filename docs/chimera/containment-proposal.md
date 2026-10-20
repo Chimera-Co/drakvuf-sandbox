@@ -10,7 +10,7 @@ A guest must be able to "see an Internet" (DNS, HTTP/S, SMTP, …) but every pac
 
 ## 2. Design
 
-The deployed topology diagram (Mermaid) is in `containment-results-2026-10-19.md`. In summary: guest packets on `drakN` pass `raw` anti-spoofing (rpfilter), then `nat` DNAT of all TCP/UDP/ICMP to INetSim at 10.99.0.2, then the `CHIMERA_GUARD` FORWARD chain (default DROP; only drakN → inetsim0 → 10.99.0.2 accepted). `CHIMERA_IN` allows guests only DHCP to dom0; `CHIMERA6` drops all IPv6; INetSim runs in netns `chimera-inet` with no default route.
+The deployed topology diagram (Mermaid) is in `containment-results-2026-10-19.md`. In summary: guest packets on `drakN` pass `raw` anti-spoofing (rpfilter) and a link-local drop (169.254.0.0/16, added 20 Oct: a real LAN never answers the cloud metadata address, INetSim did), then `nat` DNAT of all TCP/UDP/ICMP to INetSim at 10.99.0.2, then the `CHIMERA_GUARD` FORWARD chain (default DROP; only drakN → inetsim0 → 10.99.0.2 accepted). `CHIMERA_IN` allows guests only DHCP to dom0; `CHIMERA6` drops all IPv6; INetSim runs in netns `chimera-inet` with no default route.
 
 The transit subnet moved from 10.13.255.0/30 (v1) to **10.99.0.0/30** because drakrun allows VM id 255, whose bridge network 10.13.255.0/24 would collide.
 
@@ -56,6 +56,7 @@ iptables-restore --noflush <<EOF
 :CHIMERA_RAW - [0:0]
 -F CHIMERA_RAW
 -A CHIMERA_RAW -i drak+ -s 0.0.0.0/32 -p udp --sport 68 --dport 67 -j RETURN
+-A CHIMERA_RAW -i drak+ -d 169.254.0.0/16 -j DROP
 -A CHIMERA_RAW -i drak+ -m rpfilter --invert -j DROP
 -A CHIMERA_RAW -i $H ! -s $NIP/32 -j DROP
 $(jump raw PREROUTING CHIMERA_RAW)

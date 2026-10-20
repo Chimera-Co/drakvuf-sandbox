@@ -53,13 +53,15 @@ use vm-1 for Windows evasion verification in this layout.
 | --- | ---: | ---: |
 | dom0 target | 7 | 7168 |
 | Windows guest | 5 | 5120 |
-| Linux guest | 4 | 4096 |
-| Nominal total | **16** | **16384** |
+| Linux guest | 5 | 5120 |
+| Nominal total | **17** | **17408** |
 
-This fills a nominal 16 GiB host **before Xen overhead**. It is not enough
-headroom for reliable concurrency. Admission requires guest memory plus 192 MB
+This is more than a nominal 16 GiB host **before Xen overhead**, so with a 7 GiB
+dom0 both guests cannot run together. The Linux guest has 5 GB because evasion
+checks flag 4 GiB or less; at 4096 MB the total would be exactly 16 GiB, still
+without headroom. Admission requires guest memory plus 192 MB
 (64 MB shadow memory + 128 MB margin): Windows needs 5312 MB free and Linux
-4288 MB free immediately before restore. Xen, device models, host services and
+5312 MB free immediately before restore. Xen, device models, host services and
 other domains need additional headroom. The current 10 GiB dom0 allocation
 cannot support both guests together. The owner must choose a smaller dom0
 allocation (for example, 6–6.5 GiB, after checking host service usage), reduce

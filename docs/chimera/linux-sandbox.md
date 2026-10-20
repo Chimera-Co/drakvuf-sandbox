@@ -30,7 +30,7 @@ flowchart LR
 | Guest image | Official Debian 12 nocloud qcow2, grown to 128 GB, turned into a **desktop PC**: XFCE on LightDM with autologin to an ordinary user (`arjun`, in the sudo group), Firefox ESR, LibreOffice, India locale and time zone, a home directory with dated documents, shell history and recent files, no screen lock or blanking. Also everyday server tools, regenerated SSH host keys, and the noisy timers masked (apt, man-db, fstrim, timesyncd). `PROFILE=server` builds the plain server image | `drakrun/data/linux/build-image.sh`, `desktop.sh` |
 | Kernel profile | Debian `linux-image-6.1.0-54-amd64-dbg` → `dwarf2json` → ISF JSON, passed with `-r`. The guest kernel is the same build as dom0 | DRAKVUF's documented method |
 | Profile tweak | The 12 anonymous-union members of `iov_iter` are flattened so DRAKVUF resolves them. Flattening the whole profile broke procmon, so it is limited to this struct | *ours*: `drakrun/lib/linux_profile.py` |
-| VM | HVM, `altp2m=2`, 4 vCPU, 4096 MB, Cirrus VGA, e1000 NIC, Acer firmware and WDC disk identity (see *Hiding the hypervisor*), serial on a unix socket, VNC on localhost. Reuses drakrun's `VirtualMachine`, storage backend (qcow2 `vm-0.img` + overlays), snapshot restore and per-VM lock | `drakrun/data/linux/cfg-linux.template`, `drakrun/lib/linux_install.py` |
+| VM | HVM, `altp2m=2`, 4 vCPU, 5120 MB, Cirrus VGA, e1000 NIC, Acer firmware and WDC disk identity (see *Hiding the hypervisor*), serial on a unix socket, VNC on localhost. Reuses drakrun's `VirtualMachine`, storage backend (qcow2 `vm-0.img` + overlays), snapshot restore and per-VM lock | `drakrun/data/linux/cfg-linux.template`, `drakrun/lib/linux_install.py` |
 | Guest control | The agent (`chimera-agent.py`, installed as `/usr/local/sbin/console-helper`): a small Python service on ttyS0 that answers ping, clock, net, prepare, stat, chmod, exec and sh. drakshell is Windows-only | *ours*: `drakrun/data/linux/chimera-agent.py`, `drakrun/lib/linux_agent.py` |
 | Sample upload | `injector -m writefile` in the agent process; sha256 checked in the guest | upstream injector |
 | Launch gate | DRAKVUF starts first. The agent runs `/bin/true chimera-ready-<random>`, and the sample starts only after procmon logs that marker, so its first events are not lost | *ours*: `linux_analyzer.py` |
@@ -47,9 +47,11 @@ flowchart LR
 | Reliability: 30 runs of the benign probe (`bench/probe.c`), dynamic and static builds alternating | **30/30** pass all 16 checks (process tree, exit codes, file create/rename/chmod/symlink/delete, TCP and DNS attributed to the process, telemetry complete, launch gate). Run time 74.7–77.3 s for a 60 s analysis |
 | Containment from the Linux guest (`containment_test.py`, evidence in `/var/lib/chimera-evidence/linux-containment-2026-10-20/`) | **All pass.** C0 checker before and after. C1 DNS → 10.99.0.2. C2/C3 HTTP by name and by IP, UDP DNS to 8.8.8.8, all answered by INetSim. C4 LAN router → INetSim page. C5 dom0 :22/:5000/:6379 refused, CHIMERA_IN +20. C6 IPv6 dropped, CHIMERA6 +20. L1 host SSH on the LAN address refused. **0 guest packets on the uplink** |
 | Desktop image (4 vCPU, 4096 MB) | probe 16/16 checks through the console; screenshots show the XFCE desktop; containment test all pass again (`linux-containment-desktop-2026-10-20/`) |
-| Snapshot restore | 6.96 s for the 4 GB desktop (1.55 s for the 2 GB server image; Windows 3.4–3.5 s) |
+| Snapshot restore | 4.5 s for the 5 GB desktop (6.96 s earlier for the 4 GB one; 1.55 s for the 2 GB server image; Windows 3.4–3.5 s) |
 | Evasion scan (`chimera-vmcheck`, see `linux-evasion.md`) | Runs in 20 s. Score 70.44: 17 of 34 checks see the VM (Xen in CPUID, DMI, `/sys/hypervisor`, dmesg and clocksource, QEMU disk and PCI IDs, `chimera-agent`, 20 GB disk). Activity checks pass: uptime, 141 processes, logged-in desktop user, shell history, recent files |
 | Evasion scan after hiding (PERDEDOR + `chimera-vmcheck`) | Score 97.42 (was 70.44). PERDEDOR: 4 of 37 checks detected; vmcheck: none. No hypervisor, firmware, disk, PCI, uptime or name check fires. Left: 4 GB RAM, the cloud metadata address answers (INetSim answers everything), and root (the checks' user) has no shell history and few old files. Containment C0-C6, L1 and the uplink check all pass |
+| Evasion scan after the activity and network fixes (scan `71941dda`) | **Score 100.0, 0 of 31 applicable PERDEDOR checks detected** (6 skipped, as before); vmcheck 35/35 clean. Fixed: the guest gets no answer from 169.254.0.0/16 (dropped on the host, see below); the checks and samples run as the desktop user `arjun` (47 history lines, older files in `~/Documents`); 5120 MB RAM (the guest reports 4908 MiB, over the 4 GiB threshold) |
+| Containment after the link-local drop (`linux-containment-linklocal-2026-10-20/`, `windows-containment-linklocal-2026-10-20/`) | **All pass on both guests**, including the new L2: the metadata URL `http://169.254.169.254/` times out and TCP to 169.254.1.1:443 does not connect. The Linux guest routes 169.254/16 via the gateway and the raw-table drop counter rises; Windows treats 169.254/16 as on-link and ARPs for it, the ARP is never answered (proxy ARP is off), and both neighbour entries end `Unreachable`. 0 guest packets on the uplink |
 | Probe after hiding | 16/16 checks; network renewed to the vm-1 subnet after restore. Memory dumps: `dumps.zip` with 4-5 ELF cores per analysis. TLS: decrypted POST (URL, headers, user agent) and a rejected-certificate handshake with SNI and JA3 |
 | Through the console | Upload with Linux selected → worker → report, process tree and classifier verdict in the portal |
 | Windows regression after the Linux changes | BGInfo: telemetry complete, no postprocess failures, clock set, full report |
@@ -76,7 +78,7 @@ real run:
 | VM-detection reads (`/sys/class/dmi`, `/proc/cpuinfo`) | ✓ apimon | ✓ open events | filetracer |
 | Memory dumps, capa, ATT&CK TTPs | ✓ | ◐ ELF cores packaged; live test pending; no capa on cores | procdump2 |
 | Screenshots, live view, user activity | ✓ | ✓ XFCE desktop with an autologin user | screenshotter, noVNC |
-| Anti-detection hardening | ✓ H1–H3 | ✗ guest still shows Xen in DMI, CPUID and dmesg (evasion score 70.44) | – |
+| Anti-detection hardening | ✓ H1–H3 | ✓ CPUID, firmware, disk and VGA hidden; activity as the desktop user (evasion score 100.0) | – |
 
 ## Hiding the hypervisor
 
@@ -108,7 +110,17 @@ The xl template (`drakrun/data/linux/cfg-linux.template`) also hides the emulate
 | Small disk | 128 GB sparse disk |
 | Names | the agent is `console-helper`, its files are in `/var/lib/console-helper` (mode 0700), samples run from `~/Downloads`; tcpdump is removed |
 
-Left: the BIOS date is the hvmloader build date, and samples run as root.
+Samples and the evasion checks run as the desktop user `arjun` (uid 1000, `HOME=/home/arjun`): the agent drops
+privileges per command (`user` in the `exec` request). Its home has shell history and files months old, which is
+what activity checks look at; root's home is left empty, as on a real desktop. `chimera-vmcheck` and the agent itself
+still run as root.
+
+Memory is 5120 MB because Linux evasion checks flag 4 GiB or less. Xen admission needs the guest's memory plus
+192 MB free, so 5120 MB needs 5312 MB of the 5693 MB free with dom0 at 10 GiB. 8 GB (8384 MB needed) would never
+be admitted. The cost: with dom0 cut to 6 GiB later to run Windows and Linux together, Windows (5312) plus Linux
+needs about 10.6 GB at 5120 MB against 9.6 GB at 4096 MB.
+
+Left: the BIOS date is the hvmloader build date.
 
 ## Memory dumps
 
@@ -222,6 +234,8 @@ kernel, and `postinstall` checks `uname -r` before saving. The previous `vm-0.im
 sudo /opt/chimera/venv/bin/python scripts/chimera/linux/bench/run_linux.py SAMPLE --out-root DIR
 sudo /opt/chimera/venv/bin/python scripts/chimera/linux/bench/check_probe.py DIR/<id>
 sudo /opt/chimera/venv/bin/python scripts/chimera/linux/containment_test.py EVIDENCE_DIR
+sudo /opt/chimera/venv/bin/python scripts/chimera/containment/windows_containment_test.py EVIDENCE_DIR
 ```
 
-These need the VM slot free, so stop `drakrun-worker@1` first.
+These need the VM slot free, so stop `drakrun-worker@1` and `drakrun-evasion-worker@1` first. The Windows test runs
+the same C0-C6, L1 and L2 probes from the Windows golden snapshot through drakshell.
