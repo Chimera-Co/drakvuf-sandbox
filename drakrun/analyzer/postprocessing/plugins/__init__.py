@@ -6,6 +6,7 @@ from .classify_sample import classify_sample
 from .compress_ipt import compress_ipt
 from .generate_html_report import generate_html_report
 from .generate_report import generate_report
+from .get_linux_behaviour_info import get_linux_behaviour_info
 from .generate_wireshark_key_file import generate_wireshark_key_file
 from .get_http_info import get_http_info
 from .get_modified_files_info import get_modified_files_info
@@ -75,6 +76,11 @@ POSTPROCESS_PLUGINS = [
     PostprocessPlugin(
         function=get_ttps_info,
         requires=["process_tree.json", "ttps.json"],
+        generates=[],
+    ),
+    PostprocessPlugin(
+        function=get_linux_behaviour_info,
+        requires=["process_tree.json"],
         generates=[],
     ),
     PostprocessPlugin(

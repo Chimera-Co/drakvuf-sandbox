@@ -1,0 +1,29 @@
+# CHIMERA Linux guest (Debian 12, kernel 6.1.0-54-amd64): DomU config, rendered like
+# /etc/drakrun/cfg.template. The guest is contained by the same drak* bridge rules as Windows.
+arch = 'x86_64'
+name = "{{ VM_NAME }}"
+maxmem = {{ MEMORY }}
+memory = {{ MEMORY }}
+vcpus = {{ VCPUS }}
+maxvcpus = {{ VCPUS }}
+type = "hvm"
+boot = "c"
+hap = 1
+acpi = 1
+on_poweroff = "destroy"
+on_reboot = "{{ ON_REBOOT }}"
+on_crash = "destroy"
+vnc = 1
+vnclisten = "127.0.0.1:{{ VM_ID }},websocket=127.0.0.1:{{ VNC_PORT }}"
+vncpasswd = "{{ VNC_PASS }}"
+altp2m = 2
+shadow_memory = 64
+cpuid = "host,htt=0"
+# Emulated IDE disk and e1000 NIC: no Xen PV drivers in the guest
+xen_platform_pci = 0
+viridian = 0
+vga = "stdvga"
+vif = [ 'type=ioemu,model=e1000,mac=00:1b:21:3a:5c:0{{ VM_ID }},bridge={{ BRIDGE_NAME }}' ]
+disk = [ {{ DISKS }} ]
+# ttyS0 carries the chimera-agent control channel
+serial = [ "unix:/var/run/drakrun/{{ VM_NAME }}.sock,server,nowait" ]

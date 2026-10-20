@@ -19,6 +19,10 @@ EXTRA_ARTEFACTS = {
     "tlsmon": ["wireshark_key_file.txt"],
 }
 
+# Plugins whose log is not named <plugin>.log; the first file that exists counts
+# (gzip_syscalls compresses syscall.log during postprocessing).
+PLUGIN_LOGS = {"syscalls": ["syscall.log", "syscall.log.gz"]}
+
 # Plugins that only act on the guest (hidsim injects mouse input) and never write a log.
 NO_LOG_PLUGINS = {"hidsim"}
 
@@ -66,7 +70,9 @@ def summarize_telemetry(
         if plugin in NO_LOG_PLUGINS:
             plugin_status[plugin] = {"status": "no_log", "bytes": 0}
             continue
-        entry = file_status(analysis_dir / f"{plugin}.log")
+        names = PLUGIN_LOGS.get(plugin, [f"{plugin}.log"])
+        existing = [n for n in names if (analysis_dir / n).exists()]
+        entry = file_status(analysis_dir / (existing[0] if existing else names[0]))
         for artefact in EXTRA_ARTEFACTS.get(plugin, []):
             entry[artefact] = file_status(analysis_dir / artefact)["status"]
         plugin_status[plugin] = entry

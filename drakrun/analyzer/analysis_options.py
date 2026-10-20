@@ -6,9 +6,12 @@ from pydantic import BaseModel
 from drakrun.lib.config import DrakrunConfig
 
 StartMethod = Literal["createproc", "shellexec", "runas"]
+GuestOS = Literal["windows", "linux"]
 
 
 class AnalysisOptions(BaseModel):
+    # Guest to run the sample in: the Windows golden image or the Linux one (linux_analyzer.py)
+    guest_os: GuestOS = "windows"
     # Host sample path (local filesystem or None when using S3)
     host_sample_path: Optional[pathlib.Path] = None
     # Filename of the uploaded sample (archive name for archives, executable for normal files)
