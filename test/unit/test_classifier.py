@@ -640,3 +640,35 @@ def test_windows_dns_bad_pcap(analysis):
     (analysis / "dump.pcap").write_bytes(b"garbage")
     assert extract_features(analysis)["network"]["dns_queries"] == []
 
+
+def test_static_report_merged_into_features(analysis, config_factory, tmp_path, monkeypatch):
+    import uuid as _uuid
+
+    static_root = tmp_path / "static"
+    monkeypatch.setattr("drakrun.analyzer.static.worker.STATIC_DIR", static_root)
+    analysis_id = str(_uuid.uuid4())
+    (static_root / analysis_id).mkdir(parents=True)
+    (static_root / analysis_id / "static.json").write_text(
+        json.dumps({"schema": "chimera-static/1", "score": 42, "level": "medium"})
+    )
+    config = config_factory("[classifier]\nenabled = true\n[static]\nenabled = true\nwait_s = 0\n")
+    context = context_for(analysis, config)
+    context.metadata.id = analysis_id
+    classify_sample(context)
+    features = json.loads((analysis / "features.json").read_text())
+    assert features["static"]["score"] == 42
+    assert context.extra_metadata["classification"]["model"] == "chimera-stub"
+
+
+def test_static_missing_is_none_not_error(analysis, config_factory, tmp_path, monkeypatch):
+    monkeypatch.setattr("drakrun.analyzer.static.worker.STATIC_DIR", tmp_path / "empty")
+    config = config_factory("[classifier]\nenabled = true\n[static]\nenabled = true\nwait_s = 0\n")
+    classify_sample(context_for(analysis, config))  # id "test" is not a UUID
+    features = json.loads((analysis / "features.json").read_text())
+    assert features["static"] is None
+    assert "static" not in json.loads(json.dumps(features["run"]))
+
+
+def test_static_disabled_leaves_features_unchanged(analysis, config_factory):
+    classify_sample(context_for(analysis, config_factory("[classifier]\nenabled = true\n")))
+    assert "static" not in json.loads((analysis / "features.json").read_text())
