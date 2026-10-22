@@ -107,6 +107,14 @@ Out of scope: hardware/firmware attacks, hypervisor 0-days by well-resourced act
 - **Vector:** dom0 also runs Linux, so a Linux (ELF) sample could run on the host if it were ever executed outside the guest, e.g. by opening or extracting it on dom0.
 - **Controls in place:** samples stay in MalwareBazaar's encrypted archives in a root-only folder; the evaluation runner decrypts each in memory, checks its SHA-256 and submits it straight to the guest; nothing on dom0 executes it; the Linux guest runs as its own HVM domain behind the same network containment as Windows (rule 4 below).
 
+### T12 Static analysis parses hostile files on dom0 (A1, A4 → B4, asset 1)
+- **Vector:** the static analyzer (`static_analyzer/chimera_static`) parses every upload with pefile, pyelftools, libmagic, YARA, signify and thrember. A parser bug (memory corruption in a C library, a decompression bomb, a crafted PE that sends pefile into a long loop) runs inside a process on the Xen dom0.
+- **Decision: container, not VM.** The analyzer only reads the file and needs no hypervisor features; a Xen domU would compete with analysis VMs for memory and add a file-transfer channel. Risk level stays where dom0 already is (it runs capa on memory dumps and parses PCAPs). Upgrade path: gVisor (`--runtime runsc`) or a dedicated domU.
+- **Controls in place (`drakrun/analyzer/static/sandbox.py`, verified 2026-10-23 by trying each escape from inside the container):** `--network none` (connect and DNS blocked); `--read-only` root; `--cap-drop ALL` (CapEff 0); `no-new-privileges`; uid/gid 65534; `--pids-limit 32`; memory = swap = 2 GiB; 1 CPU; `nofile` 256; no core dumps; `/tmp` tmpfs `noexec,nosuid,nodev`; sample mounted read-only (`noexec` on Podman); wall-clock kill after timeout + 30 s. In-process (`chimera_static/safety.py`): RLIMIT_AS, RLIMIT_CPU, RLIMIT_NPROC = 0 (no new process or thread after start-up), RLIMIT_FSIZE, `PR_SET_NO_NEW_PRIVS`, not dumpable, `O_NOFOLLOW` regular-file-only open.
+- **Samples are never executable on the host:** uploads are chmod `0400` right after saving (`drakrun/web/api.py`); the static copy is `0440 root:65534` and deleted after the run; the analyzer never executes, imports or loads the sample.
+- **Output:** the worker accepts only `static.json` (≤ 32 MiB, no symlink, schema `chimera-static/1`) and never parses the sample itself.
+- **Gaps:** Docker (development) cannot mount the sample `noexec` (mode bits still forbid execution); the image is not yet built reproducibly with pinned hashes; no seccomp profile tighter than the engine default.
+
 ### T10 Thermal / hardware availability (operational)
 - Sustained analyses raise temperatures. The fan daemon (`acer-fan-control.service`) depends on an out-of-tree kernel module that breaks on kernel updates (seen 2026-10-19). Check `systemctl is-active acer-fan-control` before long batches.
 
@@ -133,3 +141,4 @@ If a guest is seen reaching anything other than INetSim (the `CHIMERA-EGRESS` dr
 |---|---|---|
 | 2026-10-19 | Initial version from the Phase-1 recon and code review | Group 3 |
 | 2026-10-21 | v1.1: containment, INetSim isolation, localhost-only services and root-owned deployment marked in place after checking the live host; Linux guest added (T11) | Group 3 |
+| 2026-10-23 | v1.2: static analysis in a locked-down container (T12); uploads made non-executable | Group 3 |
