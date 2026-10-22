@@ -22,8 +22,9 @@ from drakrun.analyzer.worker import (
     get_redis_connection,
     truncate_analysis_list,
 )
+from drakrun.analyzer.static.worker import stage_and_enqueue
 from drakrun.lib.config import load_config
-from drakrun.lib.paths import UPLOADS_DIR
+from drakrun.lib.paths import STATIC_DIR, UPLOADS_DIR
 from drakrun.lib.s3_storage import get_s3_client, is_s3_enabled, upload_sample_to_s3
 from drakrun.web.schema import (
     AnalysisFileRequestQuery,
@@ -47,6 +48,7 @@ from drakrun.web.storage import (
     open_seekable_stream,
     read_analysis_json,
     send_analysis_file,
+    send_entity_file,
 )
 
 ANALYSES_LIST_MAX_LENGTH = 100
@@ -80,9 +82,19 @@ def upload_sample(form: UploadFileForm):
 
     try:
         request_file.save(tmp_upload_path)
+        # Samples are data on the host, never programs: owner read-only, no execute bits.
+        tmp_upload_path.chmod(0o400)
         file_metadata = FileMetadata.evaluate(
             file_path=tmp_upload_path, file_name=sample_filename
         )
+        # Static analysis starts now, beside the detonation (stages its own copy before
+        # the upload may be moved to S3 and deleted below). Never blocks the upload.
+        try:
+            stage_and_enqueue(
+                job_id, tmp_upload_path, sample_filename, redis, config.static
+            )
+        except Exception:
+            logger.exception("Static analysis could not be queued for %s", job_id)
 
         if is_s3_enabled(config.s3):
             s3_client = get_s3_client(config.s3)
@@ -359,6 +371,18 @@ def classification(path: AnalysisRequestPath):
         "classification.json",
         mimetype="application/json",
         s3_config=config.s3,
+    )
+
+
+@api.get("/static/<task_uid>", responses={404: APIErrorResponse})
+def static_analysis(path: AnalysisRequestPath):
+    """Static analysis report (chimera-static/1); 404 until the static worker has finished."""
+    return send_entity_file(
+        path.task_uid,
+        "static.json",
+        "application/json",
+        None,  # static reports always stay on the host (not in S3)
+        base_dir=STATIC_DIR,
     )
 
 

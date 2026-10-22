@@ -101,6 +101,25 @@ class ClassifierConfigSection(BaseModel):
     timeout_s: float = Field(default=60, gt=0, allow_inf_nan=False)
 
 
+class StaticConfigSection(BaseModel):
+    """Static analysis of every upload, run beside the detonation in a locked-down container."""
+
+    enabled: bool = False
+    # "podman" (production) or "docker". The analyzer never runs outside a container.
+    engine: Literal["podman", "docker"] = "podman"
+    image: str = "localhost/chimera-static:0.1.0"
+    timeout_s: float = Field(default=90, gt=0, allow_inf_nan=False)
+    memory_mb: int = Field(default=2048, ge=256)
+    cpus: float = Field(default=1.0, gt=0, allow_inf_nan=False)
+    pids_limit: int = Field(default=32, ge=8)
+    # Unprivileged uid/gid the analyzer runs as inside the container (nobody).
+    container_uid: int = 65534
+    container_gid: int = 65534
+    # How long classify_sample waits for static.json once the detonation has finished.
+    wait_s: float = Field(default=120, ge=0, allow_inf_nan=False)
+    max_output_bytes: int = 32 * 1024 * 1024
+
+
 class MemdumpConfigSection(BaseModel):
     # Maximum total size of collected, uncompressed dumps
     max_total_dumps_size: int = 500 * 1024 * 1024
@@ -197,6 +216,7 @@ class DrakrunConfig(BaseSettings):
     drakrun: DrakrunConfigSection
     capa: CapaConfigSection = CapaConfigSection()
     classifier: ClassifierConfigSection = Field(default_factory=ClassifierConfigSection)
+    static: StaticConfigSection = Field(default_factory=StaticConfigSection)
     memdump: MemdumpConfigSection = MemdumpConfigSection()
     karton: KartonConfigSection = KartonConfigSection()
     s3: Optional[S3StorageConfigSection] = None

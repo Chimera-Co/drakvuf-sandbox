@@ -14,6 +14,7 @@ PDB_CACHE_DIR = LIB_DIR / "pdb_cache"
 ANALYSES_DIR = LIB_DIR / "analyses"
 UPLOADS_DIR = LIB_DIR / "uploads"
 EVASION_DIR = LIB_DIR / "evasion"
+STATIC_DIR = LIB_DIR / "static"
 
 VMI_INFO_PATH = VMI_PROFILES_DIR / "runtime.json"
 VMI_KERNEL_PROFILE_PATH = VMI_PROFILES_DIR / "kernel.json"
@@ -37,6 +38,7 @@ def make_dirs():
     CONFIGS_DIR.mkdir(exist_ok=True)
     ANALYSES_DIR.mkdir(exist_ok=True)
     EVASION_DIR.mkdir(exist_ok=True)
+    STATIC_DIR.mkdir(mode=0o711, exist_ok=True)
     VMI_PROFILES_DIR.mkdir(exist_ok=True)
     PDB_CACHE_DIR.mkdir(exist_ok=True)
 
