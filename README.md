@@ -49,6 +49,6 @@ This project is authored by:
 
 * Mantek Singh Burn ([@clustercoder](https://github.com/clustercoder))
 * Anusha Tiwari ([@anushatiwari27](https://github.com/anushatiwari27))
-* Shreyas Tekawade ([@ShreyasTek1](https://github.com/shreyastek))
+* Shreyas Tekawade ([@shreyastek](https://github.com/shreyastek))
 
 If you have any questions about [DRAKVUF](https://drakvuf.com/) engine itself, contact tamas@tklengyel.com
