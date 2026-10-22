@@ -1,0 +1,11 @@
+# local environments and caches
+.venv
+__pycache__/
+.pytest_cache/
+# large or regenerable data (see RUNBOOK.md): converted WinMET, CHIMERA runs, feature caches
+data/
+logs/
+# trained boosters live in deploy/; models/ keeps only reports and metadata
+models/*/*.txt
+models/*/oof.csv
+.DS_Store

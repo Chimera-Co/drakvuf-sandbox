@@ -1,0 +1,33 @@
+{
+  "_doc": [
+    "How CAPE call names map onto what CHIMERA's DRAKVUF apimon would record.",
+    "CAPE (capemon) logs only the outermost hooked call: measured on 80 WinMET reports, RegSetValueExA -> NtSetValueKey 0%, CreateProcessW -> CreateProcessInternalW 0%, LoadLibraryExW -> LdrLoadDll 5%.",
+    "DRAKVUF breaks on every hooked function, so it also sees the inner calls. 'implied' adds the inner hooked call(s) DRAKVUF would see for each outer CAPE call.",
+    "'uncertain' lists pairs NOT applied until the bridge set (same samples in both sandboxes) confirms them.",
+    "LdrGetProcedureAddressForCaller is deliberately NOT mapped to LdrGetProcedureAddress: GetProcAddress uses the ForCaller path, which CHIMERA's LdrGetProcedureAddress hook does not see (BGInfo on CHIMERA: 2 LdrGetProcedureAddress vs 58 LdrGetDllHandle)."
+  ],
+  "implied": {
+    "CreateProcessA": ["CreateProcessInternalW"],
+    "CreateProcessW": ["CreateProcessInternalW"],
+    "CreateProcessAsUserA": ["CreateProcessInternalW"],
+    "CreateProcessAsUserW": ["CreateProcessInternalW"],
+    "LoadLibraryA": ["LdrLoadDll"],
+    "LoadLibraryW": ["LdrLoadDll"],
+    "LoadLibraryExA": ["LdrLoadDll"],
+    "LoadLibraryExW": ["LdrLoadDll"],
+    "Process32First": ["Process32FirstW"],
+    "Process32Next": ["Process32NextW"]
+  },
+  "uncertain": {
+    "GetModuleHandleA": ["LdrGetDllHandle"],
+    "GetModuleHandleW": ["LdrGetDllHandle"],
+    "ShellExecuteExW": ["CreateProcessInternalW"],
+    "InternetOpenUrlA": ["HttpSendRequestA"],
+    "InternetOpenUrlW": ["HttpSendRequestW"],
+    "CopyFileA": ["CopyFileExW"],
+    "CopyFileW": ["CopyFileExW"],
+    "gethostbyname": ["getaddrinfo"],
+    "CLSIDFromProgIDEx": ["CLSIDFromProgID"],
+    "GetComputerNameExW": ["GetComputerNameW"]
+  }
+}
