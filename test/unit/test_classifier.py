@@ -353,6 +353,52 @@ def test_runner_good_model(analysis):
     }
 
 
+COMPONENTS_MODEL = GOOD_MODEL.replace(
+    '"explanation": ["test"]}',
+    '"explanation": ["test"], "components": COMPONENTS}',
+).replace(
+    "def classify",
+    'COMPONENTS = {"dynamic": {"label": "malicious", "score": 0.9, "model": "dyn", '
+    '"model_version": "1", "weight": 1.0, "explanation": ["injection"], "extra": "dropped"}, '
+    '"static": {"label": "benign", "score": 0.1}}\n\ndef classify',
+)
+
+
+def test_runner_keeps_components(analysis):
+    model = analysis / "model.py"
+    model.write_text(COMPONENTS_MODEL)
+    verdict = run_classifier(extract_features(analysis), analysis, model)
+    assert verdict["label"] == "benign"  # top level stays the combined verdict
+    assert verdict["components"] == {
+        "dynamic": {"label": "malicious", "score": 0.9, "family": None, "model": "dyn",
+                    "model_version": "1", "weight": 1.0, "explanation": ["injection"]},
+        "static": {"label": "benign", "score": 0.1, "family": None, "model": None,
+                   "model_version": None, "weight": None, "explanation": []},
+    }
+
+
+@pytest.mark.parametrize(
+    "components",
+    [
+        '{"dynamic": {"label": "evil"}}',
+        '{"dynamic": {"label": "benign", "score": 1.5}}',
+        '{"dynamic": {"label": "benign", "score": True}}',
+        '{"dynamic": {"label": "benign", "explanation": [1]}}',
+        '{"Bad Name": {"label": "benign"}}',
+        '{f"c{i}": {"label": "benign"} for i in range(9)}',
+        '["dynamic"]',
+    ],
+)
+def test_runner_rejects_bad_components(analysis, components):
+    model = analysis / "model.py"
+    model.write_text(
+        GOOD_MODEL.replace('"explanation": ["test"]}', f'"explanation": ["test"], "components": {components}}}')
+    )
+    verdict = run_classifier(extract_features(analysis), analysis, model)
+    assert verdict["label"] == "unknown"
+    assert "ValidationError" in verdict["error"]
+
+
 @pytest.mark.parametrize(
     "source,expected",
     [
@@ -593,3 +639,4 @@ def test_windows_dns_bad_pcap(analysis):
     write_log(analysis, "socketmon.log", [_udp53(40000)])
     (analysis / "dump.pcap").write_bytes(b"garbage")
     assert extract_features(analysis)["network"]["dns_queries"] == []
+

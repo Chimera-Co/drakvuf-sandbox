@@ -51,6 +51,30 @@ An exception, a timeout, or an invalid result (missing key, label outside the li
 is recorded as `{"schema": "chimera-verdict/1", "label": "unknown", "error": "..."}`; the analysis itself never
 fails because of the model. Extra keys in the result are dropped.
 
+### Optional `components`: the parts of a combined verdict
+
+A model that combines several analyses (e.g. dynamic behaviour and static file analysis) can report each part.
+The top-level fields stay the **combined** verdict; `components` is shown next to it:
+
+```python
+    return {
+        "label": "malicious", "score": 0.91, "family": "AgentTesla", "model": "chimera-fusion",
+        "model_version": "1.0", "explanation": ["dynamic and static agree"],
+        "components": {
+            "dynamic": {"label": "malicious", "score": 0.88, "model": "chimera-lgbm", "weight": 1.0,
+                        "explanation": ["process injection APIs: WriteProcessMemory ×4"]},
+            "static":  {"label": "suspicious", "score": 0.67, "model": "chimera-static-pe", "weight": 1.0,
+                        "explanation": ["UPX-packed, unsigned"]},
+        },
+    }
+```
+
+Each component needs `label` (same four values). Optional: `score` (0..1), `family`, `model`, `model_version`,
+`weight` (≥ 0, its share in the combination), `explanation` (list of strings); other keys are dropped. Names are
+lowercase `[a-z][a-z0-9_]*`, at most 32 characters, at most 8 components. An invalid component makes the whole
+result invalid (→ `unknown` with the error), like any other invalid field. Without `components` the verdict is
+exactly as before.
+
 `stub_model.py` (`model: "chimera-stub"`) is a placeholder heuristic, not a trained model, and says so in its
 explanation.
 

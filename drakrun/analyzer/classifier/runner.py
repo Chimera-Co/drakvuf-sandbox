@@ -12,9 +12,38 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+import re
 from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+Label = Literal["malicious", "suspicious", "benign", "unknown"]
+COMPONENT_NAME = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
+MAX_COMPONENTS = 8
+
+
+def _not_bool(value):
+    if isinstance(value, bool):
+        raise ValueError("score must be a number, not a bool")
+    return value
+
+
+class ComponentVerdict(BaseModel):
+    """One part of a combined verdict, e.g. the dynamic or the static model."""
+
+    model_config = ConfigDict(extra="ignore")
+    label: Label
+    score: Optional[float] = Field(default=None, ge=0, le=1, allow_inf_nan=False)
+    family: Optional[str] = None
+    model: Optional[str] = None
+    model_version: Optional[str] = None
+    weight: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
+    explanation: list[str] = Field(default_factory=list)
+
+    @field_validator("score", "weight", mode="before")
+    @classmethod
+    def _numbers_not_bool(cls, value):
+        return _not_bool(value)
 
 
 class Verdict(BaseModel):
@@ -23,19 +52,38 @@ class Verdict(BaseModel):
     schema_: Literal["chimera-verdict/1"] = Field(
         default="chimera-verdict/1", alias="schema"
     )
-    label: Literal["malicious", "suspicious", "benign", "unknown"]
+    label: Label
     score: float = Field(ge=0, le=1, allow_inf_nan=False)
     family: Optional[str]
     model: str
     model_version: str
     explanation: list[str]
+    # Optional per-part verdicts (e.g. {"dynamic": {...}, "static": {...}}); the top-level
+    # fields above stay the combined verdict that the portal and API show first.
+    components: Optional[dict[str, ComponentVerdict]] = None
 
     @field_validator("score", mode="before")
     @classmethod
     def _score_not_bool(cls, value):
-        if isinstance(value, bool):
-            raise ValueError("score must be a number, not a bool")
+        return _not_bool(value)
+
+    @field_validator("components")
+    @classmethod
+    def _component_names(cls, value):
+        if value is None:
+            return value
+        if len(value) > MAX_COMPONENTS:
+            raise ValueError(f"at most {MAX_COMPONENTS} components")
+        for name in value:
+            if not COMPONENT_NAME.match(name):
+                raise ValueError(f"invalid component name {name!r}")
         return value
+
+    def dump(self) -> dict:
+        result = self.model_dump(by_alias=True)
+        if result.get("components") is None:
+            result.pop("components", None)  # keep verdicts without parts unchanged
+        return result
 
 
 def unknown_verdict(error: str) -> dict:
@@ -83,7 +131,7 @@ def run_classifier(features: dict, analysis_dir, model_path=None, timeout_s=60) 
             result = json.loads(response.read_text(encoding="utf-8"))
             if isinstance(result, dict) and "error" in result:
                 return unknown_verdict(str(result["error"]))
-            return Verdict.model_validate(result).model_dump(by_alias=True)
+            return Verdict.model_validate(result).dump()
     except Exception as error:
         return unknown_verdict(f"{type(error).__name__}: {error}")
 
@@ -101,7 +149,7 @@ def _worker(model_path, request_path, response_path, analysis_dir):
         features = json.loads(Path(request_path).read_text(encoding="utf-8"))
         result = Verdict.model_validate(
             module.classify(features, analysis_dir)
-        ).model_dump(by_alias=True)
+        ).dump()
         encoded = json.dumps(result, allow_nan=False)
     except BaseException as error:
         encoded = json.dumps(unknown_verdict(f"{type(error).__name__}: {error}"))
