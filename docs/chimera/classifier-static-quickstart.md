@@ -33,6 +33,15 @@ What it does, in order (safe to run again):
    (backup next to it; existing values are never changed, only reported);
 7. runs the end-to-end check (below).
 
+Two things to check on a host that already had a `[classifier]` section (the CHIMERA laptop did):
+
+- **`model_path`.** The script never changes an existing section, and without `model_path` the runner uses the
+  labelled stub, not the new model. Set `model_path = "/etc/drakrun/classifier/model.py"` under `[classifier]`.
+- **Firewall.** The image is built with `--network host`, and Podman containers default to no network
+  (`/etc/containers/containers.conf`). A bridge network would make netavark put a `NETAVARK_FORWARD` jump ahead of
+  `CHIMERA_GUARD` in `FORWARD`, and `chimera-net-check` (run before every analysis worker starts) then refuses to
+  start the workers. The script runs `chimera-net-check` after the build and stops if it fails.
+
 It does not restart services (an analysis might be running). When nothing is running:
 
 ```bash

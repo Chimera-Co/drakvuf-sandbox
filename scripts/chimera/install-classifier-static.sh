@@ -90,8 +90,20 @@ print('model check:', v['label'], v['score'], v['model'], v['model_version'])")
 
 say "Building the static-analysis image $IMAGE with $ENGINE"
 command -v "$ENGINE" >/dev/null || { echo "$ENGINE not installed: apt install $ENGINE"; exit 1; }
-"$ENGINE" build -t "$IMAGE" -f static_analyzer/Containerfile static_analyzer
+# Host network for the build: a bridge network makes netavark/docker insert FORWARD rules ahead of
+# CHIMERA_GUARD, and chimera-net-check then refuses to start the analysis workers. The analyzer
+# containers themselves always run with --network none, which adds no rules.
+"$ENGINE" build --network host -t "$IMAGE" -f static_analyzer/Containerfile static_analyzer
 install -d -m 711 "$STATIC_DIR"
+if [[ "$ENGINE" == "podman" ]]; then
+  # Containers default to no network, so nothing started by hand opens a bridge either
+  install -d "$PREFIX/etc/containers"
+  [[ -e "$PREFIX/etc/containers/containers.conf" ]] || printf '[containers]\nnetns = "none"\n' \
+    > "$PREFIX/etc/containers/containers.conf"
+fi
+if [[ -z "$PREFIX" ]] && command -v chimera-net-check >/dev/null; then
+  chimera-net-check || { echo "containment check failed after the image build: fix the firewall before restarting workers"; exit 1; }
+fi
 
 say "Installing the static worker service"
 install -d "$SYSTEMD_DIR"
@@ -114,7 +126,9 @@ else:
     if not c.get("enabled"):
         print("NOTE: [classifier] enabled is not true: set it to use the model")
     if c.get("model_path") != f"{clf_dir}/model.py":
-        print(f"NOTE: [classifier] model_path is {c.get('model_path')!r}, the new model is {clf_dir}/model.py")
+        # Without model_path the runner falls back to the labelled stub, not the deployed model
+        print(f"WARNING: [classifier] model_path is {c.get('model_path')!r}: analyses use the stub model "
+              f"until it is set to {clf_dir}/model.py")
 if "static" not in cfg:
     add.append(f'\n[static]\nenabled = true\nengine = "{engine}"\nimage = "{image}"\ntimeout_s = 90\nwait_s = 120\n')
 elif not cfg["static"].get("enabled"):
