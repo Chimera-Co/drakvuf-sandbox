@@ -96,10 +96,14 @@ command -v "$ENGINE" >/dev/null || { echo "$ENGINE not installed: apt install $E
 "$ENGINE" build --network host -t "$IMAGE" -f static_analyzer/Containerfile static_analyzer
 install -d -m 711 "$STATIC_DIR"
 if [[ "$ENGINE" == "podman" ]]; then
-  # Containers default to no network, so nothing started by hand opens a bridge either
+  # Containers default to no network, so nothing started by hand opens a bridge either. No default
+  # sysctls: drakrun-static-worker runs with ProtectKernelTunables (read-only /proc/sys), and crun
+  # fails with "open /proc/sys/net/ipv4/ping_group_range: Read-only file system" if it sets one.
   install -d "$PREFIX/etc/containers"
-  [[ -e "$PREFIX/etc/containers/containers.conf" ]] || printf '[containers]\nnetns = "none"\n' \
+  [[ -e "$PREFIX/etc/containers/containers.conf" ]] || printf '[containers]\nnetns = "none"\ndefault_sysctls = []\n' \
     > "$PREFIX/etc/containers/containers.conf"
+  grep -q '^default_sysctls = \[\]' "$PREFIX/etc/containers/containers.conf" ||
+    echo "WARNING: $PREFIX/etc/containers/containers.conf exists without default_sysctls = []: the static worker cannot start containers"
 fi
 if [[ -z "$PREFIX" ]] && command -v chimera-net-check >/dev/null; then
   chimera-net-check || { echo "containment check failed after the image build: fix the firewall before restarting workers"; exit 1; }
