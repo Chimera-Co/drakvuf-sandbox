@@ -154,3 +154,15 @@ export async function uploadSample({
     });
     return request.data;
 }
+
+// Classifier verdict (chimera-verdict/1); 404 until postprocessing has classified the run
+export async function getClassification({ analysisId }) {
+    const request = await axios.get(`/classification/${analysisId}`);
+    return request.data;
+}
+
+// Static analysis report (chimera-static/1); 404 until the static worker has finished
+export async function getStaticReport({ analysisId }) {
+    const request = await axios.get(`/static/${analysisId}`);
+    return request.data;
+}

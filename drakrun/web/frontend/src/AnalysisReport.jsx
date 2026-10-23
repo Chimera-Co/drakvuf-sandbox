@@ -14,6 +14,7 @@ import { AnalysisSummary } from "./AnalysisSummary.jsx";
 import { ProcessBadge } from "./ProcessBadge.jsx";
 import { AnalysisFilesViewer } from "./AnalysisFiles.jsx";
 import { useAnalysisReport } from "./AnalysisReportContext.jsx";
+import { StaticAnalysisTab, VerdictCard } from "./AnalysisVerdict.jsx";
 
 export function AnalysisLogViewerTab({ analysisId }) {
     const logType = useTabContext()?.activeTab;
@@ -276,6 +277,13 @@ function AnalysisReportTabs({
                         </PaddedTab>
                     ) : null}
                     {!isOffline ? (
+                        <PaddedTab tab="Static analysis">
+                            <StaticAnalysisTab analysisId={analysis.id} />
+                        </PaddedTab>
+                    ) : (
+                        []
+                    )}
+                    {!isOffline ? (
                         <PaddedTab tab="Analysis files">
                             <AnalysisFilesViewer analysisId={analysis.id} />
                         </PaddedTab>
@@ -338,6 +346,9 @@ export function AnalysisReport() {
                     />
                 </div>
                 <div className="col-6">
+                    {!isOffline ? (
+                        <VerdictCard analysisId={analysis.id} />
+                    ) : null}
                     <AnalysisMetadataTable analysis={analysis} />
                     {!isOffline ? (
                         <div className="card">
