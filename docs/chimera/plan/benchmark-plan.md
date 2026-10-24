@@ -2,7 +2,12 @@
 
 Prepared 25 October 2026. Freeze the register and protocol on 27 October; collect 28–29 October; score and report 30 October. This document proposes experiments; it reports no new sandbox results. A loss, tie, inconclusive result or unavailable comparator is an acceptable outcome.
 
-**Revised 25 October:** the team has no MS 360 access, so MS 360 is not a comparator. `ms360-study.md` stays as background only. The external comparison uses only reports that public sandboxes have **already published** for the same SHA-256. Nothing is submitted anywhere and no account is used.
+**Revised 25 October:** the team has no MS 360 access, so MS 360 is not a comparator. `ms360-study.md` stays as background only. There are two comparisons:
+
+1. **Controlled: CAPE lane.** Teammates run CAPEv2 on a spare machine. CAPEv2 is the maintained descendant of Cuckoo, the engine behind MS 360's dynamic part. They run the same Windows malware, benign controls and evasion tools as CHIMERA, under matched settings (§2a).
+2. **Descriptive: public reports.** Reports public sandboxes have **already published** for the same SHA-256. Nothing is submitted to any external service and no account is used.
+
+CAPE cannot run on the CHIMERA host itself. This Linux is Xen's dom0 (`systemd-detect-virt` = `xen`), and Xen does not expose VT-x to it (no `vmx` flag, no `/dev/kvm`). CAPE's VM backends are KVM/QEMU, VirtualBox, VMware, Hyper-V, Proxmox, cloud services or XenServer's XAPI, not the plain `xl` toolstack used here [V], https://github.com/kevoreilly/CAPEv2/tree/master/modules/machinery.
 
 ## Evidence and scope
 
@@ -26,7 +31,11 @@ Repository evidence is cited as `path:line`. External claims use [V] (primary so
 | Reliability and time to usable report? | All scheduled attempts | N/A: no unseen submissions, queue or failures |
 | Resource cost? | Host/guest allocation, CPU/RAM/disk | N/A |
 
-There is **no inferential external endpoint**. A public report was produced at another time, on an unknown image, with real or simulated internet and an unknown run length. The matched-hash comparison is a descriptive stratum and cannot establish platform superiority. The primary inferential endpoint stays internal: M5 A0 versus H3 (§6). Linux public reports count only when the report shows a Linux behavioural run.
+The CAPE lane answers the same questions under matched conditions, plus evasion, reliability and time.
+
+**Primary external endpoint (CAPE lane, only if its malware part runs):** per Windows `test` hash, "behaviour observed" (§4), CHIMERA H3 versus CAPE, both using the same two-run aggregation; exact McNemar (§6). Secondary: verdicts on malware and benign controls, early exits, known-action coverage of the probe, evasion checks failed.
+
+Public reports are a descriptive stratum only. Each was produced at another time, on an unknown image, with real or simulated internet and an unknown run length, so it cannot establish platform superiority. The internal M5 endpoint, A0 versus H3 (§6), is unchanged. Linux public reports count only when the report shows a Linux behavioural run. CAPE runs Windows only in this plan.
 
 ## 2. Hard gates and sample register
 
@@ -36,13 +45,25 @@ There is **no inferential external endpoint**. A public report was produced at a
 - **Hash lookups only for the frozen register.** A lookup discloses interest in that hash to the provider. Use only hashes that are already public; log provider, date and purpose. Never bypass quotas, access controls or browser checks.
 - Local CHIMERA runs follow M5 controls and need the operator's own authorization (`docs/chimera/malware-evaluation-protocol.md`).
 
+### 2a. CAPE lane (teammates, spare machine)
+
+The CAPE machine is run by the team, not an external service, but malware leaves the CHIMERA host. The malware part therefore needs all of the following; without them the lane runs benign controls and evasion tools only:
+
+- [ ] Written OK from the project owner **and** the mentor, recorded with names and dates.
+- [ ] A dedicated machine or spare disk with a fresh Ubuntu 24.04: no personal accounts, credentials, VPN, cloud sync or personal files.
+- [ ] Routing `inetsim` (preferred, closest to CHIMERA's simulated network) or `drop`; never `internet`, `tor` or `vpn`. A probe run must show only fake or no DNS answers before any malware. Host offline during malware runs.
+- [ ] Samples handed over directly as encrypted archives, never extracted on the host, and deleted after the study. Only CAPE's `reports/` folders are copied back, never `binary`, `files/`, `CAPE/`, `procdump/` or memory dumps.
+
+Matched settings: Windows 10 22H2 x64 from the same Microsoft ISO, 2 vCPU / 4 GiB, 180 s enforced timeout for malware and benign files, 900 s for evasion tools, one analysis at a time, no manual clicks. CAPE's own defaults stay as shipped and are recorded: its in-guest monitor and its "human" interaction module. Deliberate differences, recorded rather than removed: CAPE needs 32-bit Python, its agent and an unhardened guest (firewall/updates off), and CHIMERA's H3 guest has extra installed programs. CAPE is a rolling release, so the commit hash is recorded [V], https://capev2.readthedocs.io/en/latest/installation/host/installation.html. The teammates' kit has the step-by-step sheet, file lists and hashes.
+
 Freeze these sets before seeing new results:
 
 | Set | Size | Purpose and handling |
 |---|---:|---|
 | M-public | 35 hashes: 22 Windows test, 5 Windows control, 8 Linux test | The M5 Stage 1 register, all public on MalwareBazaar. Match each hash to an existing public report (§3); compare with the CHIMERA Stage 1 report for the same hash. The register is kept outside the public repo. |
-| B-core | 6 Windows benign inputs | CHIMERA only: own behaviour probe, own exit-only control, 4 provenance-checked benign utilities. Known-action coverage, reliability, time. Record names/hashes before starting; no replacement after results. |
-| E | 2 tools × 5 runs | CHIMERA only: al-khaser and PERDEDOR, same pinned build/check inventory, full suite; excluded from verdict accuracy. |
+| M-cape | The 27 Windows hashes of M-public (22 test, 5 control) | Same files on CHIMERA H3 and CAPE, 2 runs each. Primary external endpoint uses the 22 `test` hashes. Only with the §2a gates. |
+| B-core | 7 Windows benign inputs | CHIMERA and CAPE: own behaviour probe (known actions) plus 6 programs drawn with seed `20261028` from the 26 benign-dataset Windows programs that finished and have a version-pinned download URL (zoxide 0.10.0, Python 3.14.9 installer, OBS Studio 32.2.2 installer, dust 1.2.6, ripgrep 15.2.0, PuTTYgen 0.85), with their dataset start commands. No replacement after results. |
+| E | 2 tools × 5 runs | CHIMERA and CAPE: al-khaser (same build, SHA-256 `0cd8a40f…`) and PERDEDOR (PowerShell 7 agent), full suite; excluded from verdict accuracy. |
 | L | 2 existing benign Linux probes × 2 runs | CHIMERA-only telemetry checks; no Windows/Linux pooled ranking. |
 
 B-core: two scheduled repetitions per input at 180 s. E: 900 s execution budget, since historical combined scans took 501–562 s (`docs/chimera/hardening-design.md:173`); record per-tool budgets and any truncation.
@@ -111,6 +132,8 @@ Use 95% Clopper–Pearson exact binomial intervals for proportions on independen
 
 M-public matched pairs: report per-hash paired values, median/range of differences and every pair. No significance test: the public reports were not produced under controlled, comparable conditions.
 
+M-cape: per-hash 2×2 table of "behaviour observed" (CHIMERA H3 × CAPE) on `test` hashes with an eligible run on both platforms, exact McNemar as below, plus every pair listed. Verdicts, early exits and evasion checks are reported per hash and per check, descriptively. With 22 hashes a non-significant result is not evidence of equivalence.
+
 Internal M5 (the primary inferential endpoint): preserve the implementation's two-run aggregation, complete-run majority **with ties counted observed** (`scripts/chimera/bench/m5_eval.py:289`). Show run-level data and a sensitivity requiring both runs complete and positive. Exclude pairs with no eligible run on either arm and list reasons. Role `test` only is the primary paired set (`:313`); controls separate. Report both/neither/A0-only/H3-only. Exact two-sided McNemar uses discordants b,c: `min(1,2*P[Binomial(b+c,.5)≤min(b,c)])`; zero discordants yields p=1 [V], https://www.statsmodels.org/stable/generated/statsmodels.stats.contingency_tables.mcnemar.html.
 
 Small n cannot prove equivalence, calibrated probabilities, general malware detection, rare escape resistance or "undetectable" instrumentation. No observed failures does not establish zero failure risk.
@@ -146,17 +169,20 @@ Linked `actions.csv`: `attempt_id,action_id,applicable,observable,observed,artif
 Linked `checks.csv`: `attempt_id,tool,build,check_id,status,artifact_locator`.
 Linked `ratings.csv`: `blind_report_id,rater,traceability,behaviour,explanation,network,export,total,blinding_guess,consensus_ref`.
 
-| Endpoint / stratum | CHIMERA H3 | Public reports (service + URL) | Matched n / exclusions | Delta / uncertainty |
-|---|---|---|---|---|
-| Register hashes with a usable report (of 35) | — | — | — | per OS |
-| Processes, network items, ATT&CK on matched hashes | — | — | matched pairs | per-hash differences, median/range |
-| Truth malicious: predicted B / M / I on matched hashes | — | — | matched pairs | descriptive only |
-| Report rubric, each dimension; κ | — | — | usable bundles | original raters + agreement |
-| Known-action coverage (B-core) | — | NA | — | exact CI where eligible |
-| Evasion detected / evaluated (E) | — | NA | identical checks only | per-check frequencies |
-| Report time median [range], censored n; failures | — | NA | attempted n | CI assumptions |
-| CPU/RAM/disk | — | NA | scope specified | — |
-| M5: both / neither / A0-only / H3-only | A0 versus H3 | NA | eligible test hashes | exact McNemar |
+| Endpoint / stratum | CHIMERA H3 | CAPE (commit) | Public reports (service + URL) | Matched n / exclusions | Delta / uncertainty |
+|---|---|---|---|---|---|
+| Behaviour observed on `test` hashes: both / neither / CHIMERA-only / CAPE-only | — | — | NA | eligible pairs | exact McNemar |
+| Register hashes with a usable report (of 35) | — | — | — | — | per OS |
+| Processes, network items, ATT&CK on matched hashes | — | — | — | matched pairs | per-hash differences, median/range |
+| Truth malicious: predicted B / M / I on matched hashes | — | — | — | matched pairs | descriptive only |
+| Early exits (≤10 s, no children, no network) | — | — | NA | matched pairs | per hash |
+| Truth benign (B-core): predicted B / M / I | — | — | NA | 7 inputs | descriptive |
+| Report rubric, each dimension; κ | — | — | — | usable bundles | original raters + agreement |
+| Known-action coverage (probe) | — | — | NA | — | per action |
+| Evasion detected / evaluated (E) | — | — | NA | identical checks only | per-check frequencies |
+| Report time median [range], censored n; failures | — | — | NA | attempted n | CI assumptions |
+| CPU/RAM/disk | — | NA | NA | scope specified | — |
+| M5: both / neither / A0-only / H3-only | A0 versus H3 | NA | NA | eligible test hashes | exact McNemar |
 
 ## 9. One-page runbook: 27–30 October
 
@@ -164,15 +190,17 @@ Planning estimates below are scheduling allowances, not measured performance. On
 
 | When | Step / owner | Allowance and stop condition |
 |---|---|---|
+| 26–27 Oct | CAPE teammates install CAPE and the matched guest on a spare machine; probe network check | About a day; malware part waits for the §2a gates |
 | 27 Oct | Benchmark lead + owner freeze register, selection rule, configuration and hash manifest | 1 h |
 | 27 Oct | Benchmark lead finds existing public reports for all 35 register hashes by hand, saves PDFs, fills `public-reports.csv` | 2–3 h; no sign-in, no upload, no download links |
 | 27–28 Oct | Operator runs M5 Stage 1 on CHIMERA (owner-approved); validates containment, snapshot identity, clocks, disk/thermal health and a known benign probe first | Per the M5 protocol; stop on safety/telemetry failure |
 | 28 Oct | Operator runs 6×2 B-core on H3 | 2 h; 30-minute per-attempt deadline, delays carried as censored |
 | 28–29 Oct | Operator runs E: 2 tools × 5 runs | 3 h including overhead |
 | 29 Oct morning | Operator runs local Linux probes ×2 | 1–1.5 h |
+| 28–29 Oct | CAPE teammates run 27 malware ×2 (if gated), 7 benign ×2, 2 evasion tools ×5 | About 8 h of runs; stop rule in their sheet |
 | 28–29 Oct | Benchmark lead fills `runs.csv` for every hash with both a CHIMERA and a public report | 2–3 h; fallback decision at 29 Oct 12:00 |
 | 29 Oct end | Benchmark lead closes dataset at 18:00 local, manifests every attempt, lists deviations/missing pairs | 45 min; preserve failures |
 | 29–30 Oct | Two scorers independently rate blinded bundles; benchmark lead computes metrics and agreement | 2 h per scorer + 1 h preparation; score all matched bundles, not highlights |
 | 30 Oct 12:00 | Benchmark lead delivers CSVs, PDFs and a one-page summary with limitations | Neutral wording; losses and ties reported |
 
-Do by 31 Oct: artifact integrity, honest missing data, small matched tables, two-rater report scores and limitations. Future work: controlled side-by-side runs on another sandbox (only with a separately approved submission policy), larger independent malware/family holdouts, matched guest images, more operating systems, longer windows and independently replicated evasion evaluation.
+Do by 31 Oct: artifact integrity, honest missing data, small matched tables, two-rater report scores and limitations. Future work: Linux samples on CAPE, a hardened CAPE guest as a second arm, larger independent malware/family holdouts, matched guest images, more operating systems, longer windows and independently replicated evasion evaluation.

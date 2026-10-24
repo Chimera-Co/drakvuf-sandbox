@@ -17,7 +17,7 @@ verified from a primary source, **[S]** secondary, **[K]** background knowledge 
 | [`report-intel-orchestration.md`](report-intel-orchestration.md) | Threat-intelligence design (hash-only, offline-first), `chimera-report/1` report schema, queue flow, analysis modes |
 | [`architecture.md`](architecture.md) | Components, data flow, trust boundaries and artifacts as they are today, and the deltas after the roadmap |
 | [`hardening-roadmap.md`](hardening-roadmap.md) | Measured evasion results, remaining detections and their causes, future VMI and PERDEDOR work, what never to do |
-| [`benchmark-plan.md`](benchmark-plan.md) | A fair, pre-registered comparison of CHIMERA with reports public sandboxes (Triage, ANY.RUN) already published for the same hashes; no uploads, no accounts; metrics, statistics, runbook |
+| [`benchmark-plan.md`](benchmark-plan.md) | A fair, pre-registered comparison of CHIMERA with CAPE (Cuckoo's maintained successor) on the same files under matched settings, and with reports public sandboxes (Triage, ANY.RUN) already published for the same hashes; metrics, statistics, runbook |
 | [`testing-strategy.md`](testing-strategy.md) | Test inventory, gaps, contract and security tests, operator smoke tests, freeze checklist |
 | [`bibliography.md`](bibliography.md) | All 180 external sources cited above |
 | [`evidence/`](evidence/) | Reproducible probe behind the classifier findings and its output |
