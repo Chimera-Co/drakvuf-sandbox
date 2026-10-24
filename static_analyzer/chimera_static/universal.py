@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import ipaddress
+import json
 import math
 import os
 import re
@@ -188,6 +189,18 @@ def embedded(data: bytes, own_format: str, limit: int = 20) -> list[dict]:
 
 
 _yara_rules = None
+
+
+def yara_ruleset() -> dict:
+    """What the YARA stage looks for: rule count and pins written by rules_build at image build time."""
+    source = os.environ.get("CHIMERA_STATIC_YARA", "/opt/chimera-static/rules")
+    try:
+        with open(f"{source}.json", encoding="utf-8") as fh:
+            info = json.load(fh)
+    except (OSError, ValueError):
+        return {"rules": None, "note": "ruleset not built (no rules_build metadata)"}
+    return {"rules": info.get("rules"), "sources": [{k: s.get(k) for k in ("name", "commit", "licence")}
+                                                    for s in info.get("sources", [])]}
 
 
 def yara_matches(data: bytes, timeout_s: int = 15) -> tuple[list[dict], str | None]:

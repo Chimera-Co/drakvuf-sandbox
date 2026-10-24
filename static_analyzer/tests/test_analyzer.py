@@ -14,7 +14,7 @@ from chimera_static.identify import identify
 from chimera_static.safety import SampleError, read_sample
 
 HERE = Path(__file__).resolve().parent
-PE = HERE.parents[1] / "test" / "test.exe"           # CHIMERA's own benign test program (PE32+)
+PE = HERE / "fixtures" / "test.exe"                   # copy of the repo's test/test.exe, benign test program (PE32+)
 ELF = HERE / "fixtures" / "linux-x86_64.so"           # MarkupSafe 3.0.2 manylinux wheel, _speedups.so
 
 BENIGN_PDF = b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n" \

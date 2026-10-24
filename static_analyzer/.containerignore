@@ -1,5 +1,5 @@
 .venv
 __pycache__
 *.egg-info
-tests
 build
+# tests/ stays in the build context for the "test" stage; the runtime stage never copies it.

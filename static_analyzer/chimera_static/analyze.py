@@ -21,6 +21,21 @@ def _level(score: int) -> str:
     return "high" if score >= 60 else "medium" if score >= 35 else "low" if score >= 15 else "clean"
 
 
+def _yara_severity(meta: dict) -> str:
+    """Rule metadata -> finding severity. ReversingLabs rules carry category + tc_detection_factor (1-5)."""
+    sev = str(meta.get("severity", meta.get("threat_level", ""))).lower()
+    if sev in SEVERITY_POINTS:
+        return sev
+    category = str(meta.get("category", "")).upper()
+    if category in ("MALWARE", "EXPLOIT"):
+        try:
+            factor = int(meta.get("tc_detection_factor", 0))
+        except (TypeError, ValueError):
+            factor = 0
+        return "high" if factor >= 4 else "medium"
+    return "medium"  # e.g. ReversingLabs "INFO" certificate rules: signer seen on malware, or leaked
+
+
 def _type_findings(t: dict) -> list[dict]:
     out = []
 
@@ -80,15 +95,15 @@ def analyze(path: str, out_dir: str | None = None, file_name: str = "", timeout_
     universal["iocs"] = stage("iocs", lambda: U.iocs(strs)) or {}
     result["findings"] += stage("keywords", lambda: U.keyword_findings(strs)) or []
     universal["embedded"] = stage("embedded", lambda: U.embedded(data, t["format"])) or []
+    universal["yara_ruleset"] = U.yara_ruleset()
     ymatch = stage("yara", lambda: U.yara_matches(data, timeout_s=int(max(5, timeout_s / 4))), heavy=True)
     if ymatch:
         universal["yara"], note = ymatch
         if note:
             result["errors"].append({"stage": "yara", "error": note})
         for m in universal["yara"]:
-            sev = str(m["meta"].get("severity", m["meta"].get("threat_level", "medium"))).lower()
             result["findings"].append({"id": f"yara_{m['rule']}", "title": f"YARA: {m['rule']}",
-                                       "severity": sev if sev in SEVERITY_POINTS else "medium",
+                                       "severity": _yara_severity(m["meta"]),
                                        "evidence": str(m["meta"].get("description", ""))[:200], "attack": [],
                                        "source": "yara"})
     result["universal"] = universal

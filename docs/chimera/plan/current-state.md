@@ -53,9 +53,10 @@ from earlier documents are marked as such and were not re-run.
 | Offline `report.html` embeds guest-controlled JSON inside `<script>` without escaping `</script>` | `drakrun/analyzer/postprocessing/plugins/generate_html_report.py:46` | **Fixed** `a50db46`, deployed 25 Oct
 | Static worker reports success ("Job OK") when `static.json` holds an error | `drakrun/analyzer/static/worker.py:52-68` | **Fixed** `487f677`, deployed |
 | Static rule fallback votes "benign" when the score is < 15, even for formats it could not parse | `deploy_model.py` rules fallback | **Fixed** `487f677`, deployed: no benign vote without complete coverage |
-| No YARA rules in the static image | `static_analyzer/rules/README.txt` | Open, P0 |
+| No YARA rules in the static image | `static_analyzer/rules/` | **Fixed**: ReversingLabs rules pinned at `e0a0be54`, 1240 rules, build-time compile gate; no hits on 34 local benign files |
 | Static or classifier results are fetched once; a report opened early shows "not classified yet" until reload | `drakrun/web/frontend/src/AnalysisVerdict.jsx:19` | Open, P0 |
 | Files over 256 MiB are hashed on a prefix but reported with the full size | `static_analyzer/chimera_static/safety.py:23` | **Fixed** `487f677`, deployed: refused with the reason |
+| Hashing is slow on large files (30 MB ELF: ~37 s in `hashes`, likely pure-Python ssdeep); later heavy stages get skipped under a short budget (coverage then says partial) | `static_analyzer/chimera_static/universal.py` `hashes` | Open, P1 |
 | Offline HTML report has no static or verdict section | `generate_html_report.py:20`, `AnalysisReport.jsx:349` | Open, P1 (combined report) |
 | Classifier training filter counts raw calls, so empty vectors were learned as benign | `classifier/scripts/03_train.py:125,153` | For the next retraining |
 
