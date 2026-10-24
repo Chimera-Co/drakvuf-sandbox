@@ -51,6 +51,7 @@ describe("VerdictCard", () => {
         });
         render(<VerdictCard analysisId={ID} />);
         expect(await screen.findByText("timed out")).toBeTruthy();
+        expect(screen.getByText("no verdict")).toBeTruthy();
     });
 });
 

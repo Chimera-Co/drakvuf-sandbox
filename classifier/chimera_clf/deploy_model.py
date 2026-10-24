@@ -84,11 +84,15 @@ def _dynamic(features: dict, s: dict) -> dict:
     run = features.get("run") or {}
     if run.get("guest_os") == "linux":
         return _component("unknown", None, model, version, ["Linux run: the dynamic model knows Windows behaviour only."])
-    calls = fz.hooked_call_count(features)
-    if calls < meta.get("min_hooked_calls", 10):
-        return _component("unknown", None, model, version,
-                          [f"Too little behaviour to judge: {calls} monitored API calls in the sample's process tree."])
     names, allowed = meta["feature_names"], meta.get("api_vocabulary")
+    # Gate on the calls the model can see: the vector keeps only api_vocabulary, so a run whose calls
+    # are all outside it (e.g. only loader calls) has no API behaviour to judge however many it made.
+    raw_calls, calls = fz.hooked_call_count(features), fz.hooked_call_count(features, allowed)
+    need = meta.get("min_hooked_calls", 10)
+    if calls < need:
+        return _component("unknown", None, model, version,
+                          [f"No verdict: too little behaviour to judge ({calls} usable of {raw_calls} monitored API "
+                           f"calls in the sample's process tree; at least {need} needed)."])
     x = np.asarray([fz.vectorize(features, names, allowed)], dtype=np.float32)
     seen = fz.restrict(features, allowed)
     booster = s["booster"]

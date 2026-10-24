@@ -37,10 +37,11 @@ function useOptionalJson(loader, analysisId) {
     return state;
 }
 
+// "unknown" means the model abstained (too little behaviour, unsupported OS, model error)
 export function LabelBadge({ label }) {
     return (
         <span className={`badge ${LABEL_CLASS[label] || "bg-secondary"}`}>
-            {label || "unknown"}
+            {!label || label === "unknown" ? "no verdict" : label}
         </span>
     );
 }

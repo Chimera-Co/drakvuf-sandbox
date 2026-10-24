@@ -41,6 +41,25 @@ def test_linux_and_empty_runs_are_unknown():
     assert run(empty)["label"] == "unknown"
 
 
+def test_gate_counts_only_calls_the_model_can_use():
+    # Loader calls are outside api_vocabulary: 207 of them used to pass the 10-call gate with 0 usable
+    # calls and came out "benign" (rg.exe, 23 Oct). They must give no verdict.
+    meta = json.loads((DEPLOY / "meta.json").read_text())
+    vocab, need = meta["api_vocabulary"], meta["min_hooked_calls"]
+    loader_only = copy.deepcopy(FIXTURE)
+    loader_only["api_calls"], loader_only["api_sequence"] = {"LdrLoadDll": 207}, ["LdrLoadDll"] * 207
+    assert "LdrLoadDll" not in vocab
+    v = run(loader_only)
+    assert v["label"] == "unknown" and v["components"]["dynamic"]["label"] == "unknown"
+    assert "0 usable of 207" in v["components"]["dynamic"]["explanation"][0]
+
+    api = vocab[0]
+    for n, judged in ((need - 1, False), (need, True)):
+        f = copy.deepcopy(FIXTURE)
+        f["api_calls"], f["api_sequence"] = {"LdrLoadDll": 50, api: n}, [api] * n
+        assert (run(f)["components"]["dynamic"]["label"] != "unknown") is judged, n
+
+
 def test_garbage_input_does_not_crash():
     v = run({"schema": "chimera-features/1", "run": {"guest_os": "windows"}, "api_calls": {"LdrLoadDll": "x"},
              "api_sequence": [None, 5], "files": None, "registry": [], "processes": "?", "network": 3})
