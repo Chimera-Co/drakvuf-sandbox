@@ -165,6 +165,17 @@ def _static(features: dict, s: dict):
         vec = None
     route = (smeta or {}).get("routes", {}).get(fmt)
     findings = _findings_text(static)
+    # Benign means "looked everywhere, found nothing"; a run without a type parser, or with failed layers,
+    # did not look everywhere. Such runs may still raise suspicion, but never vote benign.
+    coverage = _obj(static.get("coverage"))
+    if coverage.get("complete") is True:
+        partial = None
+    elif not coverage:
+        partial = "static result does not report its coverage (older analyzer)"
+    elif not coverage.get("type_plugin"):
+        partial = f"no parser for {fmt} files"
+    else:
+        partial = "incomplete: " + ", ".join(str(x) for x in coverage.get("failed_stages") or ["parser"]) + " failed"
     if route and route in s["static"] and vec and len(vec) == smeta["feature"]["dim"]:
         m = smeta["models"][route]
         np = s["np"]
@@ -173,6 +184,10 @@ def _static(features: dict, s: dict):
         m_mal, m_sus = _logit(p) - _logit(m["thresholds"]["malicious"]), _logit(p) - _logit(m["thresholds"]["suspicious"])
         label = _label(m_mal, m_sus)
         text = [f"Static {route.upper()} model (EMBER2024): p={p:.2f}."] + findings
+        if label == "benign" and partial:
+            return _component("unknown", p, f"chimera-static-{route}", smeta.get("model_version", "0"),
+                              [f"No static verdict: the model leans benign (p={p:.2f}) but the analysis is "
+                               f"{partial}, so it is not counted as benign evidence."] + findings)
         return _component(label, p, f"chimera-static-{route}", smeta.get("model_version", "0"), text, None, 1.0,
                           margin_malicious=m_mal, margin_suspicious=m_sus)
     # no ML model for this format: rule score (MobSF-style), half weight, never more than "suspicious"
@@ -182,9 +197,12 @@ def _static(features: dict, s: dict):
     p = 0.05 + 0.9 * min(100, max(0, score)) / 100
     m_sus = _logit(p) - _logit(0.35)                 # rule level "medium" starts at 35
     m_mal = min(m_sus, -1e-3)                        # rules alone never reach "malicious"
-    label = "suspicious" if m_sus >= 0 else "benign" if score < 15 else "unknown"
+    label = "suspicious" if m_sus >= 0 else "benign" if score < 15 and not partial else "unknown"
+    lead = f"Static rules ({fmt}): score {score}/100 ({static.get('level')})."
+    if label == "unknown" and partial:
+        lead += f" No benign verdict: {partial}."
     return _component(label, p, "chimera-static-rules", static.get("analyzer_version", "?"),
-                      [f"Static rules ({fmt}): score {score}/100 ({static.get('level')})."] + findings, None,
+                      [lead] + findings, None,
                       RULE_WEIGHT, margin_malicious=m_mal, margin_suspicious=m_sus)
 
 

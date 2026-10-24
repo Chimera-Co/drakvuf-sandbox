@@ -115,6 +115,24 @@ def test_rules_only_never_malicious_alone():
 
 
 @has_static
+def test_partial_static_never_votes_benign():
+    # "Benign" from static means every layer looked and found nothing. A quiet file with no parser, a run whose
+    # parser failed, or a result that does not report coverage must abstain instead.
+    empty = copy.deepcopy(FIXTURE)
+    empty["api_calls"], empty["api_sequence"] = {}, []
+    quiet_script = {**STATIC["ps1"], "score": 0, "level": "clean"}
+    st = run(with_static(quiet_script, base=empty))["components"]["static"]
+    assert st["label"] == "unknown" and "no parser" in " ".join(st["explanation"])
+    for fmt in ("pe", "elf"):
+        full = run(with_static(STATIC[fmt], base=empty))["components"]["static"]["label"]
+        failed = {**STATIC[fmt], "coverage": {"complete": False, "type_plugin": fmt, "failed_stages": [fmt]}}
+        unreported = {k: v for k, v in STATIC[fmt].items() if k != "coverage"}
+        for partial in (failed, unreported):
+            label = run(with_static(partial, base=empty))["components"]["static"]["label"]
+            assert label == ("unknown" if full == "benign" else full), (fmt, full, label)
+
+
+@has_static
 def test_malicious_pdf_static_only():
     empty = copy.deepcopy(FIXTURE)
     empty["api_calls"], empty["api_sequence"] = {}, []

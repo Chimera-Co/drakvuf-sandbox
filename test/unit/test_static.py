@@ -128,6 +128,23 @@ def test_missing_engine(tmp_path, settings, monkeypatch):
     assert "not installed" in result["error"]
 
 
+def test_error_result_fails_the_job_but_is_kept(tmp_path, settings, engine, monkeypatch):
+    # An error used to come back as a normal return, so RQ logged "Job OK"; now the job fails, and
+    # static.json (with the error) stays for the classifier and the UI.
+    from drakrun.analyzer.static import worker
+
+    monkeypatch.setenv("FAKE_MODE", "wrong")
+    monkeypatch.setattr(worker, "load_config", lambda: type("C", (), {"static": settings})())
+    staged(tmp_path, settings)
+    with pytest.raises(worker.StaticAnalysisFailed, match="wrong schema"):
+        worker.run_static_job(AID, "x", str(tmp_path / "static"))
+    kept = load_static(AID, tmp_path / "static")
+    assert "wrong schema" in kept["error"] and not (tmp_path / "static" / AID / "in").exists()
+    monkeypatch.setenv("FAKE_MODE", "ok")
+    staged(tmp_path, settings)
+    assert worker.run_static_job(AID, "x", str(tmp_path / "static"))["error"] is None
+
+
 def test_load_and_wait(tmp_path):
     assert load_static(AID, tmp_path) is None
     assert wait_for_static(AID, 0.2, tmp_path, poll_s=0.05) is None

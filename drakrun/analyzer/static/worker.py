@@ -30,6 +30,10 @@ logger = logging.getLogger(__name__)
 STATIC_QUEUE_NAME = "chimera-static"
 
 
+class StaticAnalysisFailed(RuntimeError):
+    """static.json was written but records an error; raised so RQ marks the job failed, not "Job OK"."""
+
+
 def job_dir(analysis_id: str, base: Optional[Path] = None) -> Path:
     return Path(base or STATIC_DIR) / str(uuid.UUID(analysis_id))  # also rejects path tricks
 
@@ -65,7 +69,10 @@ def run_static_job(analysis_id: str, file_name: str, base: Optional[str] = None)
         json.dump(result, fh, allow_nan=False)
     os.replace(tmp, final)
     shutil.rmtree(directory / "out", ignore_errors=True)
-    return {"error": result.get("error"), "score": result.get("score"), "level": result.get("level")}
+    if result.get("error"):  # static.json stays for the classifier and the UI; the job itself failed
+        logger.error("[static] analysis %s failed: %s", analysis_id, str(result["error"])[:500])
+        raise StaticAnalysisFailed(str(result["error"])[:500])
+    return {"error": None, "score": result.get("score"), "level": result.get("level")}
 
 
 def load_static(analysis_id: str, base: Optional[Path] = None) -> Optional[dict]:

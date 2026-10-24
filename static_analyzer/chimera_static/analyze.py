@@ -13,6 +13,7 @@ from .safety import read_sample, write_output
 
 SEVERITY_POINTS = {"info": 0, "low": 4, "medium": 12, "high": 25}
 ML_FORMATS = {"pe", "elf", "pdf"}
+TYPE_PLUGINS = {"pe", "elf", "pdf"}
 EMBER_MAX_BYTES = 128 * 1024 * 1024
 
 
@@ -127,7 +128,7 @@ def analyze(path: str, out_dir: str | None = None, file_name: str = "", timeout_
 
     # ---- ML features (EMBER2024 / thrember v3), for formats that have a trained static model
     if ember and fmt in ML_FORMATS:
-        if len(data) > EMBER_MAX_BYTES or info.get("truncated"):
+        if len(data) > EMBER_MAX_BYTES:
             result["errors"].append({"stage": "ember", "error": "skipped: file too large"})
         else:
             from .ember import ember_vector
@@ -143,6 +144,15 @@ def analyze(path: str, out_dir: str | None = None, file_name: str = "", timeout_
             score += SEVERITY_POINTS.get(f["severity"], 0)
     result["score"] = min(100, score)
     result["level"] = _level(result["score"])
+    # ---- coverage: a low score only means "nothing found" if the layers that look for things ran.
+    # The classifier takes benign evidence only from a complete run (YARA is reported, not required).
+    failed = sorted({e["stage"] for e in result["errors"]} - {"plugins"})
+    supported = fmt in TYPE_PLUGINS
+    wants_ml = ember and fmt in ML_FORMATS
+    complete = (supported and fmt in result and (not wants_ml or "ml" in result)
+                and not {"identify", "hashes", "strings"} & set(failed))
+    result["coverage"] = {"complete": bool(complete), "type_plugin": fmt if supported else None,
+                          "failed_stages": failed}
     result["duration_s"] = round(time.monotonic() - t0, 3)
     if out_dir:
         write_output(os.path.join(out_dir, "static.json"), json.dumps(result, allow_nan=False).encode())

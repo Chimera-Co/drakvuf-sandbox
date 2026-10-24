@@ -72,14 +72,16 @@ def read_sample(path: str, max_bytes: int = MAX_SAMPLE_BYTES) -> tuple[bytes, di
         st = os.fstat(fd)
         if not stat.S_ISREG(st.st_mode):
             raise SampleError("sample is not a regular file")
+        # Refuse rather than truncate: hashes and findings of a prefix would be reported as the whole file's.
+        if st.st_size > max_bytes:
+            raise SampleError(f"sample is {st.st_size} bytes, over the {max_bytes} byte static-analysis limit")
         info = {"size": st.st_size, "mode": oct(stat.S_IMODE(st.st_mode)),
-                "executable_bits": bool(st.st_mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)),
-                "truncated": st.st_size > max_bytes}
-        chunks, remaining = [], min(st.st_size, max_bytes)
+                "executable_bits": bool(st.st_mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH))}
+        chunks, remaining = [], st.st_size
         while remaining > 0:
             chunk = os.read(fd, min(remaining, 8 * 1024 * 1024))
             if not chunk:
-                break
+                raise SampleError(f"short read: got {st.st_size - remaining} of {st.st_size} bytes")
             chunks.append(chunk)
             remaining -= len(chunk)
         return b"".join(chunks), info

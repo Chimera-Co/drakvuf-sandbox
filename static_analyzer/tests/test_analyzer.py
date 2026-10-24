@@ -115,6 +115,26 @@ def test_refuses_symlink_and_directory(tmp_path):
         read_sample(str(tmp_path))
 
 
+def test_oversized_sample_is_refused_not_truncated(tmp_path):
+    # Hashing only the first 256 MiB and reporting it as the file's hash would be wrong; refuse with a reason.
+    big = tmp_path / "big"
+    with big.open("wb") as fh:
+        fh.truncate(256 * 1024 * 1024 + 1)  # sparse, takes no disk space
+    with pytest.raises(SampleError, match="over the 268435456 byte"):
+        read_sample(str(big))
+    data, info = read_sample(str(write(tmp_path, "small", b"abc")))
+    assert data == b"abc" and info["size"] == 3 and "truncated" not in info
+
+
+def test_coverage_marks_what_was_not_analysed(tmp_path):
+    script = analyze(str(write(tmp_path, "s.ps1", b"Write-Host 'hello'\n")), ember=False)
+    assert script["coverage"]["complete"] is False and script["coverage"]["type_plugin"] is None
+    pdf = analyze(str(write(tmp_path, "d.pdf", BENIGN_PDF)), ember=False)
+    assert pdf["coverage"]["type_plugin"] == "pdf"
+    assert pdf["coverage"]["complete"] is ("pdf" in pdf and not {"identify", "hashes", "strings"}
+                                           & set(pdf["coverage"]["failed_stages"]))
+
+
 def test_never_makes_anything_executable(tmp_path):
     sample = write(tmp_path, "s", PE.read_bytes(), mode=0o440)
     analyze(str(sample), str(tmp_path))
