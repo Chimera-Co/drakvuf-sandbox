@@ -16,25 +16,81 @@ const SEVERITY_CLASS = {
     info: "bg-secondary",
 };
 
-// Fetches once; a 404 means "not there yet" (the static worker or the classifier has not finished)
+// A 404 means the worker has not finished; retry for up to 15 minutes.
 function useOptionalJson(loader, analysisId) {
     const [state, setState] = useState({ loading: true });
     useEffect(() => {
         let active = true;
+        let retryTimer;
+        let polling = true;
         setState({ loading: true });
-        loader({ analysisId })
-            .then((data) => active && setState({ data }))
-            .catch((error) => {
-                if (!active) return;
-                if (error?.response?.status === 404)
-                    setState({ missing: true });
-                else setState({ error });
-            });
+        const deadlineTimer = setTimeout(
+            () => {
+                polling = false;
+                clearTimeout(retryTimer);
+                if (active)
+                    setState((current) =>
+                        current.missing ? { missing: true } : current,
+                    );
+            },
+            15 * 60 * 1000,
+        );
+        const load = () => {
+            loader({ analysisId })
+                .then((data) => {
+                    if (!active) return;
+                    clearTimeout(deadlineTimer);
+                    setState({ data });
+                })
+                .catch((error) => {
+                    if (!active) return;
+                    if (error?.response?.status === 404) {
+                        setState({ missing: true, polling });
+                        if (polling) retryTimer = setTimeout(load, 5000);
+                    } else {
+                        clearTimeout(deadlineTimer);
+                        setState({ error });
+                    }
+                });
+        };
+        load();
         return () => {
             active = false;
+            clearTimeout(retryTimer);
+            clearTimeout(deadlineTimer);
         };
     }, [loader, analysisId]);
     return state;
+}
+
+function isWarning(line) {
+    return (
+        /^(No verdict|No static verdict|Static analysis failed)/.test(line) ||
+        line.includes("No benign verdict")
+    );
+}
+
+function Explanation({ lines = [] }) {
+    const ordered = [
+        ...lines.filter(isWarning),
+        ...lines.filter((line) => !isWarning(line)),
+    ];
+    return (
+        <ul className="mb-0 small">
+            {ordered.map((line, idx) => (
+                <li
+                    key={idx}
+                    className={
+                        isWarning(line)
+                            ? "text-warning-emphasis fw-semibold"
+                            : undefined
+                    }
+                >
+                    {line}
+                </li>
+            ))}
+        </ul>
+    );
 }
 
 // "unknown" means the model abstained (too little behaviour, unsupported OS, model error)
@@ -57,7 +113,7 @@ function ComponentRow({ name, component }) {
             <td>
                 <LabelBadge label={component.label} />{" "}
                 <span className="ms-1">
-                    score {formatScore(component.score)}
+                    decision score {formatScore(component.score)}
                 </span>
                 {component.model ? (
                     <span className="text-muted ms-2 small">
@@ -65,11 +121,7 @@ function ComponentRow({ name, component }) {
                     </span>
                 ) : null}
                 {component.explanation?.length ? (
-                    <ul className="mb-0 small">
-                        {component.explanation.map((line, idx) => (
-                            <li key={idx}>{line}</li>
-                        ))}
-                    </ul>
+                    <Explanation lines={component.explanation} />
                 ) : null}
             </td>
         </tr>
@@ -77,14 +129,20 @@ function ComponentRow({ name, component }) {
 }
 
 export function VerdictCard({ analysisId }) {
-    const { loading, data, missing, error } = useOptionalJson(
+    const { loading, data, missing, polling, error } = useOptionalJson(
         getClassification,
         analysisId,
     );
     let body;
     if (loading) body = <div>Loading verdict...</div>;
     else if (missing)
-        body = <div className="text-muted">Not classified yet.</div>;
+        body = (
+            <div className="text-muted">
+                {polling
+                    ? "Not classified yet: waiting for the classifier (this updates by itself)."
+                    : "Not classified yet."}
+            </div>
+        );
     else if (error)
         body = <div className="text-danger">Error: {error.toString()}</div>;
     else if (data.error)
@@ -102,13 +160,19 @@ export function VerdictCard({ analysisId }) {
                     <span className="fs-5 me-2">
                         <LabelBadge label={data.label} />
                     </span>
-                    <span>combined score {formatScore(data.score)}</span>
+                    <span>
+                        combined decision score {formatScore(data.score)}
+                    </span>
                     {data.family ? (
                         <span className="ms-3">family {data.family}</span>
                     ) : null}
                     <span className="text-muted ms-auto small">
                         {data.model} {data.model_version}
                     </span>
+                </div>
+                <div className="small text-muted mb-2">
+                    Decision score: 0.50 is the malicious threshold. It is not a
+                    probability.
                 </div>
                 {components.length ? (
                     <table className="datatable-table">
@@ -123,11 +187,7 @@ export function VerdictCard({ analysisId }) {
                         </tbody>
                     </table>
                 ) : (
-                    <ul className="mb-0 small">
-                        {(data.explanation || []).map((line, idx) => (
-                            <li key={idx}>{line}</li>
-                        ))}
-                    </ul>
+                    <Explanation lines={data.explanation} />
                 )}
             </>
         );
@@ -143,7 +203,7 @@ export function VerdictCard({ analysisId }) {
 }
 
 export function StaticAnalysisTab({ analysisId }) {
-    const { loading, data, missing, error } = useOptionalJson(
+    const { loading, data, missing, polling, error } = useOptionalJson(
         getStaticReport,
         analysisId,
     );
@@ -151,8 +211,9 @@ export function StaticAnalysisTab({ analysisId }) {
     if (missing)
         return (
             <div className="py-2 text-muted">
-                No static analysis for this analysis (static analysis was off,
-                or it has not finished).
+                {polling
+                    ? "No static analysis yet: waiting for static analysis (this updates by itself)."
+                    : "No static analysis for this analysis (static analysis was off, or it has not finished)."}
             </div>
         );
     if (error)
@@ -168,6 +229,19 @@ export function StaticAnalysisTab({ analysisId }) {
     const type = data.type || {};
     const file = data.file || {};
     const findings = data.findings || [];
+    const coverage = data.coverage;
+    const failed = coverage?.failed_stages || [];
+    const reasons = [
+        coverage?.type_plugin === null
+            ? `no parser for ${type.format} files`
+            : null,
+        failed.length ? `failed: ${failed.join(", ")}` : null,
+    ].filter(Boolean);
+    const ruleset = data.universal?.yara_ruleset;
+    const yara =
+        ruleset?.rules != null
+            ? `${ruleset.rules} rules${ruleset.sources?.length ? ` (${ruleset.sources.map((source) => `${source.name} @ ${source.commit?.slice(0, 7) || "unknown"}`).join(", ")})` : ""}`
+            : ruleset?.note || "no rules";
     return (
         <div className="py-2">
             <table className="datatable-table mb-3">
@@ -189,6 +263,25 @@ export function StaticAnalysisTab({ analysisId }) {
                                     {type.magic}
                                 </div>
                             ) : null}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Coverage</th>
+                        <td>
+                            {!coverage
+                                ? "not reported (older analyzer)"
+                                : coverage.complete
+                                  ? "complete"
+                                  : `partial${reasons.length ? `: ${reasons.join("; ")}` : ""}`}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>YARA</th>
+                        <td>
+                            {yara}
+                            {failed.includes("yara")
+                                ? " - scan did not run"
+                                : ""}
                         </td>
                     </tr>
                     <tr>
