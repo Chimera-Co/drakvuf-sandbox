@@ -432,3 +432,45 @@ def test_register_start_command_reaches_upload_fields(tmp_path):
     assert fields == {"timeout": "120", "file_name": "vnc.msi", "guest_os": "windows",
                       "start_command": 'msiexec /i "{sample}" /qn'}
     assert "start_command" not in m5.upload_fields(rows[1], "rclone", 120)
+
+
+def test_classifier_is_frozen_and_verdicts_tabulated(tmp_path):
+    clf = tmp_path / "clf"
+    clf.mkdir()
+    (clf / "MANIFEST.json").write_text(json.dumps({"model": "m", "model_version": "0.1"}))
+    (clf / "model.py").write_text("x = 1\n")
+    frozen = m5.classifier_fingerprint(clf)
+    assert frozen["model_version"] == "0.1" and set(frozen["files"]) == {"MANIFEST.json", "model.py"}
+    assert m5.classifier_fingerprint(tmp_path / "absent") is None
+    (clf / "model.py").write_text("x = 2\n")
+    assert m5.classifier_fingerprint(clf)["digest"] != frozen["digest"]
+
+    analysis = tmp_path / "a"
+    analysis.mkdir()
+    (analysis / "classification.json").write_text(json.dumps(
+        {"label": "suspicious", "score": 0.3, "model_version": "0.1+fusion0.1", "components": {"static": {"label": "unknown"}}}))
+    fields = m5.verdict_fields(analysis)
+    assert fields["verdict_class"] == "I" and fields["verdict_static"] == "unknown"
+    assert m5.verdict_fields(tmp_path / "none") == {"verdict": None, "verdict_class": None}
+
+    register = [{"sha256": SHA[0], "role": "test"}, {"sha256": SHA[1], "role": "control"}, {"sha256": SHA[2], "role": "benign"}]
+    results = [{"sha256": SHA[0], "os": "windows", "arm": "H3", "verdict_class": "M", "verdict_model_version": "0.1"},
+               {"sha256": SHA[1], "os": "windows", "arm": "H3", "verdict_class": None},
+               {"sha256": SHA[2], "os": "windows", "arm": "H3", "verdict_class": "B"},
+               {"sha256": SHA[2], "os": "windows", "arm": "H3", "verdict_class": "I"}]
+    text = "\n".join(m5.verdict_tables(results, register, frozen))
+    assert "| malware | 1 | 0 | 0 | 1 | 1/2 |" in text  # the failed run stays in the denominator
+    assert "| benign | 0 | 1 | 1 | 0 | 0/2 |" in text
+    assert frozen["digest"][:16] in text
+
+
+def test_run_refuses_a_changed_classifier(tmp_path):
+    clf = tmp_path / "clf"
+    clf.mkdir()
+    (clf / "model.py").write_text("x = 1\n")
+    (tmp_path / "schedule.json").write_text(json.dumps(
+        {"register": str(tmp_path / "r.csv"), "arms": ["A0", "H3"], "schedule": [],
+         "classifier": m5.classifier_fingerprint(clf)}))
+    (clf / "model.py").write_text("x = 2\n")
+    with pytest.raises(SystemExit, match="classifier changed"):
+        m5.main(["run", "--out", str(tmp_path), "--classifier-dir", str(clf)])

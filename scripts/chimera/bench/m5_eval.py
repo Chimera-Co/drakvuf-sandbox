@@ -57,6 +57,9 @@ ANALYSIS_WORKER = "drakrun-worker@1"  # the Windows worker; arm switches restart
 # Windows files the guest starts by extension (startup_command.py); anything else gets ".exe"
 WINDOWS_RUN_EXTENSIONS = (".exe", ".msi", ".ps1", ".bat", ".cmd", ".vbs", ".js")
 DATASET_DIR = pathlib.Path("/var/lib/chimera-dataset")
+CLASSIFIER_DIR = pathlib.Path("/etc/drakrun/classifier")
+# Scoring map for verdicts: suspicious and "no verdict" are indeterminate, never counted as either class
+VERDICT_CLASS = {"malicious": "M", "benign": "B", "suspicious": "I", "unknown": "I"}
 ROLES = ("test", "control", "benign")
 GUEST_OSES = ("windows", "linux")
 # The VM slots restored from the Windows arms (vm-0 = the golden image). chimera-arm
@@ -438,6 +441,34 @@ def submit(api, sample, timeout, poll):
     return task_uid, status
 
 
+def classifier_fingerprint(directory=CLASSIFIER_DIR):
+    """SHA-256 of every deployed classifier file: the batch records it at plan time and refuses to run on
+    anything else, so every verdict in one evaluation comes from the same frozen model and policy."""
+    directory = pathlib.Path(directory)
+    if not directory.is_dir():
+        return None
+    files = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(directory.iterdir()) if p.is_file()}
+    manifest = json.loads((directory / "MANIFEST.json").read_text()) if "MANIFEST.json" in files else {}
+    digest = hashlib.sha256(json.dumps(files, sort_keys=True).encode()).hexdigest()
+    return {"model": manifest.get("model"), "model_version": manifest.get("model_version"), "digest": digest,
+            "files": files}
+
+
+def verdict_fields(analysis_dir):
+    try:
+        verdict = json.loads((pathlib.Path(analysis_dir) / "classification.json").read_text())
+    except (OSError, ValueError):
+        return {"verdict": None, "verdict_class": None}
+    components = verdict.get("components") if isinstance(verdict.get("components"), dict) else {}
+    return {
+        "verdict": verdict.get("label"),
+        "verdict_class": VERDICT_CLASS.get(verdict.get("label")),
+        "verdict_score": verdict.get("score"),
+        "verdict_model_version": verdict.get("model_version"),
+        **{f"verdict_{name}": c.get("label") for name, c in components.items() if isinstance(c, dict)},
+    }
+
+
 def cmd_plan(args):
     register = read_register(args.register)
     for sample in register:
@@ -455,6 +486,7 @@ def cmd_plan(args):
         "runs": args.runs,
         "timeout": args.timeout,
         "seed": seed,
+        "classifier": classifier_fingerprint(args.classifier_dir),
         "schedule": make_schedule(register, args.arms, args.runs, seed, args.linux_arms),
     }
     (out / "schedule.json").write_text(json.dumps(plan, indent=1))
@@ -527,6 +559,7 @@ class Lane:
                 task_uid, status = submit(ctx["api"], sample, ctx["timeout"], ctx["poll"])
                 record = {**item, "task_uid": task_uid, "submitted": started, "completed": now()}
                 record.update(label_analysis(ANALYSES_DIR / task_uid, self.guest_os))
+                record.update(verdict_fields(ANALYSES_DIR / task_uid))
                 record["status"] = status
                 features = ANALYSES_DIR / task_uid / "features.json"
                 if features.exists():
@@ -552,6 +585,14 @@ def cmd_run(args):
 
     out = pathlib.Path(args.out)
     plan = json.loads((out / "schedule.json").read_text())
+    frozen = plan.get("classifier")
+    if frozen:
+        current = classifier_fingerprint(args.classifier_dir) or {"files": {}}
+        changed = sorted(n for n in set(frozen["files"]) | set(current["files"])
+                         if frozen["files"].get(n) != current["files"].get(n))
+        if changed and not args.allow_classifier_change:
+            raise SystemExit(f"classifier changed since the plan was made ({', '.join(changed)}); the evaluation"
+                             " needs one frozen model. Redeploy the planned one, or re-plan.")
     register = {s["sha256"]: s for s in read_register(plan["register"])}
     oses = GUEST_OSES if args.os == "both" else (args.os,)
     for item in plan["schedule"]:
@@ -623,6 +664,33 @@ def _fmt(value):
 
 def _verdicts(runs):
     return " ".join(sorted({r.get("verdict") or "–" for r in runs}))
+
+
+def verdict_tables(results, register, frozen=None):
+    """Truth (register role) x classifier verdict, per lane and arm, over every attempted run. M/B/I as in
+    VERDICT_CLASS; "none" = no classification.json (failed run or classifier error) stays in the denominator."""
+    truth = {s["sha256"]: ("benign" if s["role"] == "benign" else "malware") for s in register}
+    lines = ["", "## Classifier verdicts (truth by verdict, every attempted run)", ""]
+    if frozen:
+        lines.append(f"Frozen classifier: {frozen.get('model')} {frozen.get('model_version')},"
+                     f" files digest `{frozen['digest'][:16]}` ({len(frozen['files'])} files hashed in schedule.json).")
+        seen = sorted({str(r.get("verdict_model_version")) for r in results if r.get("verdict_model_version")})
+        lines += [f"Model versions in the verdicts: {', '.join(seen) or 'none'}.", ""]
+    for os_, arm in sorted({(r["os"], r.get("arm")) for r in results}):
+        runs = [r for r in results if r["os"] == os_ and r.get("arm") == arm and r["sha256"] in truth]
+        lines += [f"**{os_} / {arm}** ({len(runs)} runs)", "",
+                  "| Truth | Malicious (M) | Benign (B) | Indeterminate (I) | No verdict file | M rate |",
+                  "|---|---|---|---|---|---|"]
+        for t in ("malware", "benign"):
+            rows = [r for r in runs if truth[r["sha256"]] == t]
+            n = {k: sum(1 for r in rows if r.get("verdict_class") == k) for k in ("M", "B", "I")}
+            none = len(rows) - sum(n.values())
+            rate = f"{n['M']}/{len(rows)}" if rows else "–"
+            lines.append(f"| {t} | {n['M']} | {n['B']} | {n['I']} | {none} | {rate} |")
+        lines.append("")
+    lines.append("M rate is end-to-end: malicious verdicts over all attempted runs of that truth class"
+                 " (detection rate for malware, false-alarm rate for benign).")
+    return lines
 
 
 def other_tables(results, register):
@@ -719,6 +787,7 @@ def cmd_report(args):
             f" | {_fmt(row[f'{arm_a}_network'])} | {_fmt(row[f'{arm_b}_network'])}"
             f" | {row[f'{arm_a}_complete']}/{row[f'{arm_b}_complete']} |"
         )
+    lines += verdict_tables(results, register, plan.get("classifier"))
     lines += other_tables(results, register)
     (out / "report.md").write_text("\n".join(lines) + "\n")
     (out / "summary.json").write_text(json.dumps(summary, indent=1))
@@ -736,6 +805,7 @@ def main(argv=None):
     p.add_argument("--timeout", type=int, default=180)
     p.add_argument("--linux-arms", nargs="+", default=["L"], help="labels for the Linux runs (one image, no switching)")
     p.add_argument("--seed", type=int)
+    p.add_argument("--classifier-dir", default=str(CLASSIFIER_DIR))
     p.set_defaults(func=cmd_plan)
     p = sub.add_parser("run")
     p.add_argument("--out", required=True)
@@ -743,6 +813,9 @@ def main(argv=None):
     p.add_argument("--poll", type=float, default=5.0)
     p.add_argument("--os", choices=["both", *GUEST_OSES], default="both", help="run only one lane")
     p.add_argument("--dataset", default=str(DATASET_DIR))
+    p.add_argument("--classifier-dir", default=str(CLASSIFIER_DIR))
+    p.add_argument("--allow-classifier-change", action="store_true",
+                   help="run although the deployed classifier differs from the one frozen in the plan")
     p.set_defaults(func=cmd_run)
     p = sub.add_parser("label")
     p.add_argument("analysis_dir")
