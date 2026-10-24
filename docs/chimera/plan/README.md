@@ -10,14 +10,14 @@ verified from a primary source, **[S]** secondary, **[K]** background knowledge 
 |---|---|
 | [`roadmap.md`](roadmap.md) | What we build by 31 Oct, in what order, with an acceptance test each; what we leave for later |
 | [`current-state.md`](current-state.md) | What is deployed and working today, test results, data, and the defects this audit found |
-| [`ms360-study.md`](ms360-study.md) | MS 360 (Malware Shodhak 360) from the team's screenshots and recordings and its public page: engines, reports, gaps |
+| [`ms360-study.md`](ms360-study.md) | MS 360 (Malware Shodhak 360) from the team's screenshots and recordings and its public page: engines, reports, gaps. Background only: the team has no MS 360 access, so it is not a benchmark comparator |
 | [`competitive-landscape.md`](competitive-landscape.md) | CERT-PL DRAKVUF Sandbox, CAPE, Cuckoo 3, ANY.RUN, Hybrid Analysis, VirusTotal, Intezer, IntelOwl, Triage, Joe Sandbox; comparison matrix with CHIMERA |
 | [`static-engine-design.md`](static-engine-design.md) | Static analyzer audit, tool and YARA ruleset choices (with licences), `chimera-static/2` evidence schema |
 | [`classifier-audit.md`](classifier-audit.md) | Data, leakage, the zero-call defect (fixed), score semantics, calibration limits, evaluation protocol |
 | [`report-intel-orchestration.md`](report-intel-orchestration.md) | Threat-intelligence design (hash-only, offline-first), `chimera-report/1` report schema, queue flow, analysis modes |
 | [`architecture.md`](architecture.md) | Components, data flow, trust boundaries and artifacts as they are today, and the deltas after the roadmap |
 | [`hardening-roadmap.md`](hardening-roadmap.md) | Measured evasion results, remaining detections and their causes, future VMI and PERDEDOR work, what never to do |
-| [`benchmark-plan.md`](benchmark-plan.md) | A fair, pre-registered comparison of CHIMERA with MS 360 and public reports: approvals, metrics, statistics, runbook |
+| [`benchmark-plan.md`](benchmark-plan.md) | A fair, pre-registered comparison of CHIMERA with reports public sandboxes (Triage, ANY.RUN) already published for the same hashes; no uploads, no accounts; metrics, statistics, runbook |
 | [`testing-strategy.md`](testing-strategy.md) | Test inventory, gaps, contract and security tests, operator smoke tests, freeze checklist |
 | [`bibliography.md`](bibliography.md) | All 180 external sources cited above |
 | [`evidence/`](evidence/) | Reproducible probe behind the classifier findings and its output |

@@ -12,8 +12,8 @@
    future work (`hardening-roadmap.md`).
 4. **No retraining and no probability claims.** The classifier artifacts stay frozen for the malware evaluation;
    scores are decision scores, not probabilities (`classifier-audit.md` §4, §7).
-5. **Nothing leaves the host.** No sample upload anywhere; any external comparison needs the owner's and mentor's
-   written approval first (`benchmark-plan.md` §2).
+5. **Nothing leaves the host.** No sample upload anywhere; the external comparison uses only reports that are already
+   public (`benchmark-plan.md` §2).
 
 ## Done on 25 Oct
 
@@ -58,7 +58,7 @@ existing CHIMERA theme; no new UI framework.
 | ID | Work | Who | When |
 |---|---|---|---|
 | O1 | M5 Stage 1 malware batch (A0 vs H3) after approval | Owner starts it; monitoring and report follow | As soon as approved |
-| O2 | Comparison study per `benchmark-plan.md` (approvals before any external upload) | Benchmark lead | Freeze register 27 Oct; collect 28–29; score 30 |
+| O2 | Comparison with existing public sandbox reports per `benchmark-plan.md` (no uploads, no accounts) | Benchmark lead | Find reports 27 Oct; compare 28–29; score 30 |
 | O3 | Containment check on the demo boot; benign rehearsal; recorded fallback demo | Owner | 30 Oct |
 | O4 | Decide: Linux control samples (8 test + 0 controls today), benign dataset repository visibility, VNC password rotation | Owner | Any time before 29 Oct |
 | O5 | Questions for the classifier owner: should a Windows run whose dynamic part abstains still get an overall verdict from static alone? Switch the training filter to usable calls at the next retraining | Classifier owner | Before the evaluation |
