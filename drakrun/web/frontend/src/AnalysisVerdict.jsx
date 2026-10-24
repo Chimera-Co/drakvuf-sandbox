@@ -202,6 +202,39 @@ export function VerdictCard({ analysisId }) {
     );
 }
 
+function HashValue({ label, value }) {
+    const [message, setMessage] = useState("");
+    async function copy() {
+        try {
+            await navigator.clipboard.writeText(value);
+            setMessage("Copied");
+        } catch {
+            setMessage("Copy unavailable; select and copy the hash manually.");
+        }
+    }
+    return (
+        <div className="mb-2">
+            <strong>{label}: </strong>
+            <span className="font-monospace small text-break">
+                {value || "not computed"}
+            </span>
+            {value ? (
+                <button
+                    type="button"
+                    className="btn btn-sm btn-outline-secondary ms-2"
+                    aria-label={`Copy ${label}`}
+                    onClick={copy}
+                >
+                    Copy
+                </button>
+            ) : null}
+            <span role="status" className="small ms-2">
+                {message}
+            </span>
+        </div>
+    );
+}
+
 export function StaticAnalysisTab({ analysisId }) {
     const { loading, data, missing, polling, error } = useOptionalJson(
         getStaticReport,
@@ -305,6 +338,13 @@ export function StaticAnalysisTab({ analysisId }) {
                     </tr>
                 </tbody>
             </table>
+            <section aria-label="Hashes" className="mb-3">
+                <h6>Hashes</h6>
+                <HashValue label="SHA-256" value={file.sha256} />
+                <HashValue label="ssdeep" value={file.ssdeep} />
+                <HashValue label="TLSH" value={file.tlsh} />
+                <HashValue label="imphash" value={data.pe?.imphash} />
+            </section>
             <h6>Findings ({findings.length})</h6>
             {findings.length ? (
                 <table className="table table-sm">

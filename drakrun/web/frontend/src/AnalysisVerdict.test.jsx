@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, act, cleanup, within } from "@testing-library/react";
+import {
+    render,
+    screen,
+    act,
+    cleanup,
+    within,
+    fireEvent,
+} from "@testing-library/react";
 import { StaticAnalysisTab, VerdictCard } from "./AnalysisVerdict.jsx";
 import { getClassification, getStaticReport } from "./api.js";
 
@@ -288,3 +295,40 @@ it.each([
         expect(screen.getByText(expected)).toBeTruthy();
     },
 );
+
+describe("static hashes", () => {
+    it("shows hashes and copies a value", async () => {
+        getStaticReport.mockResolvedValue({
+            file: {
+                sha256: "sha-value",
+                ssdeep: "ss-value",
+                tlsh: "tls-value",
+            },
+            pe: { imphash: "imp-value" },
+        });
+        const writeText = vi.fn().mockResolvedValue();
+        Object.defineProperty(navigator, "clipboard", {
+            configurable: true,
+            value: { writeText },
+        });
+        render(<StaticAnalysisTab analysisId={ID} />);
+        const block = await screen.findByRole("region", { name: "Hashes" });
+        for (const value of ["sha-value", "ss-value", "tls-value", "imp-value"])
+            expect(within(block).getByText(value)).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Copy SHA-256" }));
+        expect(await screen.findByText("Copied")).toBeTruthy();
+        expect(writeText).toHaveBeenCalledWith("sha-value");
+    });
+    it("shows missing hashes and handles unavailable clipboard", async () => {
+        getStaticReport.mockResolvedValue({ file: { sha256: "sha-value" } });
+        Object.defineProperty(navigator, "clipboard", {
+            configurable: true,
+            value: undefined,
+        });
+        render(<StaticAnalysisTab analysisId={ID} />);
+        await screen.findByRole("region", { name: "Hashes" });
+        expect(screen.getAllByText("not computed")).toHaveLength(3);
+        fireEvent.click(screen.getByRole("button", { name: "Copy SHA-256" }));
+        expect(await screen.findByText(/Copy unavailable/)).toBeTruthy();
+    });
+});
