@@ -112,16 +112,27 @@ def get_s3_prefix(analysis_id):
     return "/".join([*analysis_id[0:4], analysis_id])
 
 
-def read_analysis_file(analysis_id: str, path: str, s3_config: S3StorageConfigSection):
+def read_entity_file(
+    entity_id: str,
+    path: str,
+    s3_config: S3StorageConfigSection,
+    base_dir: pathlib.Path = ANALYSES_DIR,
+):
+    """Generalized form of read_analysis_file, parameterized on the entity's
+    root directory so a second entity kind (evasion scans) can reuse the same
+    traversal guard, S3 fallback and error semantics without duplicating
+    them. analysis_id/base_path naming is kept generic (entity_id) since the
+    on-disk layout convention (one directory per uuid, holding arbitrary
+    relative paths) is identical for analyses and evasion scans."""
     if not is_s3_enabled(s3_config):
-        base_path = ANALYSES_DIR / analysis_id
+        base_path = base_dir / entity_id
         path_to_file = check_path(base_path / path, base_path)
         if not path_to_file.exists():
             raise FileNotFoundError
         data = path_to_file.read_bytes()
     else:
         s3_client = get_s3_client(s3_config)
-        object_key = get_s3_prefix(analysis_id) + "/" + path
+        object_key = get_s3_prefix(entity_id) + "/" + path
         try:
             data = s3_client.get_object(Bucket=s3_config.bucket, Key=object_key)[
                 "Body"
@@ -134,21 +145,27 @@ def read_analysis_file(analysis_id: str, path: str, s3_config: S3StorageConfigSe
     return data
 
 
+def read_analysis_file(analysis_id: str, path: str, s3_config: S3StorageConfigSection):
+    return read_entity_file(analysis_id, path, s3_config, base_dir=ANALYSES_DIR)
+
+
 def read_analysis_json(analysis_id: str, path: str, s3_config: S3StorageConfigSection):
     data = read_analysis_file(analysis_id, path, s3_config)
     parsed_data = json.loads(data)
     return parsed_data
 
 
-def send_analysis_file(
-    analysis_id: str,
+def send_entity_file(
+    entity_id: str,
     path: str,
     mimetype: str,
     s3_config: S3StorageConfigSection,
     download_name: Optional[str] = None,
+    base_dir: pathlib.Path = ANALYSES_DIR,
 ):
+    """Generalized form of send_analysis_file - see read_entity_file."""
     if not is_s3_enabled(s3_config):
-        base_path = ANALYSES_DIR / analysis_id
+        base_path = base_dir / entity_id
         path_to_file = check_path(base_path / path, base_path)
         if not path_to_file.exists():
             return dict(error="Data not found"), 404
@@ -162,7 +179,7 @@ def send_analysis_file(
 
     # S3 handling
     s3_client = get_s3_client(s3_config)
-    object_key = get_s3_prefix(analysis_id) + "/" + path
+    object_key = get_s3_prefix(entity_id) + "/" + path
     try:
         if request.range:
             if len(request.range.ranges) > 1:
@@ -204,12 +221,33 @@ def send_analysis_file(
             raise
 
 
-@contextlib.contextmanager
-def open_seekable_stream(
-    analysis_id: str, path: str, s3_config: S3StorageConfigSection
+def send_analysis_file(
+    analysis_id: str,
+    path: str,
+    mimetype: str,
+    s3_config: S3StorageConfigSection,
+    download_name: Optional[str] = None,
 ):
+    return send_entity_file(
+        analysis_id,
+        path,
+        mimetype,
+        s3_config,
+        download_name=download_name,
+        base_dir=ANALYSES_DIR,
+    )
+
+
+@contextlib.contextmanager
+def open_entity_stream(
+    entity_id: str,
+    path: str,
+    s3_config: S3StorageConfigSection,
+    base_dir: pathlib.Path = ANALYSES_DIR,
+):
+    """Generalized form of open_seekable_stream - see read_entity_file."""
     if not is_s3_enabled(s3_config):
-        base_path = ANALYSES_DIR / analysis_id
+        base_path = base_dir / entity_id
         path_to_file = check_path(base_path / path, base_path)
         if not path_to_file.exists():
             raise FileNotFoundError
@@ -219,7 +257,7 @@ def open_seekable_stream(
     else:
         # S3 handling
         s3_client = get_s3_client(s3_config)
-        object_key = get_s3_prefix(analysis_id) + "/" + path
+        object_key = get_s3_prefix(entity_id) + "/" + path
         try:
             body = s3_client.get_object(Bucket=s3_config.bucket, Key=object_key)["Body"]
         except ClientError as e:
@@ -236,11 +274,24 @@ def open_seekable_stream(
             file.close()
 
 
-def list_analysis_files(
-    analysis_id: str, s3_config: S3StorageConfigSection
+@contextlib.contextmanager
+def open_seekable_stream(
+    analysis_id: str, path: str, s3_config: S3StorageConfigSection
+):
+    with open_entity_stream(
+        analysis_id, path, s3_config, base_dir=ANALYSES_DIR
+    ) as file:
+        yield file
+
+
+def list_entity_files(
+    entity_id: str,
+    s3_config: S3StorageConfigSection,
+    base_dir: pathlib.Path = ANALYSES_DIR,
 ) -> list[str]:
+    """Generalized form of list_analysis_files - see read_entity_file."""
     if not is_s3_enabled(s3_config):
-        base_path = ANALYSES_DIR / analysis_id
+        base_path = base_dir / entity_id
         if not base_path.exists():
             raise FileNotFoundError
         return [
@@ -250,15 +301,21 @@ def list_analysis_files(
         ]
     # S3 handling
     s3_client = get_s3_client(s3_config)
-    analysis_key = get_s3_prefix(analysis_id) + "/"
-    response = s3_client.list_objects_v2(Bucket=s3_config.bucket, Prefix=analysis_key)[
+    entity_key = get_s3_prefix(entity_id) + "/"
+    response = s3_client.list_objects_v2(Bucket=s3_config.bucket, Prefix=entity_key)[
         "Contents"
     ]
     keys = []
     for obj in response:
-        object_name = obj["Key"][len(analysis_key) :]
+        object_name = obj["Key"][len(entity_key) :]
         keys.append(object_name)
     return keys
+
+
+def list_analysis_files(
+    analysis_id: str, s3_config: S3StorageConfigSection
+) -> list[str]:
+    return list_entity_files(analysis_id, s3_config, base_dir=ANALYSES_DIR)
 
 
 def list_analysis_logs(analysis_id: str, s3_config: S3StorageConfigSection):

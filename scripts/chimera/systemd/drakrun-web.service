@@ -1,0 +1,19 @@
+[Unit]
+Description=CHIMERA web UI and API (localhost only)
+Documentation=file:///home/shreyas/Documents/chimera/chimera-console/docs/chimera/threat-model.md
+Requires=redis-server.service
+After=redis-server.service
+
+[Service]
+Type=simple
+# Bound to loopback: the API and /rq dashboard have no authentication
+# (threat model T6). Reach it remotely only through an SSH tunnel.
+ExecStart=/opt/chimera/venv/bin/gunicorn --workers 2 --bind 127.0.0.1:5000 drakrun.web.app:app
+Restart=on-failure
+RestartSec=5
+User=root
+# Uploaded samples, memory dumps and dropped files stay root-only (threat model: accidental opening on the host)
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

@@ -11,6 +11,13 @@ from .check_root import check_root
 
 @click.command("analyze")
 @click.option(
+    "--guest-os",
+    type=click.Choice(["windows", "linux"]),
+    default="windows",
+    show_default=True,
+    help="Guest operating system",
+)
+@click.option(
     "--vm-id",
     "vm_id",
     default=1,
@@ -135,6 +142,7 @@ from .check_root import check_root
 )
 @check_root
 def analyze(
+    guest_os,
     vm_id,
     output_dir,
     sample,
@@ -159,6 +167,7 @@ def analyze(
     """
     from drakrun.analyzer.analysis_options import AnalysisOptions
     from drakrun.analyzer.analyzer import analyze_file
+    from drakrun.analyzer.linux_analyzer import analyze_linux_file
     from drakrun.lib.config import load_config
 
     started_at = datetime.now(timezone.utc)
@@ -190,6 +199,7 @@ def analyze(
 
     options = AnalysisOptions.with_config_defaults(
         config=config,
+        guest_os=guest_os,
         preset=preset,
         host_sample_path=sample,
         timeout=timeout,
@@ -206,10 +216,10 @@ def analyze(
         archive_password=archive_password,
     )
 
-    if target_filepath is not None:
+    if guest_os == "windows" and target_filepath is not None:
         options.guest_target_directory = pathlib.PureWindowsPath(target_filepath)
 
-    if guest_working_directory is not None:
+    if guest_os == "windows" and guest_working_directory is not None:
         options.guest_working_directory = pathlib.PureWindowsPath(
             guest_working_directory
         )
@@ -228,7 +238,10 @@ def analyze(
         if substatus == AnalysisSubstatus.analyzing:
             metadata.time_execution_started = datetime.now(timezone.utc).isoformat()
 
-    extra_metadata = analyze_file(
+    analyzer = (
+        analyze_linux_file if metadata.options.guest_os == "linux" else analyze_file
+    )
+    extra_metadata = analyzer(
         vm_id=vm_id,
         output_dir=output_dir,
         metadata=metadata,

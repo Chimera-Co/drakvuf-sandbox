@@ -1,6 +1,7 @@
 import json
 import logging
 import pathlib
+import shlex
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, TextIO
 
@@ -104,7 +105,14 @@ class ProcessTree:
                     (not process.evtid_to) or evtid <= process.evtid_to
                 ):
                     return process
-        return None
+        # Linux: a new child can log events before the parent's kernel_clone record that
+        # creates it in the tree; give them to the next process with this PID
+        later = [
+            p
+            for p in self.processes
+            if p.pid == pid and p.evtid_from is not None and p.evtid_from > evtid
+        ]
+        return min(later, key=lambda p: p.evtid_from) if later else None
 
     def get_process(self, pid: int) -> Optional[Process]:
         """
@@ -281,9 +289,106 @@ def parse_unknown_process_entry(pstree: ProcessTree, entry: Dict[str, Any]) -> N
     )
 
 
+def split_linux_commandline(cmdline: str) -> List[str]:
+    # Linux procmon joins argv with spaces, so quoting is lost; shlex is the best guess.
+    try:
+        return shlex.split(cmdline)
+    except ValueError:
+        return cmdline.split()
+
+
+def parse_linux_clone_entry(
+    pstree: ProcessTree, entry: Dict[str, Any], execed_before_clone: set
+) -> None:
+    # kernel_clone is logged when it returns in the parent: PID is the parent, NewPid the child.
+    if "CLONE_THREAD" in entry.get("Flags", "") or not entry.get("NewPid"):
+        return  # a new thread, not a new process
+    child = pstree.get_process(entry["NewPid"])
+    if child is not None and child.seqid in execed_before_clone:
+        # vfork: the parent only returns from kernel_clone after the child called exec,
+        # so the child is already in the tree
+        execed_before_clone.discard(child.seqid)
+        return
+    parent = pstree.get_process(entry["PID"])
+    pstree.add_process(
+        pid=entry["NewPid"],
+        ppid=entry["PID"],
+        ts_from=float(entry["TimeStamp"]),
+        evtid_from=int(entry["EventUID"], 16),
+        procname=parent.procname if parent else entry.get("ProcessName", ""),
+        parent=parent,
+        args=list(parent.args) if parent else [],
+    )
+
+
+def parse_linux_exec_entry(
+    pstree: ProcessTree,
+    entry: Dict[str, Any],
+    forked_not_execed: set,
+    execed_before_clone: set,
+) -> None:
+    # Same PID, new image. A fresh fork child just takes the new image; a process that
+    # already ran an image gets a new entry as its own child, so the tree keeps both.
+    process = pstree.get_process(entry["PID"])
+    procname = entry.get("ImagePathName") or entry.get("FileName") or ""
+    args = split_linux_commandline(entry.get("CommandLine") or "")
+    if procname in ("", "(null)"):
+        # Image without a path: execve of a memfd or of an unlinked file (fileless execution)
+        procname = f"{FILELESS_PREFIX}{args[0] if args else ''}"
+    if process is None or process.ts_to is not None:
+        # Not seen yet: a vfork child whose parent's kernel_clone has not returned
+        new = pstree.add_process(
+            pid=entry["PID"],
+            ppid=entry["PPID"],
+            ts_from=float(entry["TimeStamp"]),
+            evtid_from=int(entry["EventUID"], 16),
+            procname=procname,
+            parent=pstree.get_process(entry["PPID"]),
+            args=args,
+        )
+        execed_before_clone.add(new.seqid)
+        return
+    if process.seqid in forked_not_execed:
+        forked_not_execed.discard(process.seqid)
+        process.procname = procname
+        process.args = args
+        return
+    pstree.add_process(
+        pid=entry["PID"],
+        ppid=entry["PID"],
+        ts_from=float(entry["TimeStamp"]),
+        evtid_from=int(entry["EventUID"], 16),
+        procname=procname,
+        parent=process,
+        args=args,
+    )
+
+
+def parse_linux_exit_entry(pstree: ProcessTree, entry: Dict[str, Any]) -> None:
+    # do_exit runs per thread; the thread group leader's exit ends the process.
+    if entry.get("TID", entry["PID"]) != entry["PID"]:
+        return
+    process = pstree.get_process(entry["PID"])
+    if process is None or process.ts_to is not None:
+        return
+    # evtid_to stays open: do_exit is logged at entry, and the process still closes its files
+    # (filetracer events) while it tears down. A later process with the same PID closes it.
+    process.ts_to = float(entry["TimeStamp"])
+    process.exit_code = entry.get("ExitStatus")
+    process.exit_code_str = entry.get("ExitStatusStr")
+
+
+FILELESS_PREFIX = "[fileless] "
+LINUX_PROCMON_METHODS = {"kernel_clone", "do_execveat_common", "do_exit", "send_signal"}
+
+
 def tree_from_log(file: TextIO) -> ProcessTree:
     pstree = ProcessTree()
     prev_line = None
+    # Linux: processes forked during the analysis that have not called exec yet,
+    # and vfork children whose exec was logged before the parent's kernel_clone
+    forked_not_execed = set()
+    execed_before_clone = set()
     for line in file:
         try:
             if line == prev_line:
@@ -296,6 +401,18 @@ def tree_from_log(file: TextIO) -> ProcessTree:
             if "RunningProcess" in entry:
                 # Process has been created before the analysis started.
                 parse_running_process_entry(pstree, entry)
+            elif entry.get("Method") in LINUX_PROCMON_METHODS:
+                if entry["Method"] == "kernel_clone":
+                    before = len(pstree.processes)
+                    parse_linux_clone_entry(pstree, entry, execed_before_clone)
+                    if len(pstree.processes) > before:
+                        forked_not_execed.add(pstree.processes[-1].seqid)
+                elif entry["Method"] == "do_execveat_common":
+                    parse_linux_exec_entry(
+                        pstree, entry, forked_not_execed, execed_before_clone
+                    )
+                elif entry["Method"] == "do_exit":
+                    parse_linux_exit_entry(pstree, entry)
             elif "Method" in entry:
                 if entry["Method"] == "NtCreateUserProcess":
                     # Process has been created after the analysis started.

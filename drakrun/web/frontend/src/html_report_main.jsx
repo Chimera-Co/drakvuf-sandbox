@@ -11,6 +11,7 @@ import "./chimera-theme.css";
 
 import { HashRouter } from "react-router-dom";
 import { AppHeader, AppFooter } from "./App";
+import { initTheme } from "./themes.js";
 import { OfflineAnalysisReportProvider } from "./AnalysisReportContext.jsx";
 import { AnalysisReport } from "./AnalysisReport.jsx";
 
@@ -46,6 +47,8 @@ function EmbeddedReportApp() {
         </>
     );
 }
+
+initTheme();
 
 createRoot(document.getElementById("root")).render(
     <StrictMode>

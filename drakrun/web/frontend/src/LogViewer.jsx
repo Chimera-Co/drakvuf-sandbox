@@ -11,11 +11,13 @@ export async function* _logLoader({ getLogEntries, chunkSize }) {
                 rangeStart: currentStart,
                 rangeEnd: currentStart + (chunkSize - 1),
             });
-            const dataLength = data.lastIndexOf("\n") + 1;
-            yield data.slice(0, dataLength);
-            currentStart += dataLength;
+            if (!data.length) return;
+            const byteLength = new TextEncoder().encode(data).length;
+            yield data;
+            currentStart += byteLength;
+            if (byteLength < chunkSize) return;
         } catch (err) {
-            if (err.status === 416) {
+            if (err.status === 416 || err.response?.status === 416) {
                 break;
             } else {
                 throw err;
@@ -77,7 +79,9 @@ export function LogViewer({ logLoaderFactory }) {
             .next()
             .then(({ done, value }) => {
                 if (!done) {
-                    setContent((content) => content + value);
+                    setContent((content) =>
+                        (content + value).slice(-8 * 1024 * 1024),
+                    );
                 }
                 setLoading(false);
             })
@@ -85,6 +89,7 @@ export function LogViewer({ logLoaderFactory }) {
                 if (reason?.message === "Log loader is closed") {
                     return undefined;
                 }
+                setLoading(false);
                 console.error(reason);
             });
     }, [logLoader]);
@@ -105,6 +110,9 @@ export function LogViewer({ logLoaderFactory }) {
 
     return (
         <>
+            <p className="small text-muted">
+                Raw viewer retains the most recent 8 MiB of loaded text.
+            </p>
             <div style={{ height: "600px" }} className="flex-grow-1">
                 <LazyLog
                     ref={logViewer}

@@ -8,13 +8,17 @@ from rq.exceptions import NoSuchJobError
 from rq.job import Job, JobStatus
 
 from drakrun.analyzer.analysis_metadata import AnalysisMetadata, FileMetadata
-from drakrun.analyzer.analysis_options import AnalysisOptions
 from drakrun.analyzer.postprocessing.indexer import (
     get_log_index_for_process,
     get_plugin_names_for_process,
     scattered_read_file,
 )
+from drakrun.analyzer.postprocessing.plugins.build_chimera_report import (
+    iocs_csv,
+    iocs_export,
+)
 from drakrun.analyzer.postprocessing.process_tree import tree_from_dict
+from drakrun.analyzer.static.worker import enqueue_static_only, stage_and_enqueue
 from drakrun.analyzer.worker import (
     analysis_job_to_metadata,
     enqueue_analysis,
@@ -23,7 +27,8 @@ from drakrun.analyzer.worker import (
     truncate_analysis_list,
 )
 from drakrun.lib.config import load_config
-from drakrun.lib.paths import UPLOADS_DIR
+from drakrun.lib.intel.online.options import OnlineAnalysisOptions
+from drakrun.lib.paths import STATIC_DIR, UPLOADS_DIR
 from drakrun.lib.s3_storage import get_s3_client, is_s3_enabled, upload_sample_to_s3
 from drakrun.web.schema import (
     AnalysisFileRequestQuery,
@@ -47,10 +52,16 @@ from drakrun.web.storage import (
     open_seekable_stream,
     read_analysis_json,
     send_analysis_file,
+    send_entity_file,
 )
 
 ANALYSES_LIST_MAX_LENGTH = 100
 api = APIBlueprint("api", __name__, url_prefix="/api")
+
+
+class OnlineUploadForm(UploadFileForm):
+    intel_online: bool | None = None
+
 
 config = load_config()
 redis = get_redis_connection(config.redis)
@@ -58,7 +69,34 @@ logger = logging.getLogger(__name__)
 
 
 @api.post("/upload", responses={200: UploadAnalysisResponse})
-def upload_sample(form: UploadFileForm):
+def upload_sample(form: OnlineUploadForm):
+    intel_online = (
+        config.intel.online_default if form.intel_online is None else form.intel_online
+    )
+    if form.mode == "static-only":
+        if not config.static.enabled:
+            return jsonify({"error": "static analysis is disabled on this server"}), 400
+        for field in (
+            "extract_archive",
+            "start_command",
+            "file_path",
+            "start_working_dir",
+        ):
+            if getattr(form, field):
+                return (
+                    jsonify(
+                        {"error": f"{field} is not supported for static-only analysis"}
+                    ),
+                    400,
+                )
+
+    if form.guest_os in ("android", "ios") and form.mode != "static-only":
+        return (
+            jsonify(
+                {"error": "mobile apps are analysed statically only (mode static-only)"}
+            ),
+            400,
+        )
     request_file = form.file
     job_id = str(uuid.uuid4())
 
@@ -80,9 +118,43 @@ def upload_sample(form: UploadFileForm):
 
     try:
         request_file.save(tmp_upload_path)
+        # Samples are data on the host, never programs: owner read-only, no execute bits.
+        tmp_upload_path.chmod(0o400)
         file_metadata = FileMetadata.evaluate(
             file_path=tmp_upload_path, file_name=sample_filename
         )
+        # Static analysis starts now, beside the detonation (stages its own copy before
+        # the upload may be moved to S3 and deleted below). Never blocks the upload.
+        try:
+            if form.mode == "combined":
+                stage_and_enqueue(
+                    job_id, tmp_upload_path, sample_filename, redis, config.static
+                )
+        except Exception:
+            logger.exception("Static analysis could not be queued for %s", job_id)
+
+        from drakrun.analyzer.static.worker import _write_json, job_dir
+
+        if config.intel.online_enabled:
+            intel_directory = job_dir(job_id)
+            intel_directory.mkdir(parents=True, exist_ok=True)
+            _write_json(
+                intel_directory, "online-options.json", {"intel_online": intel_online}
+            )
+        if form.mode == "static-only":
+            analysis_options = OnlineAnalysisOptions(
+                intel_online=intel_online,
+                mode=form.mode,
+                plugins=[],
+                net_enable=False,
+                sample_filename=sample_filename,
+            )
+            enqueue_static_only(
+                job_id, tmp_upload_path, file_metadata, analysis_options, redis, config
+            )
+            tmp_upload_path.unlink()
+            truncate_analysis_list(connection=redis, limit=ANALYSES_LIST_MAX_LENGTH)
+            return jsonify({"task_uid": job_id})
 
         if is_s3_enabled(config.s3):
             s3_client = get_s3_client(config.s3)
@@ -94,8 +166,11 @@ def upload_sample(form: UploadFileForm):
         else:
             sample_path = tmp_upload_path.as_posix()
 
-        analysis_options = AnalysisOptions.with_config_defaults(
+        analysis_options = OnlineAnalysisOptions.with_config_defaults(
+            intel_online=intel_online,
             config=config,
+            guest_os=form.guest_os,
+            mode=form.mode,
             preset=preset,
             host_sample_path=pathlib.Path(sample_path) if sample_path else None,
             sample_filename=sample_filename,
@@ -109,11 +184,11 @@ def upload_sample(form: UploadFileForm):
             analysis_options.net_enable = False
         if no_screenshots:
             analysis_options.no_screenshotter = True
-        if form.file_path:
+        if form.guest_os == "windows" and form.file_path:
             analysis_options.guest_target_directory = pathlib.PureWindowsPath(
                 form.file_path
             )
-        if form.start_working_dir:
+        if form.guest_os == "windows" and form.start_working_dir:
             analysis_options.guest_working_directory = pathlib.PureWindowsPath(
                 form.start_working_dir
             )
@@ -235,6 +310,36 @@ def logs(path: LogsRequestPath):
     )
 
 
+@api.get("/logs/<task_uid>/<log_type>/stats")
+def log_statistics(path: LogsRequestPath):
+    from drakrun.web.log_stats import get_stats
+
+    try:
+        return jsonify(get_stats(path.task_uid, path.log_type, config.s3))
+    except (FileNotFoundError, ValueError):
+        return jsonify({"error": "Data not found"}), 404
+
+
+@api.get("/logs/<task_uid>/stats")
+def analysis_log_statistics(path: AnalysisRequestPath):
+    from drakrun.web.log_stats import combined_stats
+
+    try:
+        return jsonify(combined_stats(path.task_uid, config.s3))
+    except (FileNotFoundError, ValueError):
+        return jsonify({"error": "Data not found"}), 404
+
+
+@api.get("/logs/<task_uid>/stats/process/<seqid>")
+def process_log_statistics(path: ProcessInfoRequestPath):
+    from drakrun.web.log_stats import process_stats
+
+    try:
+        return jsonify(process_stats(path.task_uid, path.seqid, config.s3))
+    except (FileNotFoundError, ValueError):
+        return jsonify({"error": "Data not found"}), 404
+
+
 @api.get("/process_info/<task_uid>/<seqid>")
 def process_info(path: ProcessInfoRequestPath):
     task_uid = path.task_uid
@@ -351,6 +456,85 @@ def report(path: AnalysisRequestPath):
     )
 
 
+@api.get("/classification/<task_uid>", responses={404: APIErrorResponse})
+def classification(path: AnalysisRequestPath):
+    return send_analysis_file(
+        path.task_uid,
+        "classification.json",
+        mimetype="application/json",
+        s3_config=config.s3,
+    )
+
+
+@api.get("/static/<task_uid>", responses={404: APIErrorResponse})
+def static_analysis(path: AnalysisRequestPath):
+    """Static analysis report (chimera-static/1); 404 until the static worker has finished."""
+    return send_entity_file(
+        path.task_uid,
+        "static.json",
+        "application/json",
+        None,  # static reports always stay on the host (not in S3)
+        base_dir=STATIC_DIR,
+    )
+
+
+@api.get("/static/<task_uid>/deep", responses={404: APIErrorResponse})
+def static_deep(path: AnalysisRequestPath):
+    """Deep static pass (chimera-deep/1: capa + FLOSS); 404 until it has run, or when it does not apply."""
+    return send_entity_file(
+        path.task_uid,
+        "deep.json",
+        "application/json",
+        None,  # static reports always stay on the host (not in S3)
+        base_dir=STATIC_DIR,
+    )
+
+
+@api.get("/static/<task_uid>/memdumps", responses={404: APIErrorResponse})
+def static_memdumps(path: AnalysisRequestPath):
+    """Memory-dump scan (chimera-memdumps/1); 404 until the deep worker has scanned the run's dumps."""
+    return send_entity_file(
+        path.task_uid,
+        "memdumps.json",
+        "application/json",
+        None,  # static reports always stay on the host (not in S3)
+        base_dir=STATIC_DIR,
+    )
+
+
+@api.get("/static/<task_uid>/mobsf", responses={404: APIErrorResponse})
+def static_mobsf(path: AnalysisRequestPath):
+    """MobSF APK scan (chimera-mobsf/1); 404 until it has run, or for anything but an APK."""
+    return send_entity_file(
+        path.task_uid,
+        "mobsf.json",
+        "application/json",
+        None,  # static reports always stay on the host (not in S3)
+        base_dir=STATIC_DIR,
+    )
+
+
+@api.get("/static/<task_uid>/mobsf/source", responses={404: APIErrorResponse})
+def static_mobsf_source(path: AnalysisRequestPath):
+    """One JADX-decompiled source file of an APK (?path=...), as plain text; only paths mobsf.json lists."""
+    from drakrun.analyzer.static.mobsf import read_source
+
+    text = read_source(path.task_uid, request.args.get("path", ""))
+    if text is None:
+        return jsonify({"error": "Source not found"}), 404
+    response = Response(text, mimetype="text/plain")
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Content-Disposition"] = "inline"
+    return response
+
+
+@api.get("/features/<task_uid>", responses={404: APIErrorResponse})
+def features(path: AnalysisRequestPath):
+    return send_analysis_file(
+        path.task_uid, "features.json", mimetype="application/json", s3_config=config.s3
+    )
+
+
 @api.get("/logs/<task_uid>")
 def list_logs(path: AnalysisRequestPath):
     task_uid = path.task_uid
@@ -407,3 +591,131 @@ def get_html_report(path: AnalysisRequestPath):
         s3_config=config.s3,
         download_name=f"report-{task_uid}.html",
     )
+
+
+@api.get("/chimera_report/<task_uid>", responses={404: APIErrorResponse})
+def chimera_report(path: AnalysisRequestPath):
+    """Evidence-linked report (chimera-report/1); 404 until postprocessing has written it."""
+    return send_analysis_file(
+        path.task_uid,
+        "chimera-report.json",
+        mimetype="application/json",
+        s3_config=config.s3,
+    )
+
+
+@api.get("/chimera_report/<task_uid>/html", responses={404: APIErrorResponse})
+def chimera_report_html(path: AnalysisRequestPath):
+    """Printable page of the same report, shown inline. It carries guest-controlled strings, so
+    the page may load nothing and run nothing, whatever its own meta tag says."""
+    response = send_analysis_file(
+        path.task_uid,
+        "chimera-report.html",
+        mimetype="text/html",
+        s3_config=config.s3,
+    )
+    if isinstance(response, Response):
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'"
+        )
+        response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+def _report_or_404(task_uid: str):
+    try:
+        return read_analysis_json(task_uid, "chimera-report.json", config.s3)
+    except FileNotFoundError:
+        return None
+
+
+@api.get("/intel/<task_uid>", responses={404: APIErrorResponse})
+def intel_report(path: AnalysisRequestPath):
+    report = _report_or_404(path.task_uid)
+    if report is None:
+        return jsonify({"error": "Data not found"}), 404
+    return jsonify(
+        report.get("stages", {}).get(
+            "intel",
+            {
+                "status": "unavailable",
+                "payload": None,
+                "reason": "No offline intel snapshot",
+            },
+        )
+    )
+
+
+@api.get("/chimera_report/<task_uid>/iocs.json", responses={404: APIErrorResponse})
+def chimera_report_iocs_json(path: AnalysisRequestPath):
+    report = _report_or_404(path.task_uid)
+    if report is None:
+        return jsonify({"error": "Data not found"}), 404
+    response = jsonify(iocs_export(report))
+    response.headers["Content-Disposition"] = (
+        f"attachment; filename=iocs-{path.task_uid}.json"
+    )
+    return response
+
+
+@api.get("/chimera_report/<task_uid>/iocs.csv", responses={404: APIErrorResponse})
+def chimera_report_iocs_csv(path: AnalysisRequestPath):
+    report = _report_or_404(path.task_uid)
+    if report is None:
+        return jsonify({"error": "Data not found"}), 404
+    return Response(
+        iocs_csv(report),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=iocs-{path.task_uid}.csv",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@api.get("/intel/providers")
+def intel_providers():
+    from drakrun.lib.intel.online import inventory
+
+    return jsonify(
+        {
+            "providers": inventory(config.intel),
+            "online_enabled": config.intel.online_enabled,
+            "online_default": config.intel.online_default,
+        }
+    )
+
+
+@api.post("/intel/<task_uid>/recheck")
+def recheck_offline_intel(path: AnalysisRequestPath):
+    """Re-match the analysis against the offline feeds installed now (after a new bundle was imported)."""
+    if _report_or_404(path.task_uid) is None:
+        return jsonify({"error": "Data not found"}), 404
+    from rq import Queue
+
+    from drakrun.analyzer.static.worker import INTEL_QUEUE_NAME
+    from drakrun.lib.intel.online.run import run_offline_recheck_job
+
+    Queue(name=INTEL_QUEUE_NAME, connection=redis).enqueue(
+        run_offline_recheck_job,
+        str(path.task_uid),
+        job_id=f"intel-recheck-{path.task_uid}",
+        job_timeout=600,
+        result_ttl=600,
+    )
+    return jsonify({"status": "queued"}), 202
+
+
+@api.post("/intel/<task_uid>/refresh")
+def refresh_intel(path: AnalysisRequestPath):
+    if not config.intel.online_enabled:
+        return (
+            jsonify({"error": "Online intel disabled; set intel.online_enabled=true"}),
+            409,
+        )
+    if _report_or_404(path.task_uid) is None:
+        return jsonify({"error": "Data not found"}), 404
+    from drakrun.lib.intel.online.run import enqueue
+
+    enqueue(path.task_uid, redis, {"intel_online": True})
+    return jsonify({"status": "queued"}), 202

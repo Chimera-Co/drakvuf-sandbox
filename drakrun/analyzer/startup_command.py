@@ -63,6 +63,22 @@ def get_startup_method_and_argv(
         return "createproc", ["cmd.exe", "/C", "start", "", target_path]
 
 
+SAMPLE_PLACEHOLDER = "{sample}"
+
+
+def fill_sample_placeholder(
+    start_command: list[str] | str, sample_path: str
+) -> list[str] | str:
+    """Replace {sample} in a user start command with the sample's path in the guest.
+
+    Lets a caller pass arguments (e.g. an installer's silent switch) without knowing where
+    the sample lands, such as %USERPROFILE%\\Desktop resolved to the guest user's folder.
+    """
+    if isinstance(start_command, str):
+        return start_command.replace(SAMPLE_PLACEHOLDER, sample_path)
+    return [arg.replace(SAMPLE_PLACEHOLDER, sample_path) for arg in start_command]
+
+
 class ExecParameters(NamedTuple):
     start_method: StartMethod
     command: str

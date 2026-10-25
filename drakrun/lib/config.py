@@ -1,5 +1,5 @@
 import pathlib
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import (
@@ -34,6 +34,17 @@ class NetworkConfigSection(BaseModel):
     net_enable: bool
 
 
+WorkerGuestOS = Literal["windows", "linux", "any"]
+
+
+class WorkerConfigSection(BaseModel):
+    vm_guest_os: Dict[int, WorkerGuestOS] = Field(default_factory=dict)
+    memory_admission_timeout: float = Field(default=1800, ge=0, allow_inf_nan=False)
+    memory_admission_poll_interval: float = Field(default=5, gt=0, allow_inf_nan=False)
+    # Reserve 64 MB shadow memory and 128 MB for Xen/device-model overhead.
+    memory_admission_margin_mb: int = Field(default=192, ge=0)
+
+
 class DrakrunConfigSection(BaseModel):
     model_config = ConfigDict(extra="ignore")
     plugins: List[str]
@@ -55,6 +66,13 @@ class DrakrunConfigSection(BaseModel):
     worker_hostname: Optional[str] = None
     # Don't pick 'shellexec' method even if supported by Drakvuf
     no_shellexec: bool = False
+    # DRAKVUF -F (Xen fast singlestep). Upstream leaves it off by default;
+    # drakrun has always passed it. Switchable to test the apimon crash.
+    fast_singlestep: bool = True
+    # INetSim terminates TLS for both guest OSes. Unreadable logs are optional.
+    inetsim_service_log: pathlib.Path = pathlib.Path(
+        "/var/log/chimera-inetsim/service.log"
+    )
 
 
 class DrakrunDefaultsPresetSection(BaseModel):
@@ -77,6 +95,118 @@ class CapaConfigSection(BaseModel):
     analyze_memdumps: bool = False
     analyze_only_malware_pids: bool = False
     worker_pool_processes: int = 4
+
+
+class ClassifierConfigSection(BaseModel):
+    enabled: bool = False
+    model_path: Optional[pathlib.Path] = None
+    timeout_s: float = Field(default=60, gt=0, allow_inf_nan=False)
+
+
+class IntelConfigSection(BaseModel):
+    online_enabled: bool = False
+    online_default: bool = True
+    keys_dir: pathlib.Path = pathlib.Path("/etc/chimera/keys")
+    abusech_key_file: pathlib.Path = pathlib.Path("/etc/chimera/abusech-auth-key")
+    cache_path: pathlib.Path = pathlib.Path(
+        "/var/lib/drakrun/intel/online-cache.sqlite"
+    )
+    providers: Dict[str, bool] = Field(
+        default_factory=lambda: dict.fromkeys(
+            (
+                "virustotal",
+                "malwarebazaar",
+                "threatfox",
+                "urlhaus",
+                "otx",
+                "abuseipdb",
+                "greynoise",
+                "hashlookup",
+                "hybridanalysis",
+                "urlscan",
+            ),
+            True,
+        )
+    )
+    max_observables: int = Field(default=20, gt=0, le=1000)
+    request_timeout_s: float = Field(default=10, gt=0, le=10, allow_inf_nan=False)
+    enabled: bool = False
+    db_path: pathlib.Path = pathlib.Path("/var/lib/drakrun/intel/intel.db")
+    max_bundle_bytes: int = Field(default=200 * 1024 * 1024, gt=0)
+
+
+class StaticConfigSection(BaseModel):
+    """Static analysis of every upload, run beside the detonation in a locked-down container."""
+
+    enabled: bool = False
+    # "podman" (production) or "docker". The analyzer never runs outside a container.
+    engine: Literal["podman", "docker"] = "podman"
+    image: str = "localhost/chimera-static:0.1.0"
+    timeout_s: float = Field(default=90, gt=0, allow_inf_nan=False)
+    memory_mb: int = Field(default=2048, ge=256)
+    cpus: float = Field(default=1.0, gt=0, allow_inf_nan=False)
+    pids_limit: int = Field(default=32, ge=8)
+    # Unprivileged uid/gid the analyzer runs as inside the container (nobody).
+    container_uid: int = 65534
+    container_gid: int = 65534
+    # How long classify_sample waits for static.json once the detonation has finished.
+    wait_s: float = Field(default=120, ge=0, allow_inf_nan=False)
+    max_output_bytes: int = 32 * 1024 * 1024
+    # Deep pass (capa + FLOSS) for PE and ELF files, after the fast pass, on its own queue and worker
+    # (`drakrun static-worker --deep`), so it never delays the fast result or the verdict.
+    deep_enabled: bool = False
+    deep_timeout_s: float = Field(default=240, gt=0, allow_inf_nan=False)
+    deep_memory_mb: int = Field(default=2048, ge=512)
+    # Decompilation in the deep pass: Ghidra headless in its own image (a JVM cannot run inside the
+    # self-limiting analyzer process), same isolation flags; capa's match addresses pick the functions.
+    ghidra_enabled: bool = False
+    ghidra_image: str = "localhost/chimera-ghidra:11.1.2"
+    ghidra_analysis_timeout_s: int = Field(default=180, ge=10)
+    ghidra_decompile_budget_s: int = Field(default=120, ge=10)
+    ghidra_memory_mb: int = Field(default=2048, ge=1024)
+    ghidra_max_functions: int = Field(default=40, ge=1, le=200)
+    # Where the analyzer containers run: "container" = in dom0; "vm" = inside the static-analysis Xen VM
+    # (no network device; scripts/chimera/static-vm/, drakrun/analyzer/static/vm_backend.py).
+    backend: Literal["container", "vm"] = "container"
+    vm_name: str = "chimera-static"
+    # With the VM down, run in dom0 instead of failing (the result records which backend ran).
+    vm_fallback_container: bool = True
+    vm_autostart: bool = True
+    vm_boot_timeout_s: float = Field(default=120, gt=0, allow_inf_nan=False)
+    vm_restart_every: int = Field(default=100, ge=1)
+    # On demand: jobs boot the VM (vm_autostart); chimera-static-vm-idle.timer shuts it down after this many
+    # idle seconds so its memory goes back to the dynamic VMs. 0 keeps it running.
+    vm_idle_shutdown_s: float = Field(default=600, ge=0, allow_inf_nan=False)
+    vm_result_disk_mb: int = Field(default=128, ge=16)
+    # Static analysis of the run's memory dumps (dumps.zip) on the deep queue after the analysis:
+    # unpacked payloads show their YARA matches and PE structure there. Never feeds the classifier.
+    memdump_scan_enabled: bool = False
+    # Every distinct dump is scanned (about 3-4 s each in the static VM) until the count or the time budget
+    # runs out; the budget keeps one dump-heavy run from holding the deep queue for long.
+    memdump_scan_max: int = Field(default=512, ge=1, le=4096)
+    memdump_scan_max_mb: int = Field(default=64, ge=1)
+    memdump_scan_budget_s: float = Field(
+        default=1200, gt=0, le=6 * 3600, allow_inf_nan=False
+    )
+    # Android APKs through MobSF (static scan only) in a fresh dom0 container per sample: no network,
+    # no capabilities, no new privileges, removed afterwards. Off until the image has been pulled.
+    mobsf_enabled: bool = False
+    # Built by scripts/chimera/mobsf/Containerfile: upstream v4.5.3 with JADX installed (no network at run time).
+    mobsf_image: str = "localhost/chimera-mobsf:4.5.3"
+    mobsf_timeout_s: float = Field(default=900, gt=0, le=3600, allow_inf_nan=False)
+    mobsf_memory_mb: int = Field(default=4096, ge=1024)
+    # Cap for MobSF inside the static VM (3584 MB): JADX's heap plus MobSF; the VM serialises jobs.
+    mobsf_vm_memory_mb: int = Field(default=2816, ge=1024)
+
+
+class ScreenshotConfigSection(BaseModel):
+    # VNC capture from dom0; nothing runs in the guest. A frame is kept when its
+    # perceptual hash differs from the last kept one by more than diff_threshold
+    # (0-1, fraction of hash bits), or when heartbeat_s passed without a kept frame.
+    interval_s: float = Field(default=2, gt=0)
+    diff_threshold: float = Field(default=0.02, ge=0, le=1)
+    max_screenshots: int = Field(default=90, ge=1)
+    heartbeat_s: float = Field(default=30, ge=0)
 
 
 class MemdumpConfigSection(BaseModel):
@@ -109,6 +239,58 @@ class KartonConfigSection(BaseModel):
     poll_interval: int = 10
 
 
+class SandboxDefinitionSection(BaseModel):
+    """One entry in the sandbox registry, declared as a [sandbox.<id>] table.
+
+    The registry is deliberately configuration-driven rather than discovered
+    from the hypervisor: drakrun currently derives every vm-N from a single
+    golden image, so enumerating running domains would report concurrency
+    slots as if they were distinct environments.
+    """
+
+    display_name: Optional[str] = None
+    platform: str = "windows"
+    os_version: Optional[str] = None
+    firmware: Optional[str] = None
+    hypervisor: str = "xen"
+    lifecycle: str = "drakrun-vm"
+    # Verifier ids this sandbox opts into. The API intersects this with the
+    # platforms each adapter actually supports, so declaring an unsupported
+    # tool here is harmless - it simply won't be offered.
+    verifiers: List[str] = Field(default_factory=lambda: ["perdedor", "alkhaser"])
+    metadata: Dict[str, str] = Field(default_factory=dict)
+
+
+class AlKhaserConfigSection(BaseModel):
+    # Host-side path to al-khaser_x64.exe. The binary is copied into the
+    # disposable overlay per scan and dies with it, so the golden image stays
+    # clean and the tool can be upgraded without rebuilding the image.
+    host_binary_path: Optional[pathlib.Path] = None
+    # al-khaser defaults to --sleep 600 and TIMING_ATTACKS performs nine
+    # separate sleeps of that duration, so an unqualified full run sleeps for
+    # roughly 90 minutes. The adapter always passes an explicit value.
+    default_sleep_seconds: int = 30
+    timeout: int = 1800
+
+
+class PerdedorConfigSection(BaseModel):
+    # Checkout of the perdedor repository. The adapter needs the on-disk
+    # Windows agent tree or Linux/common Python sources to stage in the guest,
+    # which a wheel install would not provide.
+    repo_path: Optional[pathlib.Path] = None
+    timeout: int = 900
+
+
+class EvasionConfigSection(BaseModel):
+    alkhaser: AlKhaserConfigSection = AlKhaserConfigSection()
+    perdedor: PerdedorConfigSection = PerdedorConfigSection()
+    # Default wall-clock budget for a whole verification scan, in seconds.
+    default_timeout: int = 2400
+    # CHIMERA evasion score thresholds (0-100, higher is better).
+    score_pass_threshold: float = 90.0
+    score_warn_threshold: float = 70.0
+
+
 class DrakrunConfig(BaseSettings):
     model_config = SettingsConfigDict(
         extra="allow",
@@ -118,13 +300,22 @@ class DrakrunConfig(BaseSettings):
         env_nested_delimiter="__",
     )
     redis: RedisConfigSection
+    worker: WorkerConfigSection = Field(default_factory=WorkerConfigSection)
     network: NetworkConfigSection
     drakrun: DrakrunConfigSection
     capa: CapaConfigSection = CapaConfigSection()
+    classifier: ClassifierConfigSection = Field(default_factory=ClassifierConfigSection)
+    intel: IntelConfigSection = Field(default_factory=IntelConfigSection)
+    static: StaticConfigSection = Field(default_factory=StaticConfigSection)
     memdump: MemdumpConfigSection = MemdumpConfigSection()
+    screenshots: ScreenshotConfigSection = Field(
+        default_factory=ScreenshotConfigSection
+    )
     karton: KartonConfigSection = KartonConfigSection()
     s3: Optional[S3StorageConfigSection] = None
     preset: Dict[str, DrakrunDefaultsPresetSection] = Field(default_factory=dict)
+    sandbox: Dict[str, SandboxDefinitionSection] = Field(default_factory=dict)
+    evasion: EvasionConfigSection = EvasionConfigSection()
 
     def get_drakrun_defaults(
         self, preset_name: Optional[str] = None

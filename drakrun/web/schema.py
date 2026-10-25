@@ -1,10 +1,10 @@
 import uuid
-from typing import Annotated, List, Optional
+from typing import Annotated, Any, List, Literal, Optional
 
 from flask_openapi3 import FileStorage
 from pydantic import AfterValidator, BaseModel, Field, RootModel
 
-from drakrun.analyzer.analysis_options import StartMethod
+from drakrun.analyzer.analysis_options import GuestOS, StartMethod
 
 
 class APIErrorResponse(BaseModel):
@@ -12,7 +12,12 @@ class APIErrorResponse(BaseModel):
 
 
 class UploadFileForm(BaseModel):
+    mode: Literal["combined", "dynamic-only", "static-only"] = "combined"
     file: FileStorage
+    # android and ios are static-only: MobSF reads the app, nothing runs it.
+    guest_os: GuestOS | Literal["android", "ios"] = Field(
+        default="windows", description="Guest operating system, or a mobile platform"
+    )
     timeout: Optional[int] = Field(default=None, description="Analysis timeout")
     file_name: Optional[str] = Field(default=None, description="Target file name")
     file_path: Optional[str] = Field(default=None, description="Target file path")
@@ -51,6 +56,9 @@ class UploadAnalysisResponse(BaseModel):
 class AnalysisResponse(BaseModel):
     id: str = Field(description="Unique analysis ID")
     status: str = Field(description="Analysis status")
+    classification: Optional[dict[str, Any]] = Field(
+        default=None, description="Classifier verdict, including model errors"
+    )
     time_started: Optional[str] = Field(
         default=None, description="Analysis start time in ISO format"
     )

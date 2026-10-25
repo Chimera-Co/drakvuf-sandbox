@@ -1,0 +1,123 @@
+#!/bin/bash
+# Switch drakrun between experiment "arms" (snapshot + VM hardware profile sets).
+#
+# Each arm lives in /var/lib/chimera-arms/<ARM>/ and holds everything that must
+# match the saved VM state: vm-0.img, snapshot.sav, profiles/, install.json,
+# cfg.template. drakrun's own paths become symlinks into the current arm.
+#
+#   chimera-arm status
+#   chimera-arm init <ARM>          first-time: move the live files into arm <ARM>
+#   chimera-arm clone <SRC> <DST>   full copy of an arm (vm-0.img is ~26 GB)
+#   chimera-arm use <ARM>           point drakrun at <ARM>
+#   chimera-arm adopt               after `drakrun modify-vm0 commit`: move a
+#                                   snapshot.sav that replaced its symlink back
+#                                   into the current arm and re-link it
+set -euo pipefail
+
+ARMS=/var/lib/chimera-arms
+declare -A LINKS=(
+    [vm-0.img]=/var/lib/drakrun/volumes/vm-0.img
+    [snapshot.sav]=/var/lib/drakrun/volumes/snapshot.sav
+    [profiles]=/var/lib/drakrun/profiles
+    [install.json]=/etc/drakrun/install.json
+    [cfg.template]=/etc/drakrun/cfg.template
+)
+
+die() { echo "chimera-arm: $*" >&2; exit 1; }
+
+# The VM slots restored from the arms. Other slots (vm-2: the Linux image, which
+# has its own files) may keep running while the Windows arm changes.
+read -r -a SLOTS <<< "${CHIMERA_ARM_SLOTS:-vm-0 vm-1}"
+
+in_slots() {
+    local slot
+    for slot in "${SLOTS[@]}"; do [[ "$1" == "$slot" ]] && return 0; done
+    return 1
+}
+
+require_idle() {
+    local domain line target
+    for domain in $(xl list 2>/dev/null | awk 'NR>1 {print $1}'); do
+        in_slots "$domain" && die "$domain is running; stop its worker and destroy it first"
+    done
+    # drakvuf -d <domain>; one whose domain cannot be read counts as busy
+    while read -r line; do
+        [[ -z "$line" ]] && continue
+        target=$(sed -nE 's/.* -d ([^ ]+).*/\1/p' <<< "$line")
+        if [[ -z "$target" ]] || in_slots "$target"; then
+            die "drakvuf is running on ${target:-an unknown domain}"
+        fi
+    done <<< "$(pgrep -a -x drakvuf || true)"
+}
+
+current() { cat "$ARMS/CURRENT" 2>/dev/null || echo "(none)"; }
+
+check_arm() {
+    local arm=$1 item
+    [[ -d "$ARMS/$arm" ]] || die "no such arm: $arm"
+    for item in "${!LINKS[@]}"; do
+        [[ -e "$ARMS/$arm/$item" ]] || die "arm $arm is missing $item"
+    done
+}
+
+link_arm() {
+    local arm=$1 item
+    for item in "${!LINKS[@]}"; do
+        ln -sfn "$ARMS/$arm/$item" "${LINKS[$item]}"
+    done
+    echo "$arm" > "$ARMS/CURRENT"
+}
+
+case "${1:-status}" in
+    status)
+        echo "current arm: $(current)"
+        for item in "${!LINKS[@]}"; do
+            printf '  %-40s -> %s\n' "${LINKS[$item]}" "$(readlink "${LINKS[$item]}" || echo 'NOT A SYMLINK')"
+        done
+        ;;
+    init)
+        arm=${2:?arm name}
+        require_idle
+        [[ -e "$ARMS/$arm" ]] && die "arm $arm already exists"
+        mkdir -p "$ARMS/$arm"
+        for item in "${!LINKS[@]}"; do
+            [[ -L "${LINKS[$item]}" ]] && die "${LINKS[$item]} is already a symlink"
+            mv "${LINKS[$item]}" "$ARMS/$arm/$item"
+        done
+        link_arm "$arm"
+        echo "initialised arm $arm from the live files"
+        ;;
+    clone)
+        src=${2:?source arm} dst=${3:?destination arm}
+        require_idle
+        check_arm "$src"
+        [[ -e "$ARMS/$dst" ]] && die "arm $dst already exists"
+        cp -a "$ARMS/$src" "$ARMS/$dst"
+        echo "cloned $src -> $dst"
+        ;;
+    use)
+        arm=${2:?arm name}
+        require_idle
+        check_arm "$arm"
+        link_arm "$arm"
+        echo "now using arm $arm"
+        ;;
+    adopt)
+        require_idle
+        arm=$(current)
+        check_arm "$arm"
+        for item in "${!LINKS[@]}"; do
+            path=${LINKS[$item]}
+            if [[ -e "$path" && ! -L "$path" ]]; then
+                rm -rf "$ARMS/$arm/$item.prev"
+                mv "$ARMS/$arm/$item" "$ARMS/$arm/$item.prev"
+                mv "$path" "$ARMS/$arm/$item"
+                echo "adopted new $item into arm $arm (previous kept as $item.prev)"
+            fi
+        done
+        link_arm "$arm"
+        ;;
+    *)
+        die "unknown command: $1"
+        ;;
+esac

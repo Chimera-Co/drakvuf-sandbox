@@ -1,0 +1,18 @@
+# chimera_static runtime (installed only inside the static-analysis container image)
+pefile==2024.8.26
+signify==0.8.1          # 0.9 removed SignedPEFile, which thrember's features use
+# signify needs oscrypto; 1.3.0 (last PyPI release, 2022) cannot detect OpenSSL >= 3.0.10 (Debian bookworm).
+oscrypto @ git+https://github.com/wbond/oscrypto.git@76bfdcb7285d856c44f8d0fbafe0ecca1c6d2f8b
+pyelftools==0.32
+python-magic==0.4.27
+yara-python==4.5.4
+py-tlsh==4.7.2
+ssdeep==3.4            # built against Debian's libfuzzy (build stage); libfuzzy2 at runtime
+numpy==2.4.6            # thrember features
+oletools==0.60.2       # olevba macro indicators (no deobfuscation pass)
+androguard==4.1.4      # APK manifest, permissions, certificates, DEX string table (plugins/apk.py)
+scikit-learn==1.9.1     # thrember's FeatureHasher (same version as the classifier)
+# deep pass (chimera_static/deep.py): same capa as drakrun's memory-dump analysis, rules in capa-rules/
+flare-capa==7.4.0
+flare-floss==3.2.0
+vivisect==1.3.2

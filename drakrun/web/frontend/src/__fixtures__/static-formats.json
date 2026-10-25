@@ -1,0 +1,49 @@
+{
+    "office": {
+        "type": { "format": "ooxml" },
+        "ooxml": {
+            "macros": true,
+            "xlm": false,
+            "modules": ["Module1"],
+            "autoexec": ["AutoOpen"],
+            "suspicious": ["Shell"],
+            "external_relationships": [
+                {
+                    "type": "attachedTemplate",
+                    "target": "https://example.invalid/template"
+                }
+            ]
+        }
+    },
+    "zip": {
+        "type": { "format": "zip" },
+        "zip": {
+            "members": 1,
+            "listed": [
+                {
+                    "name": "invoice.exe",
+                    "size": 400,
+                    "compressed": 200,
+                    "encrypted": true
+                }
+            ],
+            "executables": ["invoice.exe"]
+        }
+    },
+    "apk": {
+        "type": { "format": "apk" },
+        "apk": {
+            "package": "org.example.test",
+            "min_sdk": "23",
+            "target_sdk": "35",
+            "permissions": ["android.permission.CAMERA"],
+            "dangerous_permissions": ["android.permission.CAMERA"],
+            "activities": { "count": 1, "names": ["MainActivity"] },
+            "certificates": [
+                { "subject": "Test certificate", "sha256": "abc" }
+            ],
+            "native_libraries": ["lib/arm64-v8a/test.so"],
+            "urls": ["https://example.invalid/dex"]
+        }
+    }
+}

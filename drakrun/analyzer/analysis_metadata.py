@@ -13,6 +13,7 @@ class FileMetadata(BaseModel):
     name: str
     type: str
     sha256: str
+    size_bytes: Optional[int] = None
 
     @classmethod
     def evaluate(cls, file_path: pathlib.Path, file_name: Optional[str] = None):
@@ -27,6 +28,7 @@ class FileMetadata(BaseModel):
             name=file_name,
             type=sample_magic,
             sha256=sample_sha256.hexdigest(),
+            size_bytes=file_path.stat().st_size,
         )
 
     def to_dict(self):

@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chimera-static"
+version = "0.1.0"
+description = "CHIMERA static analysis: file-type agnostic, never executes the sample"
+requires-python = ">=3.11"
+license = { text = "Same as the repository (see ../LICENSE); vendored thrember is Apache-2.0" }
+
+[tool.setuptools.packages.find]
+include = ["chimera_static*"]
+
+[tool.setuptools.package-data]
+"chimera_static.vendor.thrember" = ["LICENSE", "pefile_warnings.txt"]
+"chimera_static" = ["knowledge/*.json"]

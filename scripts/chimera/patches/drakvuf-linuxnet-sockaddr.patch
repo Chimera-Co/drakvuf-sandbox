@@ -1,0 +1,119 @@
+diff --git a/src/plugins/syscalls/linux.cpp b/src/plugins/syscalls/linux.cpp
+index 0c11ba2..2febd44 100644
+--- a/src/plugins/syscalls/linux.cpp
++++ b/src/plugins/syscalls/linux.cpp
+@@ -249,7 +249,11 @@ void linux_syscalls::print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+     this->fmt_args.clear();
+     for (size_t i = 0; i < arguments.size(); i++)
+     {
+-        auto str = this->parse_argument(drakvuf, info, params->sc->args[i], arguments[i]);
++        size_t sockaddr_len = 110; // sizeof(struct sockaddr_un) in the Linux guest
++        if (params->sc->args[i].type == linux_sockaddr_ptr && i + 1 < arguments.size() &&
++            params->sc->args[i + 1].type == linux_socklen_t)
++            sockaddr_len = static_cast<uint32_t>(arguments[i + 1]);
++        auto str = this->parse_argument(drakvuf, info, params->sc->args[i], arguments[i], sockaddr_len);
+         if (!str.empty())
+             this->fmt_args.push_back(keyval(params->sc->args[i].name, fmt::Estr(str)));
+         else
+diff --git a/src/plugins/syscalls/private_2.h b/src/plugins/syscalls/private_2.h
+index ff940f3..80cda6d 100644
+--- a/src/plugins/syscalls/private_2.h
++++ b/src/plugins/syscalls/private_2.h
+@@ -134,7 +134,7 @@ public:
+     std::vector<std::pair<char const*, fmt::Aarg>> fmt_args;
+ 
+     void print_sysret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int nr, const char* extra_info = nullptr);
+-    std::string parse_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::arg_t& arg, addr_t val);
++    std::string parse_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::arg_t& arg, addr_t val, size_t sockaddr_len = 110);
+     uint64_t mask_value(const syscalls_ns::arg_t& arg, uint64_t val);
+     uint64_t transform_value(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::arg_t& arg, uint64_t val);
+     bool read_syscalls_filter(const char* filter_file);
+diff --git a/src/plugins/syscalls/syscalls.cpp b/src/plugins/syscalls/syscalls.cpp
+index 4ddafc8..6805db6 100644
+--- a/src/plugins/syscalls/syscalls.cpp
++++ b/src/plugins/syscalls/syscalls.cpp
+@@ -110,6 +110,7 @@
+ #include <variant>
+ #include <fstream>
+ #include <iostream>
++#include <arpa/inet.h>
+ 
+ #include "syscalls.h"
+ #include "private.h"
+@@ -128,7 +129,7 @@ void syscalls_base::print_sysret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, i
+     );
+ }
+ 
+-std::string syscalls_base::parse_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
++std::string syscalls_base::parse_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val, size_t sockaddr_len)
+ {
+     char* cstr = nullptr;
+ 
+@@ -151,6 +152,67 @@ std::string syscalls_base::parse_argument(drakvuf_t drakvuf, drakvuf_trap_info_t
+             case linux_char_ptr:
+                 cstr = drakvuf_read_ascii_str(drakvuf, info, val);
+                 break;
++            case linux_sockaddr_ptr:
++            {
++                if (!val || sockaddr_len < 2)
++                    return {};
++
++                auto vmi = vmi_lock_guard(drakvuf);
++                ACCESS_CONTEXT(ctx,
++                    .translate_mechanism = VMI_TM_PROCESS_DTB,
++                    .dtb = info->regs->cr3,
++                    .addr = val
++                );
++
++                uint8_t bytes[24] = {};
++                if (VMI_FAILURE == vmi_read(vmi, &ctx, 2, bytes, nullptr))
++                    return {};
++
++                // Linux x86 stores sa_family in little endian; ports are in network order.
++                uint16_t family = bytes[0] | (bytes[1] << 8);
++                switch (family)
++                {
++                    case 2: // AF_INET
++                    case 10: // AF_INET6
++                    {
++                        size_t size = family == 2 ? 8 : 24;
++                        if (sockaddr_len < size || VMI_FAILURE == vmi_read(vmi, &ctx, size, bytes, nullptr))
++                            return {};
++
++                        char address[INET6_ADDRSTRLEN];
++                        if (!inet_ntop(family == 2 ? AF_INET : AF_INET6, bytes + (family == 2 ? 4 : 8), address, sizeof(address)))
++                            return {};
++
++                        auto port = std::to_string((bytes[2] << 8) | bytes[3]);
++                        return family == 2 ? std::string(address) + ":" + port : "[" + std::string(address) + "]:" + port;
++                    }
++                    case 1: // AF_UNIX
++                    {
++                        std::string path = "unix:";
++                        // Read bytewise so a short path at a page boundary needs no extra mapped bytes.
++                        for (size_t i = 0; i < 108 && i < sockaddr_len - 2; i++)
++                        {
++                            uint8_t ch;
++                            ctx.addr = val + 2 + i;
++                            if (VMI_FAILURE == vmi_read_8(vmi, &ctx, &ch))
++                                return {};
++                            if (!ch)
++                            {
++                                if (i)
++                                    break;
++                                path += '@';
++                            }
++                            else
++                                path += static_cast<char>(ch);
++                        }
++                        return path;
++                    }
++                    case 16: // AF_NETLINK
++                        return "netlink";
++                    default:
++                        return "family=" + std::to_string(family);
++                }
++            }
+             case linux_intmask_prot_:
+                 // PROT_NONE == 0, so incorrect for parsing flags
+                 return val == 0 ? "PROT_NONE" : parse_flags(val, mmap_prot, m_output_format);

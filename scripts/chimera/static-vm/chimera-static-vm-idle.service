@@ -1,0 +1,10 @@
+[Unit]
+Description=CHIMERA: shut the static-analysis VM down when idle (jobs boot it again)
+After=chimera-static-vm.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/chimera/venv/bin/drakrun static-vm-idle
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes

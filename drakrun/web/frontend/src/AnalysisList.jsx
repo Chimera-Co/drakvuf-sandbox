@@ -1,9 +1,10 @@
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { getAnalysisList } from "./api";
 import { CanceledError } from "axios";
 import { AnalysisStatusBadge } from "./AnalysisStatusBadge.jsx";
-import { formatDate } from "./formatUtils.js";
+import { formatDate, formatSandbox } from "./formatUtils.js";
+import { Pagination, usePagination } from "./Pagination.jsx";
 
 function AnalysisListRow({ analysis }) {
     return (
@@ -15,17 +16,18 @@ function AnalysisListRow({ analysis }) {
             <td>
                 <div className="d-flex flex-row flex-wrap font-monospace">
                     <div className="fw-bold pe-2">SHA256:</div>
-                    <div>{analysis.file.sha256}</div>
+                    <div>{analysis.file?.sha256}</div>
                 </div>
                 <div className="d-flex flex-row flex-wrap font-monospace">
                     <div className="fw-bold pe-2">Name:</div>
-                    <div>{analysis.file.name}</div>
+                    <div>{analysis.file?.name}</div>
                 </div>
                 <div className="d-flex flex-row flex-wrap">
                     <div className="fw-bold pe-2">Type:</div>
-                    <div>{analysis.file.type}</div>
+                    <div>{analysis.file?.type}</div>
                 </div>
             </td>
+            <td>{formatSandbox(analysis)}</td>
             <td>{formatDate(analysis.time_started)}</td>
             <td>{formatDate(analysis.time_finished)}</td>
         </tr>
@@ -33,6 +35,14 @@ function AnalysisListRow({ analysis }) {
 }
 
 function AnalysisListTable() {
+    const [params, setParams] = useSearchParams();
+    function updateFilter(key, value) {
+        const next = new URLSearchParams(params);
+        if (value) next.set(key, value);
+        else next.delete(key);
+        next.delete("page"); // a new filter starts at its first page
+        setParams(next, { replace: true });
+    }
     const [error, setError] = useState();
     const [analysisList, setAnalysisList] = useState();
 
@@ -53,6 +63,29 @@ function AnalysisListTable() {
         };
     }, []);
 
+    const filtered = (analysisList || []).filter((analysis) => {
+        const verdict = analysis.classification
+            ? ["malicious", "suspicious", "benign"].includes(
+                  analysis.classification.label,
+              )
+                ? analysis.classification.label
+                : "no verdict"
+            : "not classified";
+        const query = (params.get("q") || "").trim().toLowerCase();
+        return (
+            (!params.get("os") ||
+                params.get("os") ===
+                    (analysis.options?.guest_os || "windows")) &&
+            (!params.get("status") ||
+                params.get("status") === analysis.status) &&
+            (!params.get("verdict") || params.get("verdict") === verdict) &&
+            ["name", "md5", "sha1", "sha256"].some((key) =>
+                (analysis.file?.[key] || "").toLowerCase().includes(query),
+            )
+        );
+    });
+    const pager = usePagination(filtered.length);
+
     if (typeof error !== "undefined") {
         return <div>Error: {error.toString()}</div>;
     }
@@ -69,17 +102,78 @@ function AnalysisListTable() {
 
     return (
         <div className="datatable-container">
+            <div className="d-flex flex-wrap gap-2 mb-3">
+                {Object.entries({
+                    os: ["windows", "linux"],
+                    status: [
+                        "created",
+                        "queued",
+                        "started",
+                        "finished",
+                        "failed",
+                        "deferred",
+                        "scheduled",
+                        "stopped",
+                        "canceled",
+                        "unknown",
+                    ],
+                    verdict: [
+                        "malicious",
+                        "suspicious",
+                        "benign",
+                        "no verdict",
+                        "not classified",
+                    ],
+                }).map(([key, values]) => (
+                    <label key={key}>
+                        {key === "os"
+                            ? "OS"
+                            : key === "status"
+                              ? "Status"
+                              : "Verdict"}
+                        <select
+                            className="form-select"
+                            value={params.get(key) || ""}
+                            onChange={(event) =>
+                                updateFilter(key, event.target.value)
+                            }
+                        >
+                            <option value="">All</option>
+                            {values.map((value) => (
+                                <option key={value} value={value}>
+                                    {value}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                ))}
+                <label>
+                    Search name or hash
+                    <input
+                        className="form-control"
+                        type="search"
+                        value={params.get("q") || ""}
+                        onChange={(event) =>
+                            updateFilter("q", event.target.value)
+                        }
+                    />
+                </label>
+            </div>
+            {filtered.length === 0 ? (
+                <div>No analyses match these filters.</div>
+            ) : null}
             <table className="datatable-table">
                 <thead>
                     <tr>
                         <th>Analysis ID</th>
                         <th>Sample info</th>
+                        <th>Sandbox</th>
                         <th>Started</th>
                         <th>Finished</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {analysisList.map((analysis) => (
+                    {pager.slice(filtered).map((analysis) => (
                         <AnalysisListRow
                             analysis={analysis}
                             key={analysis.id}
@@ -87,6 +181,7 @@ function AnalysisListTable() {
                     ))}
                 </tbody>
             </table>
+            <Pagination pager={pager} label="Analyses pages" noun="analyses" />
         </div>
     );
 }

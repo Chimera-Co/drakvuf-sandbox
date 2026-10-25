@@ -1,0 +1,518 @@
+/* Layout of the application shell and the shared building blocks of the report pages: sticky top bar,
+   collapsible sidebar with a hover peek, edge drawers (process tree, outline) and the data-table frame.
+   Colours come from the theme tokens (chimera-theme.css, themes.css); this file only places things. */
+
+:root {
+    --chimera-topbar-h: 56px;
+    --chimera-nav-w: 260px;
+    --chimera-rail-w: 3.75rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Top bar: stays in view, the page scrolls under it.
+   ------------------------------------------------------------------------- */
+
+.sb-topnav.navbar {
+    position: sticky;
+    top: 0;
+    z-index: 1040;
+}
+
+.chimera-nav-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    margin-left: 0.5rem;
+    border: 0;
+    border-radius: var(--chimera-radius-sm);
+    background: transparent;
+    color: var(--chimera-shell-text);
+    font-size: 1.05rem;
+}
+
+.chimera-nav-toggle:hover {
+    background-color: rgba(var(--chimera-shell-line-rgb), 0.12);
+    color: var(--chimera-shell-strong);
+}
+
+.sb-topnav .navbar-brand.chimera-brand {
+    width: auto;
+    padding-left: 0.5rem !important;
+}
+
+/* ---------------------------------------------------------------------------
+   Sidebar. "open": full width in the page flow. "rail": icons only; hovering
+   or focusing it opens a peek panel over the page without moving the content.
+   ------------------------------------------------------------------------- */
+
+#layoutSidenav.chimera-shell #layoutSidenav_nav {
+    position: sticky;
+    top: var(--chimera-topbar-h);
+    flex: 0 0 var(--chimera-nav-w);
+    width: var(--chimera-nav-w);
+    height: calc(100vh - var(--chimera-topbar-h));
+    transform: none;
+    z-index: 1038;
+    transition:
+        flex-basis 0.15s ease-in-out,
+        width 0.15s ease-in-out;
+}
+
+#layoutSidenav.chimera-shell #layoutSidenav_content {
+    margin-left: 0;
+    min-height: calc(100vh - var(--chimera-topbar-h));
+}
+
+#layoutSidenav.chimera-shell #layoutSidenav_content::before {
+    display: none;
+}
+
+.chimera-shell .sb-sidenav {
+    width: var(--chimera-nav-w);
+    height: 100%;
+    flex-wrap: nowrap;
+    transition:
+        width 0.15s ease-in-out,
+        box-shadow 0.15s ease-in-out;
+}
+
+.chimera-shell .sb-sidenav-menu {
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.chimera-nav-tools {
+    display: flex;
+    justify-content: flex-start;
+    gap: 0.25rem;
+    /* the pin icon sits on the same column as the nav icons, so the rail shows it in place */
+    padding: 0.75rem 0.5rem 0 16px; /* 16px + border + padding puts the pin's centre on the 30px icon column */
+}
+
+.chimera-nav-tools button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.55rem;
+    border: 1px solid rgba(var(--chimera-shell-line-rgb), 0.18);
+    border-radius: var(--chimera-radius-sm);
+    background: transparent;
+    color: var(--chimera-shell-text);
+    font-size: 0.75rem;
+}
+
+.chimera-nav-tools button:hover {
+    background-color: rgba(var(--chimera-shell-line-rgb), 0.12);
+    color: var(--chimera-shell-strong);
+}
+
+#layoutSidenav.chimera-shell.is-rail #layoutSidenav_nav {
+    flex-basis: var(--chimera-rail-w);
+    width: var(--chimera-rail-w);
+}
+
+.chimera-shell.is-rail .sb-sidenav {
+    width: var(--chimera-rail-w);
+}
+
+/* Keep the rail's geometry while its labels are clipped during peek. */
+.chimera-shell .sb-sidenav {
+    overflow: hidden;
+}
+
+/* Icon column: link margin 8px + padding 8px + a 28px icon box puts every icon's centre at 30px, the middle of
+   the 60px rail; the pin and the heading dividers use the same centre. */
+.chimera-shell .sb-sidenav .sb-sidenav-menu .nav-link {
+    height: 48px;
+    flex-wrap: nowrap;
+    overflow: hidden;
+    margin-inline: 8px;
+    padding-inline: 8px;
+}
+
+.chimera-shell .sb-nav-link-icon {
+    flex: 0 0 28px;
+    width: 28px;
+    margin-right: 0.75rem;
+    text-align: center;
+    font-size: 1rem;
+}
+
+.chimera-nav-label {
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.chimera-nav-tools,
+.chimera-shell .sb-sidenav-menu-heading,
+.chimera-shell .sb-sidenav-footer {
+    width: var(--chimera-nav-w);
+    white-space: nowrap;
+}
+
+.chimera-nav-tools button {
+    height: 30px;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.chimera-shell .chimera-nav-label,
+.chimera-shell .sb-sidenav-footer,
+.chimera-nav-tools button {
+    transition:
+        opacity 160ms ease,
+        border-color 160ms ease,
+        background-color 160ms ease;
+}
+
+.chimera-shell.is-rail:not(.is-peek) .chimera-nav-label,
+.chimera-shell.is-rail:not(.is-peek) .sb-sidenav-footer {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Rail: the pin button shrinks to its icon (same place, same height). */
+.chimera-shell.is-rail:not(.is-peek) .chimera-nav-tools button {
+    border-color: transparent;
+    color: var(--chimera-shell-muted);
+}
+
+/* Rail: section headings keep their height (no shift on peek) and show a short divider instead of text. */
+.chimera-shell .sb-sidenav .sb-sidenav-menu .sb-sidenav-menu-heading {
+    position: relative;
+    padding: 1.1rem 1.25rem 0.45rem;
+    transition: color 160ms ease;
+}
+
+.chimera-shell .sb-sidenav .sb-sidenav-menu .sb-sidenav-menu-heading::after {
+    content: "";
+    position: absolute;
+    left: calc((var(--chimera-rail-w) - 1.5rem) / 2);
+    top: 55%;
+    width: 1.5rem;
+    border-top: 1px solid rgba(var(--chimera-shell-line-rgb), 0.28);
+    opacity: 0;
+    transition: opacity 160ms ease;
+}
+
+.chimera-shell.is-rail:not(.is-peek)
+    .sb-sidenav
+    .sb-sidenav-menu
+    .sb-sidenav-menu-heading {
+    color: transparent;
+}
+
+.chimera-shell.is-rail:not(.is-peek)
+    .sb-sidenav
+    .sb-sidenav-menu
+    .sb-sidenav-menu-heading::after {
+    opacity: 1;
+}
+
+.chimera-shell.is-rail.is-peek .sb-sidenav {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: var(--chimera-nav-w);
+    box-shadow: 0.5rem 0 1.75rem rgba(var(--chimera-shadow-rgb), 0.35);
+}
+
+@media (max-width: 767.98px) {
+    .chimera-nav-toggle {
+        display: inline-flex;
+    }
+    /* Phones: the rail would take a fifth of the screen, so the sidebar hides
+       completely and the menu button opens it over the page. */
+    #layoutSidenav.chimera-shell.is-rail #layoutSidenav_nav,
+    #layoutSidenav.chimera-shell #layoutSidenav_nav {
+        flex-basis: 0;
+        width: 0;
+    }
+    .chimera-shell:not(.is-peek) .sb-sidenav {
+        visibility: hidden;
+    }
+    .chimera-shell.is-peek .sb-sidenav,
+    .chimera-shell.is-rail.is-peek .sb-sidenav {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: min(var(--chimera-nav-w), 80vw);
+        box-shadow: 0.5rem 0 1.75rem rgba(var(--chimera-shadow-rgb), 0.35);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #layoutSidenav.chimera-shell #layoutSidenav_nav,
+    .chimera-shell .sb-sidenav {
+        transition: none;
+    }
+}
+
+/* ---------------------------------------------------------------------------
+   Data tables: columns take the width their content needs; a table wider than
+   its panel scrolls sideways inside its own frame and the header row stays
+   visible while the rows scroll.
+   ------------------------------------------------------------------------- */
+
+.chimera-table-scroll {
+    overflow: auto;
+    max-height: min(72vh, 46rem);
+    border: 1px solid var(--chimera-border);
+    border-radius: var(--chimera-radius-sm);
+    background-color: var(--chimera-surface);
+    overscroll-behavior-x: contain;
+}
+
+.chimera-table-scroll > .table {
+    width: 100%;
+    margin-bottom: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.chimera-table-scroll > .table > thead > tr > th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 0.45rem 0.65rem;
+    background-color: var(--chimera-surface-2);
+    box-shadow: inset 0 -1px 0 var(--chimera-border-strong);
+    border-bottom: 0;
+    white-space: nowrap;
+}
+
+.chimera-data-table > tbody > tr > td {
+    padding: 0.4rem 0.65rem;
+    vertical-align: top;
+    font-size: 0.8125rem;
+}
+
+.chimera-data-table .cell-short {
+    white-space: nowrap;
+}
+
+.chimera-data-table .cell-long {
+    min-width: 16rem;
+    max-width: 52rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.chimera-data-table .cell-procs {
+    min-width: 14rem;
+    max-width: 40rem;
+    white-space: normal;
+}
+
+.chimera-data-table .cell-mono {
+    font-family: var(--chimera-font-mono);
+}
+
+.chimera-data-table .cell-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.chimera-sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+}
+
+.chimera-sort:hover,
+.chimera-sort:focus-visible {
+    color: var(--chimera-strong);
+}
+
+.chimera-sort-mark {
+    opacity: 0.75;
+    font-size: 0.65rem;
+}
+
+.chimera-table-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.chimera-table-toolbar h3,
+.chimera-table-toolbar h6 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.chimera-table-toolbar > .form-control {
+    width: min(18rem, 100%);
+    margin-left: auto;
+}
+
+.chimera-table-scroll + .chimera-pagination {
+    padding-inline: 0;
+    border-top: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Edge drawers: a small tab on the screen edge that opens a panel over the
+   page (process tree on the left, section outline on the right). The left
+   ones sit next to the sidebar, whatever its width.
+   ------------------------------------------------------------------------- */
+
+#layoutSidenav.chimera-shell {
+    --chimera-edge-left: var(--chimera-nav-w);
+}
+
+#layoutSidenav.chimera-shell.is-rail {
+    --chimera-edge-left: var(--chimera-rail-w);
+}
+
+@media (max-width: 767.98px) {
+    #layoutSidenav.chimera-shell,
+    #layoutSidenav.chimera-shell.is-rail {
+        --chimera-edge-left: 0px;
+    }
+}
+
+.chimera-edge-tab {
+    position: fixed;
+    top: calc(var(--chimera-topbar-h) + 4.5rem);
+    z-index: 1036;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.6rem 0.4rem;
+    border: 1px solid var(--chimera-border-strong);
+    background-color: var(--chimera-surface);
+    color: var(--chimera-text);
+    font-size: 0.78rem;
+    font-weight: 600;
+    writing-mode: vertical-rl;
+    box-shadow: var(--chimera-shadow);
+}
+
+.chimera-edge-tab:hover,
+.chimera-edge-tab[aria-expanded="true"] {
+    background-color: var(--chimera-surface-2);
+    color: var(--chimera-strong);
+}
+
+.chimera-edge-tab.is-left {
+    left: var(--chimera-edge-left, 0);
+    border-left: 0;
+    border-radius: 0 var(--chimera-radius) var(--chimera-radius) 0;
+}
+
+.chimera-edge-tab.is-right {
+    right: 0;
+    border-right: 0;
+    border-radius: var(--chimera-radius) 0 0 var(--chimera-radius);
+}
+
+.chimera-edge-drawer {
+    position: fixed;
+    top: calc(var(--chimera-topbar-h) + 0.5rem);
+    bottom: 0.5rem;
+    z-index: 1037;
+    display: flex;
+    flex-direction: column;
+    width: min(26rem, 92vw);
+    border: 1px solid var(--chimera-border-strong);
+    background-color: var(--chimera-surface);
+    box-shadow: 0 1rem 2.5rem rgba(var(--chimera-shadow-rgb), 0.35);
+}
+
+.chimera-edge-drawer.is-left {
+    left: var(--chimera-edge-left, 0);
+    border-left: 0;
+    border-radius: 0 var(--chimera-radius) var(--chimera-radius) 0;
+}
+
+.chimera-edge-drawer.is-right {
+    right: 0;
+    width: min(19rem, 88vw);
+    border-right: 0;
+    border-radius: var(--chimera-radius) 0 0 var(--chimera-radius);
+}
+
+.chimera-edge-drawer > header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--chimera-border);
+    background-color: var(--chimera-surface-2);
+}
+
+.chimera-edge-drawer > header h2 {
+    margin: 0 auto 0 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.chimera-edge-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 0.5rem;
+}
+
+.chimera-edge-drawer .card {
+    border: 0;
+    box-shadow: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Section outline (summary report).
+   ------------------------------------------------------------------------- */
+
+.chimera-outline {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.chimera-outline a {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.6rem;
+    border-left: 3px solid transparent;
+    border-radius: 0 var(--chimera-radius-sm) var(--chimera-radius-sm) 0;
+    color: var(--chimera-text);
+    font-size: 0.85rem;
+    text-decoration: none;
+}
+
+.chimera-outline a:hover {
+    background-color: rgba(var(--chimera-accent-rgb), 0.08);
+    color: var(--chimera-strong);
+}
+
+.chimera-outline a.is-current {
+    border-left-color: var(--chimera-accent);
+    background-color: rgba(var(--chimera-accent-rgb), 0.12);
+    color: var(--chimera-strong);
+    font-weight: 600;
+}
+
+.chimera-outline .badge {
+    margin-left: auto;
+}
+
+.chimera-outline .is-empty a {
+    color: var(--chimera-text-muted);
+}
+
+[data-outline] {
+    scroll-margin-top: calc(var(--chimera-topbar-h) + 1rem);
+}

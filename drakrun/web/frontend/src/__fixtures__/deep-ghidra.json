@@ -1,0 +1,28 @@
+{
+    "ghidra": {
+        "version": "11.1.2",
+        "language": "x86:LE:64:default",
+        "functions_total": 412,
+        "decompiled": 2,
+        "functions": [
+            {
+                "name": "entry",
+                "address": "0x140001000",
+                "size": 312,
+                "reasons": ["entry", "capa"],
+                "capa": ["create process on Windows"],
+                "c": "int entry(void) {\n  /* <script>alert(1)</script> */\n  return 0;\n}",
+                "truncated": true,
+                "error": null
+            },
+            {
+                "name": "worker",
+                "address": "0x140002000",
+                "size": 120,
+                "reasons": ["largest"],
+                "c": null,
+                "error": "timeout"
+            }
+        ]
+    }
+}

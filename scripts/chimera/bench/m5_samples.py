@@ -1,0 +1,475 @@
+#!/usr/bin/env python3
+"""
+CHIMERA M5 sample shortlist and download from MalwareBazaar (abuse.ch).
+
+  shortlist  query MalwareBazaar *metadata* for families documented to check for
+             VMs/sandboxes and pick the newest Windows EXE of each, plus control
+             samples; writes shortlist.csv for the team to review. Nothing is
+             downloaded. About 20 small queries: abuse.ch rate-limits heavy use
+             and its terms forbid high-volume harvesting, so do not loop this.
+  linux-shortlist  the same for the Linux sandbox: up to three ELF candidates per
+             Linux family (about 9 queries), added to shortlist.csv with guest_os linux
+  cohort     calibration cohort (classifier calibration and fitted fusion): about 100
+             Windows EXEs, at most --per-family per family, none from the Stage 1
+             shortlist/register, chosen from the cached family metadata (no new
+             query unless --extra-families names an uncached family; capped by
+             --max-queries). Writes cohort.csv and cohort-manifest.json.
+  download   operator only, after the mentor's written sign-off and the team's
+             review: fetch the reviewed shortlist as MalwareBazaar's
+             password-protected ZIPs into a root-only directory and write the
+             private register that m5_eval.py reads.
+
+The API needs an abuse.ch Auth-Key. Put it in a root-only file (never in the
+repository or on the command line):
+  sudo install -D -m 600 /dev/null /etc/chimera/abusech-auth-key   # then paste the key into it
+
+  sudo /opt/chimera/venv/bin/python scripts/chimera/bench/m5_samples.py shortlist \
+      --out /var/lib/chimera-samples
+  # optional: a second sample from some families (cached metadata, no new query per family)
+  sudo /opt/chimera/venv/bin/python scripts/chimera/bench/m5_samples.py add AgentTesla Formbook
+  # review /var/lib/chimera-samples/shortlist.csv; delete rows to drop them
+  sudo /opt/chimera/venv/bin/python scripts/chimera/bench/m5_samples.py download \
+      --out /var/lib/chimera-samples --i-have-the-mentor-signoff
+"""
+
+import argparse
+import csv
+import datetime
+import json
+import os
+import pathlib
+import sys
+import time
+
+API = "https://mb-api.abuse.ch/api/v1/"
+KEY_FILE = pathlib.Path("/etc/chimera/abusech-auth-key")
+ZIP_PASSWORD = "infected"  # MalwareBazaar's published password for every sample ZIP
+# MalwareBazaar's evasion tags are rare (2 recent EXEs tagged anti-vm, Oct 2026), so
+# samples are chosen by family; the tags only rank samples within a family.
+EVASION_TAGS = ["anti-vm", "anti-sandbox", "vm-detection", "evasive", "antivm", "anti-analysis", "vmprotect"]
+# Families with publicly documented VM/sandbox checks (vendor and research write-ups);
+# names as MalwareBazaar's "signature" field spells them.
+VM_AWARE_FAMILIES = [
+    "GuLoader", "Rhadamanthys", "AgentTesla", "Formbook", "SmokeLoader", "Vidar", "LummaStealer",
+    "DarkGate", "PrivateLoader", "Amadey", "Stealc", "RedLineStealer", "Latrodectus", "PureLogsStealer",
+    "QuasarRAT", "SnakeKeylogger", "ValleyRAT", "XLoader", "CryptBot", "Socks5Systemz", "Pikabot",
+    "WarzoneRAT", "MassLogger", "BumbleBee", "MeduzaStealer",
+]
+# Families that spread by themselves over networks or infect other files.
+# Containment is fail-closed, but they are not needed to answer the question.
+EXCLUDED_FAMILIES = {
+    "wannacry", "phorpiex", "conficker", "ramnit", "sality", "virut", "neshta", "mydoom",
+    "expiro", "floxif", "emotet", "qakbot", "trickbot",
+}
+EXCLUDED_TAGS = {"worm", "wormable", "file-infector", "infector", "ransomware"}
+# Common families used as controls; samples carrying an evasion tag are skipped.
+# Team to confirm each has no reported environment checks (XWorm left out: it spreads over USB).
+CONTROL_FAMILIES = ["AsyncRAT", "njrat", "RemcosRAT", "DCRat", "NanoCore"]
+# Linux: backdoors, implants and miners that hide or evade analysis, none of which
+# spreads by itself. Botnets that scan for and infect other hosts (Mirai, Gafgyt,
+# XorDDoS, Kinsing, P2PInfect, Sysrv, ...) are left out, as worms are on Windows.
+LINUX_FAMILIES = ["BPFDoor", "Rekoobe", "Bifrost", "Sliver", "perfctl", "sedexp", "WolfsBane", "Merlin"]
+LINUX_CONTROL_FAMILIES = ["CoinMiner"]
+LINUX_EXCLUDED_TAGS = {"mirai", "gafgyt", "bashlite", "mozi", "xorddos", "kinsing", "p2pinfect", "sysrv", "muhstik", "tsunami"}
+FIELDS = ["sha256", "role", "family", "tags", "file_name", "first_seen", "source_url", "guest_os"]
+
+
+def auth_key():
+    key = os.environ.get("MB_AUTH_KEY") or (KEY_FILE.read_text().strip() if KEY_FILE.exists() else "")
+    if not key:
+        raise SystemExit(f"no abuse.ch Auth-Key: create {KEY_FILE} (root, mode 600)")
+    return key
+
+
+def query(session, key, **data):
+    resp = session.post(API, data=data, headers={"Auth-Key": key}, timeout=60)
+    resp.raise_for_status()
+    body = resp.json()
+    status = body.get("query_status")
+    if status in ("no_results", "tag_not_found", "signature_not_found"):
+        return []
+    if status != "ok":
+        raise SystemExit(f"MalwareBazaar query {data.get('query')} failed: {status}")
+    return body.get("data") or []
+
+
+def _tags(entry):
+    return {t.lower() for t in entry.get("tags") or []}
+
+
+def eligible(entry, since, guest_os="windows"):
+    family = (entry.get("signature") or "").strip()
+    linux = guest_os == "linux"
+    return bool(
+        family
+        and family.lower() not in EXCLUDED_FAMILIES
+        and not _tags(entry) & (EXCLUDED_TAGS | (LINUX_EXCLUDED_TAGS if linux else set()))
+        and entry.get("file_type") == ("elf" if linux else "exe")
+        and (entry.get("first_seen") or "")[:10] >= since
+    )
+
+
+def _row(entry, role, guest_os="windows"):
+    return {
+        "guest_os": guest_os,
+        "sha256": entry["sha256_hash"],
+        "role": role,
+        "family": entry["signature"].strip(),
+        "tags": " ".join(entry.get("tags") or []),
+        "file_name": entry.get("file_name", ""),
+        "first_seen": entry["first_seen"],
+        "source_url": f"https://bazaar.abuse.ch/sample/{entry['sha256_hash']}/",
+    }
+
+
+def _rank(entry):
+    return (len(_tags(entry) & set(EVASION_TAGS)), entry["first_seen"])
+
+
+def pick(entries, count, role, taken, guest_os="windows"):
+    """One sample per family: the one with the most evasion tags, then the newest."""
+    best = {}
+    for entry in entries:
+        family = entry["signature"].strip().lower()  # MalwareBazaar spells some families two ways (Stealc/StealC)
+        if family in taken:
+            continue
+        if family not in best or _rank(entry) > _rank(best[family]):
+            best[family] = entry
+    ranked = sorted(best.values(), key=lambda e: e["first_seen"], reverse=True)
+    ranked.sort(key=lambda e: -len(_tags(e) & set(EVASION_TAGS)))  # stable: newest first within a tag count
+    rows = []
+    for entry in ranked[:count]:
+        taken.add(entry["signature"].strip().lower())
+        rows.append(_row(entry, role, guest_os))
+    return rows
+
+
+def shortlist(fetch_family, count, controls, since):
+    vm_aware = [e for family in VM_AWARE_FAMILIES for e in fetch_family(family) if eligible(e, since)]
+    taken = set()
+    rows = pick(vm_aware, count, "test", taken)
+    control_entries = [
+        e
+        for family in CONTROL_FAMILIES
+        for e in fetch_family(family)
+        if eligible(e, since) and not _tags(e) & set(EVASION_TAGS)
+    ]
+    rows += pick(control_entries, controls, "control", taken)
+    return rows
+
+
+LINUX_PER_FAMILY = 2  # kept after download; Linux has no arm comparison, so runs are cheap
+
+
+def linux_shortlist(fetch_family, since, per_family=LINUX_PER_FAMILY + 1):
+    """Up to three ELF candidates per Linux family: MalwareBazaar's metadata does
+    not give the CPU, so the download keeps the first two x86-64 ones and the
+    third stands in for an ARM or MIPS build."""
+    rows = []
+    for families, role in ((LINUX_FAMILIES, "test"), (LINUX_CONTROL_FAMILIES, "control")):
+        for family in families:
+            candidates = [
+                e for e in fetch_family(family)
+                if eligible(e, since, "linux") and e["signature"].strip().lower() == family.lower()
+            ]
+            candidates.sort(key=_rank, reverse=True)
+            rows += [_row(e, role, "linux") for e in candidates[:per_family]]
+    return rows
+
+
+def elf_machine(data):
+    """'x86-64', or why the file cannot run in the x86-64 Linux guest."""
+    if data[:4] != b"\x7fELF":
+        return "not an ELF file"
+    if data[4] != 2:
+        return "32-bit ELF"
+    machine = int.from_bytes(data[18:20], "little" if data[5] == 1 else "big")
+    return "x86-64" if machine == 0x3E else f"ELF machine {machine:#x}"
+
+
+def add_samples(rows, fetch_family, families, since):
+    """One more test sample from each named family: its best-ranked eligible
+    sample not already on the shortlist."""
+    present = {r["sha256"] for r in rows}
+    added = []
+    for family in families:
+        candidates = [
+            e for e in fetch_family(family)
+            if eligible(e, since) and e["sha256_hash"] not in present
+            and e["signature"].strip().lower() == family.lower()
+        ]
+        if not candidates:
+            print(f"{family}: no further eligible sample", file=sys.stderr)
+            continue
+        best = max(candidates, key=_rank)
+        present.add(best["sha256_hash"])
+        added.append(_row(best, "test"))
+    return added
+
+
+def cached_fetch(session, key, cache_dir):
+    """get_siginfo per family, saved once under cache_dir so later runs do not
+    query MalwareBazaar again (abuse.ch rate-limits heavy accounts)."""
+    cache_dir = private_dir(cache_dir)
+
+    def fetch(family):
+        path = cache_dir / f"{family.lower()}.json"
+        if path.exists():
+            return json.loads(path.read_text())
+        data = query(session, key, query="get_siginfo", signature=family, limit="100")
+        path.write_text(json.dumps(data))
+        return data
+
+    return fetch
+
+
+def private_dir(path):
+    path.mkdir(parents=True, exist_ok=True)
+    path.chmod(0o700)
+    return path
+
+
+def cmd_shortlist(args):
+    import requests
+
+    out = private_dir(pathlib.Path(args.out))
+    since = (datetime.date.today() - datetime.timedelta(days=args.since_days)).isoformat()
+    fetch = cached_fetch(requests.Session(), auth_key(), out / "metadata")
+    rows = shortlist(fetch, args.count, args.controls, since)
+    write_shortlist(out, rows)
+
+
+def write_shortlist(out, rows):
+    with (out / "shortlist.csv").open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=FIELDS)
+        writer.writeheader()
+        writer.writerows(rows)
+    tests = sum(r["role"] == "test" for r in rows)
+    print(f"{tests} test + {len(rows) - tests} control samples -> {out / 'shortlist.csv'} (metadata only)")
+
+
+def cmd_linux_shortlist(args):
+    import requests
+
+    out = private_dir(pathlib.Path(args.out))
+    since = (datetime.date.today() - datetime.timedelta(days=args.since_days)).isoformat()
+    fetch = cached_fetch(requests.Session(), auth_key(), out / "metadata")
+    with (out / "shortlist.csv").open(newline="") as f:
+        rows = [r for r in csv.DictReader(f) if (r.get("guest_os") or "windows") != "linux"]
+    for row in rows:
+        row.setdefault("guest_os", "windows")
+        row["guest_os"] = row["guest_os"] or "windows"
+    linux = linux_shortlist(fetch, since)
+    write_shortlist(out, rows + linux)
+    for row in linux:
+        print(f"linux {row['role']} {row['family']} {row['sha256'][:16]}")
+
+
+def cmd_add(args):
+    import requests
+
+    out = pathlib.Path(args.out)
+    with (out / "shortlist.csv").open(newline="") as f:
+        rows = list(csv.DictReader(f))
+    since = (datetime.date.today() - datetime.timedelta(days=args.since_days)).isoformat()
+    fetch = cached_fetch(requests.Session(), auth_key(), out / "metadata")
+    added = add_samples(rows, fetch, args.families, since)
+    controls = [r for r in rows if r["role"] == "control"]
+    write_shortlist(out, [r for r in rows if r["role"] == "test"] + added + controls)
+    for row in added:
+        print(f"added {row['family']} {row['sha256'][:16]}")
+
+
+def unzip_head(path):
+    """The first bytes of the archive's only entry, decrypted in memory with 7-Zip."""
+    import subprocess
+
+    data = subprocess.run(
+        ["7z", "x", "-so", f"-p{ZIP_PASSWORD}", str(path)], capture_output=True, check=True
+    ).stdout
+    return data[:64]
+
+
+COHORT_PER_FAMILY = 4
+
+
+def stage1_hashes(out):
+    """sha256 of every sample already in the Stage 1 shortlist or register (never reused for calibration)."""
+    taken = set()
+    for name in ("shortlist.csv", "register.csv"):
+        path = out / name
+        if path.exists():
+            with path.open(newline="") as f:
+                taken |= {r["sha256"].lower() for r in csv.DictReader(f) if r.get("sha256")}
+    return taken
+
+
+def cohort(fetch_family, families, count, per_family, since, exclude):
+    """Spread the cohort over families and over time: within a family, every k-th sample by first_seen."""
+    by_family = {}
+    for family in families:
+        for entry in fetch_family(family):
+            if not eligible(entry, since) or entry["sha256_hash"].lower() in exclude:
+                continue
+            by_family.setdefault(entry["signature"].strip().lower(), {})[entry["sha256_hash"]] = entry
+    rows = []
+    for family in sorted(by_family):
+        entries = sorted(by_family[family].values(), key=lambda e: e["first_seen"])
+        step = max(1, len(entries) // per_family)
+        rows += [_row(e, "calibration") for e in entries[::step][:per_family]]
+    rows.sort(key=lambda r: (r["family"].lower(), r["first_seen"]))
+    if len(rows) > count:  # trim the largest families first, keeping every family represented
+        while len(rows) > count:
+            counts = {}
+            for r in rows:
+                counts[r["family"].lower()] = counts.get(r["family"].lower(), 0) + 1
+            biggest = max(counts, key=lambda f: (counts[f], f))
+            drop = max(i for i, r in enumerate(rows) if r["family"].lower() == biggest)
+            rows.pop(drop)
+    return rows
+
+
+def cmd_cohort(args):
+    import requests
+
+    out = private_dir(pathlib.Path(args.out))
+    since = (datetime.date.today() - datetime.timedelta(days=args.since_days)).isoformat()
+    metadata = out / "metadata"
+    families = VM_AWARE_FAMILIES + CONTROL_FAMILIES + list(args.extra_families)
+    uncached = [f for f in families if not (metadata / f"{f.lower()}.json").exists()]
+    if len(uncached) > args.max_queries:
+        raise SystemExit(f"{len(uncached)} families need a MalwareBazaar query (limit {args.max_queries}): "
+                         + ", ".join(uncached))
+    cached = cached_fetch(requests.Session(), auth_key() if uncached else None, metadata)
+
+    def fetch(family):  # pause between new queries: abuse.ch restricts heavy accounts
+        if family in uncached:
+            time.sleep(args.query_delay)
+        return cached(family)
+
+    exclude = stage1_hashes(out)
+    rows = cohort(fetch, families, args.count, args.per_family, since, exclude)
+    with (out / "cohort.csv").open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=FIELDS)
+        writer.writeheader()
+        writer.writerows(rows)
+    stage1_families = set()
+    for name in ("shortlist.csv", "register.csv"):
+        path = out / name
+        if path.exists():
+            with path.open(newline="") as f:
+                stage1_families |= {r["family"].strip().lower() for r in csv.DictReader(f) if r.get("family")}
+    per_family = {}
+    for r in rows:
+        per_family[r["family"]] = per_family.get(r["family"], 0) + 1
+    manifest = {
+        "created": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+        "purpose": "classifier calibration and fitted fusion; never the Stage 1 holdout",
+        "samples": len(rows),
+        "families": per_family,
+        "stage1_hashes_excluded": len(exclude),
+        "families_shared_with_stage1": sorted(f for f in per_family if f.lower() in stage1_families),
+        "new_queries": len(uncached),
+        "since": since,
+    }
+    (out / "cohort-manifest.json").write_text(json.dumps(manifest, indent=2))
+    print(f"{len(rows)} calibration samples from {len(per_family)} families -> {out / 'cohort.csv'} "
+          f"(metadata only; {len(uncached)} new queries)")
+
+
+def cmd_download(args):
+    import requests
+
+    if not args.i_have_the_mentor_signoff:
+        raise SystemExit("download needs --i-have-the-mentor-signoff (protocol precondition)")
+    key, session = auth_key(), requests.Session()
+    out = private_dir(pathlib.Path(args.out))
+    zips = private_dir(out / "zips")
+    with (out / args.list).open(newline="") as f:
+        rows = list(csv.DictReader(f))
+    register = []
+    linux_taken = {}
+    for row in rows:
+        guest_os = row.get("guest_os") or "windows"
+        if guest_os == "linux" and linux_taken.get(row["family"], 0) >= LINUX_PER_FAMILY:
+            continue  # the family already has enough x86-64 samples
+        path = zips / f"{row['sha256']}.zip"
+        if not path.exists():
+            resp = session.post(
+                API, data={"query": "get_file", "sha256_hash": row["sha256"]}, headers={"Auth-Key": key}, timeout=120
+            )
+            resp.raise_for_status()
+            if resp.content[:2] != b"PK":
+                raise SystemExit(f"{row['sha256']}: not a ZIP ({resp.content[:120]!r})")
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "wb") as f:
+                f.write(resp.content)
+            print(f"saved {row['family']} {row['sha256'][:12]}", flush=True)
+        if guest_os == "linux":
+            machine = elf_machine(unzip_head(path))
+            if machine != "x86-64":
+                print(f"skipped {row['family']} {row['sha256'][:12]}: {machine}", flush=True)
+                path.unlink()  # not needed: never keep a sample that will not run
+                continue
+            linux_taken[row["family"]] = linux_taken.get(row["family"], 0) + 1
+        register.append(
+            {
+                "sha256": row["sha256"],
+                "path": str(path),
+                "role": row["role"],
+                "family": row["family"],
+                "tags": row["tags"],
+                "archive_password": ZIP_PASSWORD,
+                "entry": "",
+                "file_name": row.get("file_name", ""),
+                "source_url": row["source_url"],
+                "retrieved": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "guest_os": guest_os,
+            }
+        )
+    with (out / args.register).open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(register[0].keys()))
+        writer.writeheader()
+        writer.writerows(register)
+    print(f"{len(register)} samples registered in {out / args.register}")
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    p = sub.add_parser("shortlist")
+    p.add_argument("--out", default="/var/lib/chimera-samples")
+    p.add_argument("--count", type=int, default=len(VM_AWARE_FAMILIES))
+    p.add_argument("--controls", type=int, default=5)
+    p.add_argument("--since-days", type=int, default=180)
+    p.set_defaults(func=cmd_shortlist)
+    p = sub.add_parser("linux-shortlist", help="add Linux ELF candidates to shortlist.csv (metadata only)")
+    p.add_argument("--out", default="/var/lib/chimera-samples")
+    p.add_argument("--since-days", type=int, default=180)
+    p.set_defaults(func=cmd_linux_shortlist)
+    p = sub.add_parser("add", help="one more test sample from each named family")
+    p.add_argument("families", nargs="+")
+    p.add_argument("--out", default="/var/lib/chimera-samples")
+    p.add_argument("--since-days", type=int, default=180)
+    p.set_defaults(func=cmd_add)
+    p = sub.add_parser("cohort", help="calibration cohort, disjoint from Stage 1 (metadata only)")
+    p.add_argument("--out", default="/var/lib/chimera-samples")
+    p.add_argument("--count", type=int, default=100)
+    p.add_argument("--per-family", type=int, default=COHORT_PER_FAMILY)
+    p.add_argument("--since-days", type=int, default=365)
+    p.add_argument("--extra-families", nargs="*", default=[])
+    p.add_argument("--max-queries", type=int, default=10)
+    p.add_argument("--query-delay", type=float, default=3.0, help="seconds before each new metadata query")
+    p.set_defaults(func=cmd_cohort)
+    p = sub.add_parser("download")
+    p.add_argument("--out", default="/var/lib/chimera-samples")
+    p.add_argument("--list", default="shortlist.csv", help="rows to fetch (cohort.csv for the calibration cohort)")
+    p.add_argument("--register", default="register.csv", help="register to write (register-cohort.csv)")
+    p.add_argument("--i-have-the-mentor-signoff", action="store_true")
+    p.set_defaults(func=cmd_download)
+    args = parser.parse_args(argv)
+    return args.func(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

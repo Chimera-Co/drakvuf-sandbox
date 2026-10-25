@@ -1,3 +1,4 @@
+import { FileExplorer } from "./AnalysisExplorer.jsx";
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import { getAnalysisFileList } from "./api.js";
 import { CanceledError } from "axios";
@@ -207,7 +208,7 @@ export function AnalysisFilesViewer({ analysisId }) {
         <div className="container-fluid">
             <div className="row">
                 <AnalysisZipDownload files={files} analysisId={analysisId} />
-                <FileTree fileList={files} analysisId={analysisId} />
+                <FileExplorer files={files} analysisId={analysisId} />
             </div>
         </div>
     );

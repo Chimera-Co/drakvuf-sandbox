@@ -1,0 +1,26 @@
+# Training environment for the CHIMERA classifier (Python 3.11). The sandbox itself only needs
+# lightgbm + numpy (already in the drakrun venv); everything here is for training and tests.
+#   python3.11 -m venv .venv && .venv/bin/pip install -r requirements-train.txt
+# macOS: LightGBM needs OpenMP (brew install libomp).
+
+# pinned to the CHIMERA sandbox versions (classifier-interface.md)
+scikit-learn==1.9.1
+joblib==1.6.0
+lightgbm==4.7.0
+xgboost==3.2.0
+numpy==2.4.6
+scipy==1.17.1
+
+# data handling
+py7zr==1.1.4          # WinMET 7z volumes (AES)
+orjson==3.13.0
+pandas==3.1.0
+
+# EMBER2024 features (thrember @ 0ef753e, the commit vendored into static_analyzer/)
+thrember @ git+https://github.com/FutureComputing4AI/EMBER2024.git@0ef753e
+signify==0.8.1        # thrember needs SignedPEFile, removed in signify 0.9
+pefile==2024.8.26
+
+# tests (tests/chimera_runner.py is CHIMERA's runner.py)
+pydantic==2.13.4
+pytest

@@ -1,13 +1,6 @@
+New-Item 'HKLM:\SYSTEM\CurrentControlSet\Control\Network\NewNetworkWindowOff' -Force -EA 0 | Out-Null
 if ( $DRAKVUF_NET_ENABLE )
 {
     ipconfig /release
     ipconfig /renew
 }
-$scriptBlock = {
-  Set-Date -Date $DRAKVUF_DATE
-}
-Start-Process -Wait -Verb RunAs powershell.exe -ArgumentList (
-  '-EncodedCommand', (
-    [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($scriptBlock))
-  )
-)

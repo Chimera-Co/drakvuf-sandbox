@@ -1,0 +1,22 @@
+[Unit]
+Description=CHIMERA evasion-verification worker for vm-%i
+Documentation=file:///home/shreyas/Documents/chimera/chimera-console/docs/chimera/containment-results-2026-10-19.md
+# Shares vm-%i with the analysis worker; drakrun's per-VM lock serialises them.
+Requires=chimera-net.service chimera-inetsim.service redis-server.service
+After=chimera-net.service chimera-inetsim.service redis-server.service xen-init-dom0.service
+
+[Service]
+Type=simple
+ExecStartPre=/usr/local/sbin/chimera-net-check --require-inetsim
+ExecStart=/opt/chimera/venv/bin/drakrun evasion-worker --vm-id %i
+Restart=on-failure
+RestartSec=10
+User=root
+# Uploaded samples, memory dumps and dropped files stay root-only (threat model: accidental opening on the host)
+UMask=0077
+# DRAKVUF handles every trapped guest event: if its pages were swapped out the guest would stall.
+# Desktop applications on the host swap instead.
+MemorySwapMax=0
+
+[Install]
+WantedBy=multi-user.target

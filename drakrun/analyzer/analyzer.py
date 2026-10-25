@@ -3,6 +3,7 @@ import json
 import logging
 import pathlib
 import subprocess
+import time
 from typing import Any, Dict, List, Optional, Protocol
 
 from drakrun.lib.config import DrakrunConfig, NetworkConfigSection, load_config
@@ -22,14 +23,16 @@ from drakrun.lib.version_detection import get_drakvuf_version
 
 from .analysis_metadata import AnalysisMetadata
 from .analysis_options import AnalysisOptions, StartMethod
-from .post_restore import get_post_restore_command, prepare_ps_command
+from .post_restore import get_post_restore_command, prepare_ps_command, set_guest_clock
 from .postprocessing import postprocess_analysis_dir
-from .run_tools import run_drakvuf, run_screenshotter, run_tcpdump, run_vm
+from .run_tools import StallMonitor, run_drakvuf, run_screenshotter, run_tcpdump, run_vm
 from .startup_command import (
+    fill_sample_placeholder,
     get_sample_filename_from_host_path,
     get_startup_method_and_argv,
     make_exec_parameters,
 )
+from .telemetry import summarize_telemetry
 
 log = logging.getLogger(__name__)
 
@@ -216,6 +219,11 @@ def analyze_file(
                 "to know what to execute after unpacking archive."
             )
 
+    drakvuf_returncode = None
+    drakvuf_hard_timeout = False
+    stall_monitor = StallMonitor(f"vm-{vm_id}")
+    drakvuf_runtime_s = None
+    guest_clock = None
     with run_vm(
         vm_id, install_info, network_conf, no_restore=options.no_vm_restore
     ) as vm:
@@ -235,6 +243,7 @@ def analyze_file(
             log.info("Running post-restore command...")
             post_restore_cmd = get_post_restore_command(network_conf.net_enable)
             drakshell.check_call(post_restore_cmd)
+            guest_clock = set_guest_clock(drakshell)
 
         if options.extract_archive:
             log.info("Running archive extraction...")
@@ -324,6 +333,10 @@ def analyze_file(
                 # If user provides its own method, we will stick to that one
                 if options.start_method is None:
                     options.start_method = start_method
+            else:
+                options.start_command = fill_sample_placeholder(
+                    options.start_command, str(guest_executable_path)
+                )
 
         tcpdump_file = output_dir / "dump.pcap"
         drakmon_file = output_dir / "drakmon.log"
@@ -379,6 +392,7 @@ def analyze_file(
                     install_info,
                     output_dir,
                     enabled=(not options.no_screenshotter),
+                    settings=config.screenshots,
                 ),
                 run_drakvuf(
                     vm_name=vm.vm_name,
@@ -390,9 +404,12 @@ def analyze_file(
                     drakvuf_version_info=drakvuf_version_info,
                     exec_parameters=exec_parameters,
                     drakvuf_cwd=output_dir,
+                    fast_singlestep=config.drakrun.fast_singlestep,
+                    stall_monitor=stall_monitor,
                 ) as drakvuf,
             ):
                 log.info("Analysis started...")
+                drakvuf_started = time.monotonic()
                 try:
                     # -t should be respected, but let's give 30 more secs
                     if options.timeout is not None:
@@ -401,15 +418,42 @@ def analyze_file(
                         drakvuf.wait()
                 except subprocess.TimeoutExpired:
                     log.info("Drakvuf hard timed out - hang?")
+                    drakvuf_hard_timeout = True
                     drakvuf.terminate()
                     drakvuf.wait(10)
+                drakvuf_returncode = drakvuf.returncode
+                drakvuf_runtime_s = time.monotonic() - drakvuf_started
         except KeyboardInterrupt:
             log.info("Interrupted with CTRL-C, analysis finished.")
 
     if substatus_callback is not None:
         substatus_callback(AnalysisSubstatus.postprocessing)
 
+    telemetry = summarize_telemetry(
+        output_dir,
+        options.plugins,
+        drakvuf_returncode,
+        drakvuf_hard_timeout,
+        drakvuf_runtime_s=drakvuf_runtime_s,
+        analysis_timeout_s=options.timeout,
+        vm_stalled=stall_monitor.stalled,
+        vm_max_stall_s=stall_monitor.max_stall_s,
+    )
+    # Classifiers need the final telemetry while postprocessing is running.
+    metadata.model_extra["telemetry"] = telemetry
     extra_metadata = postprocess_analysis_dir(output_dir, config, metadata)
+    extra_metadata["guest_clock"] = guest_clock
+    # Log splitting/compression changes artifact availability during postprocessing.
+    extra_metadata["telemetry"] = summarize_telemetry(
+        output_dir,
+        options.plugins,
+        drakvuf_returncode,
+        drakvuf_hard_timeout,
+        drakvuf_runtime_s=drakvuf_runtime_s,
+        analysis_timeout_s=options.timeout,
+        vm_stalled=stall_monitor.stalled,
+        vm_max_stall_s=stall_monitor.max_stall_s,
+    )
 
     if substatus_callback is not None:
         substatus_callback(AnalysisSubstatus.done)

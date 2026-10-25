@@ -1,0 +1,13 @@
+[Unit]
+Description=CHIMERA static-analysis agent
+After=chimera-scratch.service proc-xen.mount
+Requires=chimera-scratch.service
+
+[Service]
+ExecStart=/usr/bin/python3 -I /usr/local/sbin/chimera-static-agent
+Restart=always
+RestartSec=2
+StandardOutput=journal+console
+
+[Install]
+WantedBy=multi-user.target

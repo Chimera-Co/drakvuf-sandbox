@@ -1,111 +1,101 @@
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlusCircle, faMinusCircle } from "@fortawesome/free-solid-svg-icons";
-import { useEffect, useRef } from "react";
-import { Tooltip } from "bootstrap/js/index.esm.js";
+import { Fragment } from "react";
 
-function trimProcessName(procname) {
-    return procname.split("\\").at(-1);
-}
-
-function TooltipSpan({ className, tooltip, children }) {
-    const node = useRef(undefined);
-    useEffect(() => {
-        if (node.current) {
-            const tooltip = new Tooltip(node.current);
-            return () => tooltip.dispose();
-        }
-    }, []);
-    if (tooltip) {
-        return (
-            <span
-                ref={node}
-                className={className}
-                data-bs-toggle={tooltip}
-                data-bs-placement="right"
-                data-bs-title={tooltip}
-            >
-                {children}
-            </span>
-        );
-    } else {
-        return (
-            <span ref={node} className={className}>
-                {children}
-            </span>
-        );
-    }
-}
-
-export function ProcessNode({ node, onClick }) {
-    let nodeStyle = "";
-    if (!node.ts_from) {
-        nodeStyle = "text-muted";
-    } else if (!node.ts_to) {
-        nodeStyle = "text-primary";
-    }
-    const commandLine = (node.args || []).join(" ");
+export function ProcessNode({
+    node,
+    onClick,
+    lineage = false,
+    sample = false,
+}) {
     return (
-        <button className="btn btn-inline-link" onClick={onClick}>
-            <TooltipSpan className={nodeStyle} tooltip={commandLine}>
-                {trimProcessName(node.procname)}
-            </TooltipSpan>
-            <span className="ms-1">({node.pid})</span>
+        <button
+            className={`btn btn-sm btn-inline-link text-start text-break ${lineage ? "fw-bold text-primary" : ""}`}
+            onClick={onClick}
+            title={
+                Array.isArray(node.args) ? node.args.join(" ") : node.args || ""
+            }
+        >
+            {(node.procname || "unknown").split(/[\\/]/).pop()}{" "}
+            <span className="font-monospace">({node.pid})</span>
+            {sample && <span className="badge bg-primary ms-1">sample</span>}
+            {lineage && !sample && (
+                <span className="badge bg-info text-dark ms-1">descendant</span>
+            )}
+            {node.killed_by != null ? (
+                <span className="badge bg-danger ms-1">killed</span>
+            ) : node.ts_to != null ? (
+                <span className="badge bg-secondary ms-1">terminated</span>
+            ) : null}
+            {node.injected_into && (
+                <span className="badge bg-warning text-dark ms-1">
+                    injected into
+                </span>
+            )}
+            {node.exit_code != null && Number(node.exit_code) !== 0 && (
+                <span className="badge bg-warning text-dark ms-1">
+                    exit {node.exit_code_str || node.exit_code}
+                </span>
+            )}
         </button>
     );
 }
-
 export function ProcessTree({
     processTree,
     uncollapsedSeqid,
     setCollapse,
     selected,
     onSelect = () => {},
+    lineage = new Set(),
+    samples = new Set(),
 }) {
     return (
-        <ul style={{ "list-style-type": "none" }}>
-            {processTree.map((element) => {
-                const leaf = element.children.length === 0;
-                const collapsed = !uncollapsedSeqid.has(element.seqid);
-                const isSelected = element.seqid === selected;
+        <ul className="list-unstyled ps-2" role="group">
+            {processTree.slice(0, 250).map((element) => {
+                const children = element.children || [],
+                    collapsed = !uncollapsedSeqid.has(element.seqid);
                 return (
-                    <>
-                        <li className={isSelected ? "selected" : ""}>
-                            {!leaf ? (
-                                <FontAwesomeIcon
-                                    icon={
-                                        collapsed ? faPlusCircle : faMinusCircle
-                                    }
-                                    className="me-1"
-                                    style={{ cursor: "pointer" }}
-                                    onClick={(ev) => {
-                                        ev.preventDefault();
-                                        setCollapse(element.seqid);
+                    <Fragment key={element.seqid}>
+                        <li
+                            className={
+                                String(element.seqid) === String(selected)
+                                    ? "selected border-start border-primary border-3"
+                                    : ""
+                            }
+                        >
+                            <div className="d-flex align-items-start">
+                                {children.length > 0 && (
+                                    <button
+                                        className="btn btn-sm p-1"
+                                        aria-label={`${collapsed ? "Expand" : "Collapse"} ${element.procname?.split(/[\\/]/).pop()}`}
+                                        aria-expanded={!collapsed}
+                                        onClick={() =>
+                                            setCollapse(element.seqid)
+                                        }
+                                    >
+                                        {collapsed ? "+" : "−"}
+                                    </button>
+                                )}
+                                <ProcessNode
+                                    node={element}
+                                    onClick={() => onSelect(element.seqid)}
+                                    lineage={lineage.has(element.seqid)}
+                                    sample={samples.has(element.seqid)}
+                                />
+                            </div>
+                            {!collapsed && children.length > 0 && (
+                                <ProcessTree
+                                    processTree={children}
+                                    {...{
+                                        uncollapsedSeqid,
+                                        setCollapse,
+                                        selected,
+                                        onSelect,
+                                        lineage,
+                                        samples,
                                     }}
                                 />
-                            ) : (
-                                <FontAwesomeIcon
-                                    icon={faPlusCircle}
-                                    className="me-1"
-                                    style={{ visibility: "hidden" }}
-                                />
                             )}
-                            <ProcessNode
-                                node={element}
-                                onClick={() => onSelect(element.seqid)}
-                            />
                         </li>
-                        {!leaf && !collapsed ? (
-                            <ProcessTree
-                                processTree={element.children}
-                                uncollapsedSeqid={uncollapsedSeqid}
-                                setCollapse={setCollapse}
-                                selected={selected}
-                                onSelect={onSelect}
-                            />
-                        ) : (
-                            []
-                        )}
-                    </>
+                    </Fragment>
                 );
             })}
         </ul>

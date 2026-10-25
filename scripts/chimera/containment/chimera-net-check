@@ -1,0 +1,97 @@
+#!/bin/bash
+# CHIMERA containment invariant check (read-only). Exit 0 only if every
+# invariant holds; prints one line per failed invariant otherwise.
+#
+#   chimera-net-check                     firewall + veth/netns + ip_forward
+#   chimera-net-check --rules-only        firewall only (C-1 dry run)
+#   chimera-net-check --require-inetsim   also require INetSim listening in the netns
+set -uo pipefail
+
+NS=chimera-inet
+H=inetsim0
+NIP=10.99.0.2
+RULES_ONLY=0
+REQUIRE_INETSIM=0
+for arg in "$@"; do
+    case "$arg" in
+        --rules-only) RULES_ONLY=1 ;;
+        --require-inetsim) REQUIRE_INETSIM=1 ;;
+        *) echo "unknown argument: $arg" >&2; exit 2 ;;
+    esac
+done
+
+fail=0
+bad() { echo "FAIL: $*"; fail=1; }
+
+# Jump must be the first rule of the built-in chain.
+first_rule() {  # cmd table chain expected-target
+    local got
+    got=$($1 -t "$2" -S "$3" 2>/dev/null | sed -n 2p)
+    [[ "$got" == "-A $3 -j $4" ]] || bad "$1 -t $2 $3: first rule is '$got', expected jump to $4"
+}
+
+rule_count() {  # cmd table chain expected
+    local got
+    got=$($1 -t "$2" -S "$3" 2>/dev/null | grep -c '^-A')
+    [[ "$got" == "$4" ]] || bad "$1 -t $2 $3 has $got rules, expected $4"
+}
+
+# FORWARD: Xen's vif-bridge hotplug script inserts bridged-only physdev
+# ACCEPTs above us whenever a domain starts. They are inert while
+# bridge-nf-call-iptables=0 (checked below) and only match frames bridged
+# between a guest's own vif ports, so they are the one tolerated exception.
+XEN_PHYSDEV='^-A FORWARD -m physdev --physdev-(in|out) vif[0-9]+\.[0-9]+(-emu)? --physdev-is-bridged -j ACCEPT$'
+got=$(iptables -S FORWARD | sed 1d | grep -Ev "$XEN_PHYSDEV" | head -1)
+[[ "$got" == "-A FORWARD -j CHIMERA_GUARD" ]] \
+    || bad "iptables FORWARD: first non-Xen rule is '$got', expected jump to CHIMERA_GUARD"
+
+first_rule iptables raw PREROUTING CHIMERA_RAW
+first_rule iptables nat PREROUTING CHIMERA_DNAT
+first_rule iptables filter INPUT CHIMERA_IN
+first_rule ip6tables filter INPUT CHIMERA6
+first_rule ip6tables filter FORWARD CHIMERA6
+
+rule_count iptables raw CHIMERA_RAW 4
+iptables -t raw -C CHIMERA_RAW -i drak+ -d 169.254.0.0/16 -j DROP 2>/dev/null \
+    || bad "iptables raw CHIMERA_RAW: link-local drop missing"
+rule_count iptables nat CHIMERA_DNAT 4
+rule_count iptables filter CHIMERA_GUARD 7
+rule_count iptables filter CHIMERA_IN 3
+rule_count ip6tables filter CHIMERA6 4
+
+[[ "$(iptables -S FORWARD | sed -n 1p)" == "-P FORWARD DROP" ]] || bad "FORWARD policy is not DROP"
+
+if [[ $RULES_ONLY -eq 0 ]]; then
+    ip link show "$H" &>/dev/null || bad "$H missing"
+    [[ "$(cat /proc/sys/net/ipv6/conf/$H/disable_ipv6 2>/dev/null)" == "1" ]] || bad "IPv6 not disabled on $H"
+    ip netns list | grep -qw "$NS" || bad "netns $NS missing"
+    [[ "$(ip netns exec "$NS" cat /proc/sys/net/ipv6/conf/all/disable_ipv6 2>/dev/null)" == "1" ]] \
+        || bad "IPv6 not disabled in $NS"
+    ip -n "$NS" route show default | grep -q . && bad "netns $NS has a default route"
+    [[ "$(cat /proc/sys/net/ipv4/ip_forward)" == "1" ]] || bad "ip_forward is not 1 (DNAT to INetSim will fail)"
+    for f in iptables ip6tables arptables; do
+        v=$(cat "/proc/sys/net/bridge/bridge-nf-call-$f" 2>/dev/null || echo missing)
+        [[ "$v" == "0" ]] || bad "net.bridge.bridge-nf-call-$f is $v, expected 0"
+    done
+    # Each analysis bridge may only contain Xen guest ports (one guest per bridge).
+    for br in /sys/class/net/drak*/brif; do
+        [[ -d "$br" ]] || continue
+        for port in "$br"/*; do
+            [[ -e "$port" ]] || continue
+            name=$(basename "$port")
+            [[ "$name" =~ ^vif[0-9]+\.[0-9]+(-emu)?$ ]] || bad "unexpected port $name on $(basename "$(dirname "$br")")"
+        done
+    done
+fi
+
+if [[ $REQUIRE_INETSIM -eq 1 ]]; then
+    for port in 53 80 443; do
+        ip netns exec "$NS" ss -Hltun "sport = :$port" 2>/dev/null | grep -q "$NIP:$port" \
+            || bad "INetSim not listening on $NIP:$port"
+    done
+fi
+
+if [[ $fail -eq 0 ]]; then
+    echo "chimera-net-check: OK"
+fi
+exit $fail

@@ -12,6 +12,21 @@ HTML_TEMPLATE = PACKAGE_DIR / "web/frontend/dist/embedded/index.html"
 OFFLINE_FILES_PLACEHOLDER = "window.OFFLINE_FILES = {};"
 
 
+def script_safe_json(data) -> str:
+    """JSON for embedding inside a <script> element.
+
+    The report carries guest-controlled strings (process names, command lines, URLs); a literal
+    "</script>" in one would end the element early and the rest would run as HTML. The \\uXXXX forms are
+    valid JSON string escapes, so the parsed data is unchanged (ensure_ascii already covers U+2028/2029).
+    """
+    return (
+        json.dumps(data)
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("&", "\\u0026")
+    )
+
+
 def png_bytes_to_data_uri(png_bytes: bytes):
     encoded = base64.b64encode(png_bytes).decode("ascii")
     return f"data:image/png;base64,{encoded}"
@@ -44,7 +59,8 @@ def generate_html_report(context: PostprocessContext) -> None:
             offline_files["screenshots"].append(screenshot_data_uri)
 
     html_report = HTML_TEMPLATE.read_text().replace(
-        OFFLINE_FILES_PLACEHOLDER, f"window.OFFLINE_FILES={json.dumps(offline_files)};"
+        OFFLINE_FILES_PLACEHOLDER,
+        f"window.OFFLINE_FILES={script_safe_json(offline_files)};",
     )
     (context.analysis_dir / "report.html").write_text(html_report)
     context.update_metadata({"html_report": True})

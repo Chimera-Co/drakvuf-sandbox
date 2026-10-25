@@ -1,0 +1,42 @@
+[al-khaser version 0.82]
+-------------------------[TLS Callbacks]-------------------------
+[*] TLS process attach callback                                                                    [ GOOD ]
+[*] TLS thread attach callback                                                                     [ GOOD ]
+-------------------------[Debugger Detection]-------------------------
+[*] Checking IsDebuggerPresent API                                                                 [ GOOD ]
+[*] Checking If Parent Process is explorer.exe                                                     [ BAD  ]
+[*] Checking NtYieldExecution                                                                      [ BAD  ]
+-------------------------[Generic Sandboxe/VM Detection]-------------------------
+[*] Checking if process loaded modules contains: avghookx.dll                                      [ GOOD ]
+[*] Checking CPU fan using WMI                                                                     [ BAD  ]
+-------------------------[VirtualBox Detection]-------------------------
+[*] Checking SMBIOS firmware                                                                       [ GOOD ]
+-------------------------[Virtual PC Detection]-------------------------
+[*] Checking Virtual PC processes VMSrvc.exe                                                       [ GOOD ]
+[*] Checking Virtual PC processes VMUSrvc.exe                                                      [ GOOD ]
+[*] Checking reg key SOFTWARE\Microsoft\Virtual Machine\Guest\Parameters                           [ GOOD ]
+[*] Checking reg key SYSTEM\CurrentControlSet\Enum\PCI\VEN_5333*                                   [ GOOD ]
+
+-------------------------[QEMU Detection]-------------------------
+[*] Checking SMBIOS firmware                                                                       [ GOOD ]
+[*] Checking ACPI tables                                                                           [ BAD  ]
+-------------------------[Xen Detection]-------------------------
+[*] Checking reg key SYSTEM\CurrentControlSet\Enum\PCI\VEN_5853*                                   [ BAD  ]
+[*] Checking Citrix Xen process xenservice.exe                                                     [ GOOD ]
+[*] Checking Mac Address start with 08:16:3E                                                       [ GOOD ]
+
+-------------------------[Hyper-V Detection]-------------------------
+[*] Checking for Hyper-V driver objects                                                            [ BAD  ]
+[*] Checking for Hyper-V global objects                                                            [ BAD  ]
+
+-------------------------[Timing-attacks]-------------------------
+[*] Checking RDTSC which force a VM Exit (cpuid)                                                   [ BAD  ]
+-------------------------[Analysis-tools]-------------------------
+[*] Checking process of malware analysis tool: ResourceHacker.exe                                  [ GOOD ]
+[*] Checking process of malware analysis tool: ResourceHacker.exe                                  [ GOOD ]
+-------------------------[Anti Dumping]-------------------------
+[*] Erasing PE header from memory
+[*] Increasing SizeOfImage in PE Header to: 0x100000
+
+
+Analysis done, I hope you didn't get red flags :)

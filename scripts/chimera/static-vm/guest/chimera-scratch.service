@@ -1,0 +1,13 @@
+[Unit]
+Description=CHIMERA scratch disk (reformatted at every boot)
+DefaultDependencies=no
+After=dev-xvde.device systemd-udevd.service
+Requires=dev-xvde.device
+Before=chimera-static-agent.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/mkfs.ext4 -q -F -L scratch /dev/xvde
+ExecStart=/bin/mount -o noatime,nosuid,nodev /dev/xvde /work
+ExecStart=/bin/mkdir -p /work/containers /work/run

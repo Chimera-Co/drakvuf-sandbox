@@ -1,0 +1,12 @@
+# MobSF for CHIMERA: the upstream image plus everything it would otherwise fetch on first start.
+# CHIMERA runs MobSF with --network none, so JADX (the Java decompiler behind code analysis) and the database
+# migrations are done here, at build time, the only time this image has network access.
+#   sudo podman build --network=host -t localhost/chimera-mobsf:4.5.3 scripts/chimera/mobsf
+FROM docker.io/opensecurity/mobile-security-framework-mobsf:v4.5.3
+RUN python3 -c "from mobsf.MobSF.tools_download import install_jadx; install_jadx('/home/mobsf/.MobSF')" \
+ && test -x /home/mobsf/.MobSF/tools/jadx/jadx-1.5.0/bin/jadx \
+ && python3 manage.py makemigrations \
+ && python3 manage.py makemigrations StaticAnalyzer \
+ && python3 manage.py migrate \
+ && (python3 manage.py createsuperuser --noinput --email "" || true) \
+ && python3 manage.py create_roles

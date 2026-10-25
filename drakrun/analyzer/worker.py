@@ -1,5 +1,6 @@
 import datetime
 import logging
+import math
 import shutil
 import socket
 from typing import List, Optional
@@ -9,7 +10,7 @@ from rq import Queue, Worker, get_current_job
 from rq.exceptions import InvalidJobOperation
 from rq.job import Job, JobStatus
 
-from drakrun.lib.config import RedisConfigSection, load_config
+from drakrun.lib.config import RedisConfigSection, WorkerGuestOS, load_config
 from drakrun.lib.paths import ANALYSES_DIR, UPLOADS_DIR
 
 from ..lib.s3_storage import (
@@ -21,9 +22,16 @@ from ..lib.s3_storage import (
 from .analysis_metadata import AnalysisMetadata, FileMetadata
 from .analysis_options import AnalysisOptions
 from .analyzer import AnalysisSubstatus, analyze_file
+from .linux_analyzer import analyze_linux_file
+from .static.worker import STATIC_ONLY_QUEUE_NAME
 
 ANALYSIS_QUEUE_NAME = "drakrun-analysis"
+LINUX_ANALYSIS_QUEUE_NAME = "drakrun-analysis-linux"
+ANALYSIS_QUEUE_NAMES = (ANALYSIS_QUEUE_NAME, LINUX_ANALYSIS_QUEUE_NAME)
+
+LISTED_QUEUE_NAMES = ANALYSIS_QUEUE_NAMES + (STATIC_ONLY_QUEUE_NAME,)
 _WORKER_VM_ID: Optional[int] = None
+_WORKER_GUEST_OS: WorkerGuestOS = "any"
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +55,15 @@ def analysis_job_to_metadata(job: Job) -> AnalysisMetadata:
     return AnalysisMetadata.load_from_dict(
         {
             **job_meta.get("extra_metadata", {}),
+            **(
+                {
+                    "memory_admission_wait_seconds": job_meta[
+                        "memory_admission_wait_seconds"
+                    ]
+                }
+                if "memory_admission_wait_seconds" in job_meta
+                else {}
+            ),
             "id": job.id,
             "status": job_status.value if job_status is not None else "unknown",
             "substatus": job_meta.get("substatus"),
@@ -71,18 +88,24 @@ def worker_analyze(options: AnalysisOptions):
         raise RuntimeError("Fatal error: no vm_id assigned in worker")
 
     config = load_config()
+    # Reconstruct options object to include worker-side preset defaults
+    options = AnalysisOptions.with_config_defaults(config, **dict(options))
+
+    if _WORKER_GUEST_OS != "any" and options.guest_os != _WORKER_GUEST_OS:
+        raise RuntimeError(
+            f"Worker vm-{_WORKER_VM_ID} is bound to {_WORKER_GUEST_OS}; "
+            f"refusing {options.guest_os} analysis"
+        )
+
+    if not options.plugins:
+        raise RuntimeError("Cannot analyze sample without plugins specified")
+
     if is_s3_enabled(config.s3):
         s3_client = get_s3_client(config.s3)
         s3_bucket = config.s3.bucket
     else:
         s3_client = None
         s3_bucket = None
-
-    # Reconstruct options object to include worker-side preset defaults
-    options = AnalysisOptions.with_config_defaults(config, **dict(options))
-
-    if not options.plugins:
-        raise RuntimeError("Cannot analyze sample without plugins specified")
 
     job = get_current_job()
     job.meta["vm_id"] = _WORKER_VM_ID
@@ -132,7 +155,10 @@ def worker_analyze(options: AnalysisOptions):
 
     job_success = True
     try:
-        extra_metadata = analyze_file(
+        analyzer = (
+            analyze_linux_file if metadata.options.guest_os == "linux" else analyze_file
+        )
+        extra_metadata = analyzer(
             vm_id, output_dir, metadata, substatus_callback=substatus_callback
         )
         job.meta.update({"extra_metadata": extra_metadata})
@@ -147,6 +173,10 @@ def worker_analyze(options: AnalysisOptions):
         file_handler.close()
 
         metadata.status = "finished" if job_success else "failed"
+        if "memory_admission_wait_seconds" in job.meta:
+            metadata.model_extra["memory_admission_wait_seconds"] = job.meta[
+                "memory_admission_wait_seconds"
+            ]
         metadata.time_finished = datetime.datetime.now(
             datetime.timezone.utc
         ).isoformat()
@@ -161,18 +191,33 @@ def worker_analyze(options: AnalysisOptions):
                 shutil.rmtree(output_dir)
 
 
-def worker_main(vm_id: int):
-    global _WORKER_VM_ID
+def worker_main(vm_id: int, guest_os: Optional[WorkerGuestOS] = None):
+    global _WORKER_VM_ID, _WORKER_GUEST_OS
     _WORKER_VM_ID = vm_id
     config = load_config()
+    _WORKER_GUEST_OS = guest_os or config.worker.vm_guest_os.get(vm_id, "any")
+    if _WORKER_GUEST_OS not in ("windows", "linux", "any"):
+        raise ValueError(f"Invalid worker guest OS: {_WORKER_GUEST_OS}")
     hostname = config.drakrun.worker_hostname or socket.gethostname()
 
     worker = Worker(
-        queues=[ANALYSIS_QUEUE_NAME],
+        queues=(
+            list(ANALYSIS_QUEUE_NAMES)
+            if _WORKER_GUEST_OS == "any"
+            else [queue_for_guest_os(_WORKER_GUEST_OS)]
+        ),
         name=f"drakrun-worker@{hostname}:vm-{vm_id}",
         connection=get_redis_connection(config.redis),
     )
     worker.work()
+
+
+def queue_for_guest_os(guest_os: str) -> str:
+    if guest_os == "windows":
+        return ANALYSIS_QUEUE_NAME
+    if guest_os == "linux":
+        return LINUX_ANALYSIS_QUEUE_NAME
+    raise ValueError(f"Invalid analysis guest OS: {guest_os}")
 
 
 def enqueue_analysis(
@@ -182,7 +227,7 @@ def enqueue_analysis(
     connection: Redis,
     result_ttl: int,
 ) -> Job:
-    queue = Queue(name=ANALYSIS_QUEUE_NAME, connection=connection)
+    queue = Queue(name=queue_for_guest_os(options.guest_os), connection=connection)
     if options.timeout is None:
         raise RuntimeError("Timeout is required when spawning analysis to worker")
     return queue.enqueue(
@@ -193,28 +238,37 @@ def enqueue_analysis(
             "options": options.to_dict(exclude_none=True),
             "file": file_metadata.to_dict(),
         },
-        job_timeout=options.timeout + options.job_timeout_leeway,
+        # RQ's wall-clock budget must leave time for admission before analysis.
+        job_timeout=(
+            options.timeout
+            + options.job_timeout_leeway
+            + math.ceil(load_config().worker.memory_admission_timeout)
+        ),
         result_ttl=result_ttl,
     )
 
 
 def get_analyses_list(connection: Redis) -> List[Job]:
-    queue = Queue(name=ANALYSIS_QUEUE_NAME, connection=connection)
-    jobs = list(queue.get_jobs())
-    for job_registry in [
-        queue.started_job_registry,
-        queue.finished_job_registry,
-        queue.failed_job_registry,
-    ]:
-        job_ids = job_registry.get_job_ids()
-        jobs.extend(
-            [
-                job
-                for job in Job.fetch_many(job_ids, connection=connection)
-                if job is not None
-            ]
-        )
-    return sorted(jobs, key=lambda job: job.enqueued_at, reverse=True)
+    jobs = {}
+    for queue_name in LISTED_QUEUE_NAMES:
+        queue = Queue(name=queue_name, connection=connection)
+        for job in queue.get_jobs():
+            jobs[job.id] = job
+        for job_registry in [
+            queue.started_job_registry,
+            queue.finished_job_registry,
+            queue.failed_job_registry,
+            queue.deferred_job_registry,
+            queue.scheduled_job_registry,
+            queue.canceled_job_registry,
+        ]:
+            job_ids = job_registry.get_job_ids()
+            for job in Job.fetch_many(job_ids, connection=connection):
+                if job is not None:
+                    jobs[job.id] = job
+    return sorted(
+        jobs.values(), key=lambda job: job.enqueued_at or job.created_at, reverse=True
+    )
 
 
 def truncate_analysis_list(connection: Redis, limit: int) -> None:

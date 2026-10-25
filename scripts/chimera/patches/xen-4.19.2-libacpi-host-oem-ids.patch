@@ -1,0 +1,105 @@
+diff -ru -x '*.o' -x '*.aml' -x '*.hex' -x 'dsdt_*.c' -x 'ssdt_*.h' -x '*.d' -x mk_dsdt -x '*.asl.*' -x '*.lst' a/tools/libacpi/acpi2_0.h b/tools/libacpi/acpi2_0.h
+--- a/tools/libacpi/acpi2_0.h	2025-04-04 16:17:23.000000000 +0530
++++ b/tools/libacpi/acpi2_0.h	2026-10-19 19:49:42.790618562 +0530
+@@ -31,12 +31,12 @@
+     uint32_t creator_revision;
+ };
+ 
+-#define ACPI_OEM_ID             "Xen"
+-#define ACPI_OEM_TABLE_ID       "HVM"
+-#define ACPI_OEM_REVISION       0
++#define ACPI_OEM_ID             "ACRSYS"
++#define ACPI_OEM_TABLE_ID       "ACRPRDCT"
++#define ACPI_OEM_REVISION       2
+ 
+-#define ACPI_CREATOR_ID         ASCII32('H','V','M','L') /* HVMLoader */
+-#define ACPI_CREATOR_REVISION   0
++#define ACPI_CREATOR_ID         ASCII32('1','0','2','5') /* host laptop's tables */
++#define ACPI_CREATOR_REVISION   0x40000
+ 
+ /*
+  * ACPI 2.0 Generic Address Space definition.
+diff -ru -x '*.o' -x '*.aml' -x '*.hex' -x 'dsdt_*.c' -x 'ssdt_*.h' -x '*.d' -x mk_dsdt -x '*.asl.*' -x '*.lst' a/tools/libacpi/dsdt.asl b/tools/libacpi/dsdt.asl
+--- a/tools/libacpi/dsdt.asl	2025-04-04 16:17:23.000000000 +0530
++++ b/tools/libacpi/dsdt.asl	2026-10-19 19:49:30.794411690 +0530
+@@ -5,7 +5,7 @@
+  * Copyright (c) 2004, Intel Corporation.
+  */
+ 
+-DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
++DefinitionBlock ("DSDT.aml", "DSDT", 2, "ACRSYS", "ACRPRDCT", 2)
+ {
+     Name (\PMBS, 0x0C00)
+     Name (\PMLN, 0x08)
+diff -ru -x '*.o' -x '*.aml' -x '*.hex' -x 'dsdt_*.c' -x 'ssdt_*.h' -x '*.d' -x mk_dsdt -x '*.asl.*' -x '*.lst' a/tools/libacpi/ssdt_laptop_slate.asl b/tools/libacpi/ssdt_laptop_slate.asl
+--- a/tools/libacpi/ssdt_laptop_slate.asl	2025-04-04 16:17:23.000000000 +0530
++++ b/tools/libacpi/ssdt_laptop_slate.asl	2026-10-19 19:49:30.794411690 +0530
+@@ -11,7 +11,7 @@
+  * See https://msdn.microsoft.com/en-us/windows/hardware/commercialize/design/device-experiences/continuum#method-2----use-the-injection-interface
+  */
+ 
+-DefinitionBlock ("SSDT_LAPTOP_SLATE.aml", "SSDT", 2, "Xen", "HVM", 0)
++DefinitionBlock ("SSDT_LAPTOP_SLATE.aml", "SSDT", 2, "ACRSYS", "ACRPRDCT", 2)
+ {
+     Device (CONV) {
+         Method (_HID, 0x0, NotSerialized) {
+diff -ru -x '*.o' -x '*.aml' -x '*.hex' -x 'dsdt_*.c' -x 'ssdt_*.h' -x '*.d' -x mk_dsdt -x '*.asl.*' -x '*.lst' a/tools/libacpi/ssdt_pm.asl b/tools/libacpi/ssdt_pm.asl
+--- a/tools/libacpi/ssdt_pm.asl	2025-04-04 16:17:23.000000000 +0530
++++ b/tools/libacpi/ssdt_pm.asl	2026-10-19 19:49:30.794411690 +0530
+@@ -35,7 +35,7 @@
+  * 0xB040, 0xB044, 0xB046, 0xB048 
+  */
+ 
+-DefinitionBlock ("SSDT_PM.aml", "SSDT", 2, "Xen", "HVM", 0)
++DefinitionBlock ("SSDT_PM.aml", "SSDT", 2, "ACRSYS", "ACRPRDCT", 2)
+ {
+     Scope (\_SB)
+     {
+diff -ru -x '*.o' -x '*.aml' -x '*.hex' -x 'dsdt_*.c' -x 'ssdt_*.h' -x '*.d' -x mk_dsdt -x '*.asl.*' -x '*.lst' a/tools/libacpi/ssdt_s3.asl b/tools/libacpi/ssdt_s3.asl
+--- a/tools/libacpi/ssdt_s3.asl	2025-04-04 16:17:23.000000000 +0530
++++ b/tools/libacpi/ssdt_s3.asl	2026-10-19 19:49:30.794411690 +0530
+@@ -5,7 +5,7 @@
+  * Copyright (c) 2011  Citrix Systems, Inc.
+  */
+ 
+-DefinitionBlock ("SSDT_S3.aml", "SSDT", 2, "Xen", "HVM", 0)
++DefinitionBlock ("SSDT_S3.aml", "SSDT", 2, "ACRSYS", "ACRPRDCT", 2)
+ {
+     /* Must match piix emulation */
+     Name (\_S3, Package (0x04)
+diff -ru -x '*.o' -x '*.aml' -x '*.hex' -x 'dsdt_*.c' -x 'ssdt_*.h' -x '*.d' -x mk_dsdt -x '*.asl.*' -x '*.lst' a/tools/libacpi/ssdt_s4.asl b/tools/libacpi/ssdt_s4.asl
+--- a/tools/libacpi/ssdt_s4.asl	2025-04-04 16:17:23.000000000 +0530
++++ b/tools/libacpi/ssdt_s4.asl	2026-10-19 19:49:30.794411690 +0530
+@@ -5,7 +5,7 @@
+  * Copyright (c) 2011  Citrix Systems, Inc.
+  */
+ 
+-DefinitionBlock ("SSDT_S4.aml", "SSDT", 2, "Xen", "HVM", 0)
++DefinitionBlock ("SSDT_S4.aml", "SSDT", 2, "ACRSYS", "ACRPRDCT", 2)
+ {
+     /* Must match piix emulation */
+     Name (\_S4, Package (0x04)
+diff -ru -x '*.o' -x '*.aml' -x '*.hex' -x 'dsdt_*.c' -x 'ssdt_*.h' -x '*.d' -x mk_dsdt -x '*.asl.*' -x '*.lst' a/tools/libacpi/ssdt_tpm2.asl b/tools/libacpi/ssdt_tpm2.asl
+--- a/tools/libacpi/ssdt_tpm2.asl	2025-04-04 16:17:23.000000000 +0530
++++ b/tools/libacpi/ssdt_tpm2.asl	2026-10-19 19:49:30.794411690 +0530
+@@ -7,7 +7,7 @@
+ 
+ /* SSDT for TPM CRB Interface for Xen with Qemu device model. */
+ 
+-DefinitionBlock ("SSDT_TPM2.aml", "SSDT", 2, "Xen", "HVM", 0)
++DefinitionBlock ("SSDT_TPM2.aml", "SSDT", 2, "ACRSYS", "ACRPRDCT", 2)
+ {
+     Device (TPM)
+     {
+diff -ru -x '*.o' -x '*.aml' -x '*.hex' -x 'dsdt_*.c' -x 'ssdt_*.h' -x '*.d' -x mk_dsdt -x '*.asl.*' -x '*.lst' a/tools/libacpi/ssdt_tpm.asl b/tools/libacpi/ssdt_tpm.asl
+--- a/tools/libacpi/ssdt_tpm.asl	2025-04-04 16:17:23.000000000 +0530
++++ b/tools/libacpi/ssdt_tpm.asl	2026-10-19 19:49:30.794411690 +0530
+@@ -7,7 +7,7 @@
+ 
+ /* SSDT for TPM TIS Interface for Xen with Qemu device model. */
+ 
+-DefinitionBlock ("SSDT_TPM.aml", "SSDT", 2, "Xen", "HVM", 0)
++DefinitionBlock ("SSDT_TPM.aml", "SSDT", 2, "ACRSYS", "ACRPRDCT", 2)
+ {
+     Device (TPM) {
+         Name (_HID, EisaId ("PNP0C31"))

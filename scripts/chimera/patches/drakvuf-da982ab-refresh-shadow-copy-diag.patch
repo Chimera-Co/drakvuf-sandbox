@@ -1,0 +1,135 @@
+diff --git a/src/libdrakvuf/vmi.c b/src/libdrakvuf/vmi.c
+index 69f41ac..fd884ba 100644
+--- a/src/libdrakvuf/vmi.c
++++ b/src/libdrakvuf/vmi.c
+@@ -202,10 +202,69 @@ void process_free_requests(drakvuf_t drakvuf)
+     drakvuf->remove_traps = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, NULL);
+ }
+ 
++/* CHIMERA-DIAG: map one guest frame directly and report Xen's per-page error. */
++#include <dlfcn.h>
++#include <sys/mman.h>
++typedef void* (*chimera_fm_open_t)(void*, unsigned int);
++typedef void* (*chimera_fm_map_t)(void*, uint32_t, int, size_t, const xen_pfn_t*, int*);
++typedef int (*chimera_fm_unmap_t)(void*, void*, size_t);
++static void chimera_diag_map(drakvuf_t drakvuf, const char* what, addr_t gfn, int prot)
++{
++    static void* fm = NULL;
++    static chimera_fm_map_t fmap = NULL;
++    static chimera_fm_unmap_t funmap = NULL;
++    if (!fm)
++    {
++        chimera_fm_open_t fopen_ = (chimera_fm_open_t)dlsym(RTLD_DEFAULT, "xenforeignmemory_open");
++        fmap = (chimera_fm_map_t)dlsym(RTLD_DEFAULT, "xenforeignmemory_map");
++        funmap = (chimera_fm_unmap_t)dlsym(RTLD_DEFAULT, "xenforeignmemory_unmap");
++        if (fopen_)
++            fm = fopen_(NULL, 0);
++    }
++    if (!fm || !fmap || !funmap)
++    {
++        fprintf(stderr, "CHIMERA-DIAG %s gfn=0x%lx map=unavailable\n", what, gfn);
++        return;
++    }
++    xen_pfn_t pfn = gfn;
++    int err = 0;
++    errno = 0;
++    void* page = fmap(fm, drakvuf->domID, prot, 1, &pfn, &err);
++    int saved_errno = errno;
++    fprintf(stderr, "CHIMERA-DIAG %s gfn=0x%lx prot=%s map=%s err=%d errno=%d\n",
++        what, gfn, prot & PROT_WRITE ? "rw" : "r", page ? "ok" : "FAILED", err, saved_errno);
++    if (page)
++        funmap(fm, page, 1);
++}
++
++static void chimera_diag_fail(drakvuf_t drakvuf, struct memcb_pass* pass, const char* site, addr_t pa)
++{
++    fprintf(stderr, "CHIMERA-DIAG refresh_shadow_copy failed at %s: o=0x%lx r=0x%lx trap_pa=0x%lx write_pa=0x%lx gfn=0x%lx access=0x%x max_gpfn=0x%lx active=%d\n",
++        site, pass->remapped_gfn->o, pass->remapped_gfn->r, pa, pass->pa, pass->gfn,
++        (unsigned)pass->access, (unsigned long)drakvuf->max_gpfn, pass->remapped_gfn->active);
++    chimera_diag_map(drakvuf, "orig", pass->remapped_gfn->o, PROT_READ);
++    chimera_diag_map(drakvuf, "shadow", pass->remapped_gfn->r, PROT_READ | PROT_WRITE);
++    uint8_t probe[VMI_PS_4KB];
++    vmi_pagecache_flush(drakvuf->vmi);
++    fprintf(stderr, "CHIMERA-DIAG after pagecache flush: read orig=%s write shadow-readback=%s\n",
++        VMI_SUCCESS == vmi_read_pa(drakvuf->vmi, pass->remapped_gfn->o << 12, VMI_PS_4KB, probe, NULL) ? "ok" : "FAILED",
++        VMI_SUCCESS == vmi_read_pa(drakvuf->vmi, pass->remapped_gfn->r << 12, VMI_PS_4KB, probe, NULL) ? "ok" : "FAILED");
++}
++
+ static bool refresh_shadow_copy(vmi_instance_t vmi, struct memcb_pass* pass)
+ {
+     drakvuf_t drakvuf = pass->drakvuf;
+ 
++    /*
++     * The page may have got its first breakpoint, and so its shadow copy,
++     * only after the write was intercepted. That copy was taken after the
++     * write and is current; a page without one has nothing to refresh.
++     */
++    if (!pass->remapped_gfn)
++        pass->remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns, GSIZE_TO_POINTER(pass->gfn));
++    if (!pass->remapped_gfn)
++        return 1;
++
+     PRINT_DEBUG("Re-copying remapped gfn\n");
+ 
+     if (!drakvuf_pause(drakvuf))
+@@ -216,6 +275,7 @@ static bool refresh_shadow_copy(vmi_instance_t vmi, struct memcb_pass* pass)
+     if ( VMI_FAILURE == vmi_read_pa(vmi, pass->remapped_gfn->o<<12, VMI_PS_4KB, &backup, NULL) )
+     {
+         fprintf(stderr, "Critical error in re-copying remapped gfn\n");
++        chimera_diag_fail(drakvuf, pass, "read-orig", 0);
+         drakvuf->interrupted = -1;
+         return 0;
+     }
+@@ -223,20 +283,35 @@ static bool refresh_shadow_copy(vmi_instance_t vmi, struct memcb_pass* pass)
+     if ( VMI_FAILURE == vmi_write_pa(vmi, pass->remapped_gfn->r<<12, VMI_PS_4KB, &backup, NULL) )
+     {
+         fprintf(stderr, "Critical error in re-copying remapped gfn\n");
++        chimera_diag_fail(drakvuf, pass, "write-shadow", 0);
+         drakvuf->interrupted = -1;
+         return 0;
+     }
+ 
+-    GSList* loop = (GSList*)pass->traps;
++    /*
++     * pass->traps was looked up when the write was intercepted. Callbacks and
++     * process_free_requests() may have removed breakpoints on this page since,
++     * which frees nodes of that list, so walk the current list instead.
++     */
++    GSList* loop = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(pass->gfn));
++    if (loop != pass->traps)
++        fprintf(stderr, "CHIMERA-DIAG trap list of gfn 0x%lx changed during single-step; using the current list\n", pass->gfn);
+     while (loop)
+     {
+         uint8_t test = 0;
+         addr_t pa = GPOINTER_TO_SIZE(loop->data);
+         struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, loop->data);
+ 
++        if (!s)
++        {
++            loop = loop->next;
++            continue;
++        }
++
+         if ( VMI_FAILURE == vmi_read_8_pa(vmi, pa, &test) )
+         {
+             fprintf(stderr, "Critical error in re-copying remapped gfn\n");
++            chimera_diag_fail(drakvuf, pass, "read-trap-byte", pa);
+             drakvuf->interrupted = -1;
+             return 0;
+         }
+@@ -342,7 +417,14 @@ static event_response_t _post_mem_cb(drakvuf_t drakvuf, vmi_event_t* event)
+      * We need to copy the newly written page to the remapped gfn
+      * and reapply all traps
+      */
+-    if ( pass->traps && !refresh_shadow_copy(drakvuf->vmi, pass) )
++    /*
++     * pass->traps is set only for a write to a page that had breakpoints when
++     * the write was intercepted. Use it as that flag only: the list itself may
++     * have been freed since (see refresh_shadow_copy).
++     */
++    if ( pass->traps &&
++        g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(pass->gfn)) &&
++        !refresh_shadow_copy(drakvuf->vmi, pass) )
+     {
+         fprintf(stderr, "Failed to refresh shadow copy\n");
+         drakvuf->interrupted = 1;

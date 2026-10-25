@@ -2,7 +2,7 @@ import json
 import pathlib
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .paths import SNAPSHOT_DIR, XL_CFG_TEMPLATE_PATH
 
@@ -19,6 +19,9 @@ class InstallInfo(BaseModel):
     vnc_passwd: str
     vcpus: int
     memory: int
+    cpus: Optional[str] = Field(
+        default=None, pattern=r"^\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*$"
+    )
     reboot_vm0_action: str = "restart"
     reboot_vmn_action: str = "destroy"
     xl_cfg_template: pathlib.Path = XL_CFG_TEMPLATE_PATH

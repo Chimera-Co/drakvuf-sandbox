@@ -1,0 +1,6 @@
+[2026-10-25 05:11:51,919][drakrun.lib.vm][INFO] Destroying vm-1
+[2026-10-25 05:11:51,923][drakrun.lib.networking][INFO] VM network for vm-1 is not running
+[2026-10-25 05:11:51,958][drakrun.lib.networking][DEBUG] Setting up iptables chains
+[2026-10-25 05:11:51,981][drakrun.lib.networking][INFO] Created bridge drak1
+[2026-10-25 05:11:51,988][drakrun.lib.networking][INFO] Bridge drak1 is up
+[2026-10-25 05:11:52,023][drakrun.lib.vm][INFO] Generated VM configuration for vm-1

@@ -43,6 +43,17 @@ class RespCode(enum.IntEnum):
     RESP_PROCESS_ERROR = 0xB2
 
 
+class ProcessStartError(RuntimeError):
+    """Raised when the guest agent replies RESP_PROCESS_ERROR to a process
+    start request - a well-formed protocol response (the drakshell channel
+    answered correctly) reporting that the OS itself could not start the
+    requested process (e.g. Windows CreateProcess ERROR_FILE_NOT_FOUND for a
+    missing executable). Deliberately distinct from the generic RuntimeError
+    raised elsewhere in _start_process() for actual protocol desync: unlike
+    desync, a RESP_PROCESS_ERROR reply means the channel's request/response
+    framing is intact and safe to reuse for the next command."""
+
+
 class Channel:
     MAX_BUFFER_SIZE = 4096
 
@@ -315,7 +326,7 @@ class Drakshell:
         if status == RespCode.RESP_PROCESS_START:
             pass
         elif status == RespCode.RESP_PROCESS_ERROR:
-            raise RuntimeError(f"Process startup failed: {code}")
+            raise ProcessStartError(f"Process startup failed: {code}")
         else:
             raise RuntimeError(
                 f"Drakshell is out of sync: got {status} instead of {expected_status}"
@@ -340,11 +351,15 @@ class Drakshell:
             raise RuntimeError(f"Process exited with exit code {exit_code}")
 
 
-def get_drakshell(vm, injector):
+def get_drakshell(vm, injector, connect_timeout: int = 10):
     drakshell = Drakshell(vm.vm_name)
     connected = False
     try:
-        drakshell.connect()
+        # A just-restored guest can take several seconds to answer the ping.
+        # Injecting a second drakshell into a guest that already runs one
+        # hijacks explorer.exe and can wedge it, so be patient here (the
+        # analyzer uses the same 10 s, see analyzer.py).
+        drakshell.connect(timeout=connect_timeout)
         connected = True
     except Exception as e:
         log.warning(f"Failed to connect to drakshell: {str(e)}")

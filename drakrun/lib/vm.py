@@ -9,6 +9,7 @@ from .networking import get_network_info_path, start_vm_network, stop_vm_network
 from .paths import CONFIGS_DIR
 from .storage import get_storage_backend
 from .xen import (
+    reap_orphaned_device_models,
     xen_create_vm,
     xen_destroy_vm,
     xen_eject_cd,
@@ -60,6 +61,18 @@ class VirtualMachine:
         template = template.replace("{{ VNC_PORT }}", str(6400 + self.vm_id))
         template = template.replace("{{ VCPUS }}", str(self.install_info.vcpus))
         template = template.replace("{{ MEMORY }}", str(self.install_info.memory))
+        cpus = self.install_info.cpus
+        if "{{ CPUS }}" in template:
+            if cpus is not None:
+                template = template.replace("{{ CPUS }}", cpus)
+            else:
+                template = "".join(
+                    line
+                    for line in template.splitlines(keepends=True)
+                    if "{{ CPUS }}" not in line
+                )
+        elif cpus is not None:
+            template = template.rstrip("\n") + f'\ncpus = "{cpus}"\n'
         template = template.replace("{{ VNC_PASS }}", str(self.install_info.vnc_passwd))
         template = template.replace(
             "{{ BRIDGE_NAME }}", str(self._network_info.bridge_name)
@@ -87,7 +100,7 @@ class VirtualMachine:
             self._network_info = NetworkInfo.load(network_info_path)
         return self._network_info
 
-    def create(self, iso_path: Optional[str] = None) -> None:
+    def create(self, iso_path: Optional[str] = None, pause: bool = False) -> None:
         disks = [self.storage.get_vm_disk_path(self.vm_id)]
         if iso_path is not None:
             iso_disk = f"file:{iso_path},{FIRST_CDROM_DRIVE}:cdrom,r"
@@ -96,15 +109,20 @@ class VirtualMachine:
         self._network_info = start_vm_network(self.vm_id, self.network_conf)
 
         vm_conf_path = self._generate_vm_conf(disks)
-        xen_create_vm(self.vm_name, vm_conf_path.as_posix())
+        xen_create_vm(self.vm_name, vm_conf_path.as_posix(), pause=pause)
 
-    def restore(self, snapshot_path: Optional[str] = None, cold_boot=False) -> None:
+    def restore(
+        self, snapshot_path: Optional[str] = None, cold_boot=False, pause: bool = False
+    ) -> None:
         if not cold_boot and snapshot_path is None:
             snapshot_path = (
                 Path(self.install_info.snapshot_dir) / "snapshot.sav"
             ).as_posix()
         # Ensure VM is destroyed
         self.destroy()
+        # A device model left over from an earlier run would still hold this
+        # VM's VNC port and make the restore fail.
+        reap_orphaned_device_models()
         # No need to rollback vm-0. Since the state of vm-0
         # is correct by definition.
         if self.vm_id != 0:
@@ -119,9 +137,11 @@ class VirtualMachine:
         vm_conf_path = self._generate_vm_conf(disks)
         log.info(f"Restoring VM {self.vm_name}")
         if not cold_boot:
-            xen_restore_vm(self.vm_name, vm_conf_path.as_posix(), snapshot_path)
+            xen_restore_vm(
+                self.vm_name, vm_conf_path.as_posix(), snapshot_path, pause=pause
+            )
         else:
-            xen_create_vm(self.vm_name, vm_conf_path.as_posix())
+            xen_create_vm(self.vm_name, vm_conf_path.as_posix(), pause=pause)
 
     def save(self, snapshot_path: Optional[str] = None) -> None:
         if snapshot_path is None:

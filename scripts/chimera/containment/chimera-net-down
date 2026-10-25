@@ -1,0 +1,67 @@
+#!/bin/bash
+# CHIMERA containment rollback. Refuses to run while any vm-* domain exists,
+# because removing the guard under a live guest would expose it.
+#
+#   chimera-net-down               full teardown
+#   chimera-net-down --rules-only  remove firewall state only (C-1 dry run cleanup)
+set -euo pipefail
+
+NS=chimera-inet
+H=inetsim0
+RULES_ONLY=0
+[[ "${1:-}" == "--rules-only" ]] && RULES_ONLY=1
+
+if [[ $RULES_ONLY -eq 0 ]] && command -v xl >/dev/null; then
+    if xl list 2>/dev/null | awk 'NR>1 {print $1}' | grep -q '^vm-'; then
+        echo "chimera-net-down: refusing, analysis domains are running (xl destroy them first)" >&2
+        exit 1
+    fi
+fi
+
+# Lines removing a jump if present.
+unjump() {  # cmd table chain target
+    if $1 -t "$2" -C "$3" -j "$4" 2>/dev/null; then
+        echo "-D $3 -j $4"
+    fi
+}
+
+# Lines flushing and deleting a user chain if present.
+drop_chain() {  # cmd table chain
+    if $1 -t "$2" -S "$3" &>/dev/null; then
+        echo "-F $3"
+        echo "-X $3"
+    fi
+}
+
+iptables-restore --noflush <<EOF
+*raw
+$(unjump iptables raw PREROUTING CHIMERA_RAW)
+$(drop_chain iptables raw CHIMERA_RAW)
+COMMIT
+*nat
+$(unjump iptables nat PREROUTING CHIMERA_DNAT)
+$(drop_chain iptables nat CHIMERA_DNAT)
+COMMIT
+*filter
+$(unjump iptables filter FORWARD CHIMERA_GUARD)
+$(unjump iptables filter INPUT CHIMERA_IN)
+$(drop_chain iptables filter CHIMERA_GUARD)
+$(drop_chain iptables filter CHIMERA_IN)
+COMMIT
+EOF
+iptables -P FORWARD ACCEPT
+
+ip6tables-restore --noflush <<EOF
+*filter
+$(unjump ip6tables filter INPUT CHIMERA6)
+$(unjump ip6tables filter FORWARD CHIMERA6)
+$(drop_chain ip6tables filter CHIMERA6)
+COMMIT
+EOF
+
+if [[ $RULES_ONLY -eq 0 ]]; then
+    ip link show "$H" &>/dev/null && ip link del "$H"
+    ip netns list | grep -qw "$NS" && ip netns del "$NS"
+    echo 0 > /proc/sys/net/ipv4/ip_forward
+fi
+echo "chimera-net-down: done"

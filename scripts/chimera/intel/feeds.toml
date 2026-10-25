@@ -1,0 +1,63 @@
+# Review provider access and redistribution terms before enabling scheduled updates.
+[[feeds]]
+name = "malwarebazaar"
+url = "https://mb-api.abuse.ch/v2/files/exports/{auth_key}/recent.csv"
+format = "malwarebazaar"
+indicator_types = ["sha256", "sha1", "md5"]
+license = "abuse.ch terms: not-for-profit; no high-volume harvesting; no model training without written permission; redistribution requires review"
+max_age_days = 7
+auth_key = true
+
+[[feeds]]
+name = "urlhaus"
+url = "https://urlhaus-api.abuse.ch/v2/files/exports/{auth_key}/recent.csv"
+format = "urlhaus"
+indicator_types = ["url"]
+license = "abuse.ch terms: not-for-profit; no high-volume harvesting; no model training without written permission; redistribution requires review"
+max_age_days = 7
+auth_key = true
+
+[[feeds]]
+name = "threatfox"
+url = "https://threatfox-api.abuse.ch/v2/files/exports/{auth_key}/recent.json"
+format = "threatfox"
+indicator_types = ["sha256", "sha1", "md5", "domain", "url", "ip_port", "ip"]
+license = "abuse.ch terms: not-for-profit; no high-volume harvesting; no model training without written permission; redistribution requires review"
+max_age_days = 7
+auth_key = true
+
+[[feeds]]
+name = "feodo"
+url = "https://feodotracker.abuse.ch/downloads/ipblocklist.json"
+format = "feodo"
+indicator_types = ["ip", "ip_port"]
+license = "abuse.ch feed terms; review access and redistribution rights"
+max_age_days = 2
+auth_key = false
+
+[[feeds]]
+name = "sslbl-certificates"
+url = "https://sslbl.abuse.ch/blacklist/sslblacklist.csv"
+format = "sslbl"
+indicator_types = ["sslcert_sha1"]
+license = "abuse.ch feed terms; review access and redistribution rights"
+max_age_days = 7
+auth_key = false
+
+[[feeds]]
+name = "sslbl-ja3"
+url = "https://sslbl.abuse.ch/blacklist/ja3_fingerprints.csv"
+format = "sslbl"
+indicator_types = ["ja3"]
+license = "abuse.ch feed terms; review access and redistribution rights"
+max_age_days = 7
+auth_key = false
+
+[[feeds]]
+name = "warninglist"
+url = "https://raw.githubusercontent.com/MISP/misp-warninglists/main/lists/public-dns-v4/list.json"
+format = "misp_warninglist"
+indicator_types = ["allowlist"]
+license = "MISP warninglists: review upstream list-specific license and provenance before redistribution"
+max_age_days = 30
+auth_key = false
