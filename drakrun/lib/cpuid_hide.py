@@ -12,6 +12,7 @@ Ways to run it:
   - `start_detached(vm_name)` / `stop_detached(vm_name)`: across commands, e.g. from `drakrun install` (vm-0
     is created paused, the helper attaches, then vm-0 is unpaused) until `drakrun postinstall` saves it
 """
+
 import contextlib
 import logging
 import os
@@ -48,7 +49,9 @@ def _start(vm_name: str, detached: bool) -> subprocess.Popen:
     if line != "ready":
         process.kill()
         process.wait()
-        raise RuntimeError(f"chimera-cpuid-hide did not attach to {vm_name} (exit {process.returncode})")
+        raise RuntimeError(
+            f"chimera-cpuid-hide did not attach to {vm_name} (exit {process.returncode})"
+        )
     return process
 
 
@@ -63,7 +66,11 @@ def _alive(process_or_pid) -> bool:
 
 
 def _stop(process_or_pid, timeout: float = 15) -> None:
-    pid = process_or_pid.pid if isinstance(process_or_pid, subprocess.Popen) else process_or_pid
+    pid = (
+        process_or_pid.pid
+        if isinstance(process_or_pid, subprocess.Popen)
+        else process_or_pid
+    )
     try:
         os.kill(pid, signal.SIGTERM)
     except ProcessLookupError:
@@ -71,7 +78,9 @@ def _stop(process_or_pid, timeout: float = 15) -> None:
     deadline = time.monotonic() + timeout
     while _alive(process_or_pid):
         if time.monotonic() > deadline:
-            raise RuntimeError(f"chimera-cpuid-hide (pid {pid}) did not stop within {timeout} s")
+            raise RuntimeError(
+                f"chimera-cpuid-hide (pid {pid}) did not stop within {timeout} s"
+            )
         time.sleep(0.2)
 
 
@@ -85,7 +94,9 @@ def detach(process: subprocess.Popen) -> None:
 
 
 @contextlib.contextmanager
-def cpuid_hidden(vm_name: str, required: bool = False) -> Iterator[Optional[subprocess.Popen]]:
+def cpuid_hidden(
+    vm_name: str, required: bool = False
+) -> Iterator[Optional[subprocess.Popen]]:
     if not available():
         if required:
             raise RuntimeError(f"{CPUID_HIDE_BINARY} is missing")
@@ -101,7 +112,9 @@ def cpuid_hidden(vm_name: str, required: bool = False) -> Iterator[Optional[subp
 
 def start_detached(vm_name: str) -> int:
     if not available():
-        raise RuntimeError(f"{CPUID_HIDE_BINARY} is missing (build scripts/chimera/linux/cpuid-hide)")
+        raise RuntimeError(
+            f"{CPUID_HIDE_BINARY} is missing (build scripts/chimera/linux/cpuid-hide)"
+        )
     stop_detached(vm_name)
     process = _start(vm_name, detached=True)
     process.stdout.close()

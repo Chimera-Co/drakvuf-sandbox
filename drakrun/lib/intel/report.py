@@ -29,7 +29,8 @@ def sample_scope(report):
 
 def observations(metadata, report, static, tls, scope=None):
     """(kind, value, origin) triples. With `scope` (sample seqids), run-time rows are split by who made them:
-    "dynamic" (the sample's process tree), "system" (only other guest processes) or "unattributed"."""
+    "dynamic" (the sample's process tree), "system" (only other guest processes) or "unattributed".
+    """
     out = []
     row_origin = "dynamic"
 
@@ -45,7 +46,9 @@ def observations(metadata, report, static, tls, scope=None):
         seqids = set(row.get("process_seqids") or [])
         if row.get("process_seqid") is not None:
             seqids.add(row["process_seqid"])
-        row_origin = "unattributed" if not seqids else "dynamic" if seqids & scope else "system"
+        row_origin = (
+            "unattributed" if not seqids else "dynamic" if seqids & scope else "system"
+        )
 
     for source in (
         metadata.get("file") or {},

@@ -25,7 +25,8 @@ def read_json(path):
 
 def collect(directory, static_directory, config, network=None):
     """(kind, value, origin) to look up: the sample's hash, then what its own processes contacted, then what
-    nobody can attribute, then strings in the file. Other guest processes' traffic is not looked up."""
+    nobody can attribute, then strings in the file. Other guest processes' traffic is not looked up.
+    """
     metadata = read_json(directory / "metadata.json")
     static = read_json(static_directory / "static.json")
     report = read_json(directory / "report.json")
@@ -59,7 +60,13 @@ def collect(directory, static_directory, config, network=None):
             except ValueError:
                 pass
     # Most telling first: the sample's own hash, then indicators seen at run time, then strings in the file.
-    origin_rank = {"sample": 0, "dynamic": 1, "memory": 2, "unattributed": 3, "static": 4}
+    origin_rank = {
+        "sample": 0,
+        "dynamic": 1,
+        "memory": 2,
+        "unattributed": 3,
+        "static": 4,
+    }
     kind_rank = {"sha256": 0, "sha1": 1, "md5": 2, "domain": 3, "url": 4, "ip": 5}
     candidates = sorted(
         candidates, key=lambda c: (origin_rank.get(c[2], 3), kind_rank.get(c[0], 9))
@@ -121,7 +128,9 @@ def run(directory, static_directory, config, network=None):
         if info["enabled"] and info["configured"]:
             wanted = [item for item in items if item[0] in provider.types]
             for kind, value, origin in wanted[: provider.max_lookups]:
-                rows.append({**provider.lookup(kind, value, config, cache), "origin": origin})
+                rows.append(
+                    {**provider.lookup(kind, value, config, cache), "origin": origin}
+                )
         statuses = Counter(row["status"] for row in rows)
         status = (
             "disabled"
@@ -178,7 +187,9 @@ def run(directory, static_directory, config, network=None):
             observables=len(items),
             # A match is a provider calling it malicious or suspicious; "seen" only means the provider
             # knows the value (a urlscan search hit, a known-good file).
-            matches=sum(r.get("verdict") in ("malicious", "suspicious") for r in results),
+            matches=sum(
+                r.get("verdict") in ("malicious", "suspicious") for r in results
+            ),
             malicious=sum(r.get("verdict") == "malicious" for r in results),
             known_good=sum(r.get("verdict") == "harmless" for r in results),
             seen=sum(r["status"] == "ok" for r in results),

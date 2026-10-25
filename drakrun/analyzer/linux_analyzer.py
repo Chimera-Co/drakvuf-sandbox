@@ -7,6 +7,7 @@ telemetry, guest_clock), so postprocessing and the portal work unchanged. Differ
   - DRAKVUF is started first and the agent launches the sample only after a marker command
     shows up in procmon, so the sample's first events are not lost
 """
+
 import json
 import logging
 import pathlib
@@ -47,10 +48,26 @@ log = logging.getLogger(__name__)
 # DRAKVUF plugins with a Linux implementation that produce analysis telemetry
 # (drakvuf/src/plugins/plugins.h, drakvuf_plugin_os_support)
 LINUX_PLUGINS = {
-    "procmon", "syscalls", "filetracer", "unixsocketmon", "ptracemon", "ebpfmon",
-    "rebootmon", "cpuidmon", "debugmon", "procdump2",
+    "procmon",
+    "syscalls",
+    "filetracer",
+    "unixsocketmon",
+    "ptracemon",
+    "ebpfmon",
+    "rebootmon",
+    "cpuidmon",
+    "debugmon",
+    "procdump2",
 }
-DEFAULT_LINUX_PLUGINS = ["procmon", "syscalls", "filetracer", "unixsocketmon", "ptracemon", "ebpfmon", "procdump2"]
+DEFAULT_LINUX_PLUGINS = [
+    "procmon",
+    "syscalls",
+    "filetracer",
+    "unixsocketmon",
+    "ptracemon",
+    "ebpfmon",
+    "procdump2",
+]
 # Linux plugins outside the default set that a request may add
 OPTIONAL_LINUX_PLUGINS = ["cpuidmon", "rebootmon", "debugmon"]
 READY_TIMEOUT_S = 30
@@ -84,25 +101,47 @@ def guest_file_name(sample_filename: Optional[str]) -> str:
 
 
 def linux_drakvuf_cmdline(
-    vm_name: str, kernel_profile: pathlib.Path, plugins: List[str], timeout: int,
+    vm_name: str,
+    kernel_profile: pathlib.Path,
+    plugins: List[str],
+    timeout: int,
     output_dir: pathlib.Path,
     extra_args: Optional[Dict[str, Any]] = None,
 ) -> List[str]:
     binary = LINUX_DRAKVUF if pathlib.Path(LINUX_DRAKVUF).exists() else "drakvuf"
-    args = [binary, "-o", "json", "-r", kernel_profile.as_posix(), "-d", vm_name, "-t", str(timeout)]
+    args = [
+        binary,
+        "-o",
+        "json",
+        "-r",
+        kernel_profile.as_posix(),
+        "-d",
+        vm_name,
+        "-t",
+        str(timeout),
+    ]
     for plugin in plugins:
         args.extend(["-a", plugin])
     if "syscalls" in plugins:
-        args.extend(["--syscall-hooks-list", (PACKAGE_DATA_PATH / "linux-syscalls.txt").as_posix()])
+        args.extend(
+            [
+                "--syscall-hooks-list",
+                (PACKAGE_DATA_PATH / "linux-syscalls.txt").as_posix(),
+            ]
+        )
     if "procdump2" in plugins:
         dumps_dir = output_dir / DUMPS_DIR
         dumps_dir.mkdir(exist_ok=True)
-        args.extend([
-            "--procdump-dir", dumps_dir.resolve().as_posix(),
-            "--procdump-use-maple-tree",  # Debian 12's kernel 6.1 VMAs
-            "--procdump-new-processes-on-finish",
-            "--procdump-timeout", "10",  # finish sweep; exit dumps are automatic
-        ])
+        args.extend(
+            [
+                "--procdump-dir",
+                dumps_dir.resolve().as_posix(),
+                "--procdump-use-maple-tree",  # Debian 12's kernel 6.1 VMAs
+                "--procdump-new-processes-on-finish",
+                "--procdump-timeout",
+                "10",  # finish sweep; exit dumps are automatic
+            ]
+        )
     for key, value in (extra_args or {}).items():
         if value is True:
             args.append(key)
@@ -111,12 +150,33 @@ def linux_drakvuf_cmdline(
     return args
 
 
-def upload_sample(vm_name: str, kernel_profile: pathlib.Path, agent_pid: int,
-                  host_path: pathlib.Path, guest_path: str) -> Dict[str, Any]:
+def upload_sample(
+    vm_name: str,
+    kernel_profile: pathlib.Path,
+    agent_pid: int,
+    host_path: pathlib.Path,
+    guest_path: str,
+) -> Dict[str, Any]:
     # Linux writefile runs inside the agent process: it must be making syscalls (it polls every 0.5 s)
-    cmd = ["injector", "-o", "json", "-d", vm_name, "-r", kernel_profile.as_posix(),
-           "-i", str(agent_pid), "-m", "writefile", "-B", host_path.as_posix(), "-e", guest_path,
-           "--timeout", "60"]
+    cmd = [
+        "injector",
+        "-o",
+        "json",
+        "-d",
+        vm_name,
+        "-r",
+        kernel_profile.as_posix(),
+        "-i",
+        str(agent_pid),
+        "-m",
+        "writefile",
+        "-B",
+        host_path.as_posix(),
+        "-e",
+        guest_path,
+        "--timeout",
+        "60",
+    ]
     last_error = None
     for attempt in range(3):
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
@@ -129,7 +189,12 @@ def upload_sample(vm_name: str, kernel_profile: pathlib.Path, agent_pid: int,
                 if entry.get("Status") == "Success":
                     return entry
                 last_error = entry
-        log.warning("Linux upload attempt %d failed: rc=%s %s", attempt + 1, result.returncode, last_error)
+        log.warning(
+            "Linux upload attempt %d failed: rc=%s %s",
+            attempt + 1,
+            result.returncode,
+            last_error,
+        )
         time.sleep(2)
     raise RuntimeError(f"Failed to upload the sample to the Linux guest: {last_error}")
 
@@ -185,7 +250,9 @@ def analyze_linux_file(
     drakmon_file = output_dir / "drakmon.log"
     drakvuf_err_file = output_dir / "drakvuf_stderr.log"
 
-    with run_vm(vm_id, install_info, network_conf, no_restore=options.no_vm_restore) as vm:
+    with run_vm(
+        vm_id, install_info, network_conf, no_restore=options.no_vm_restore
+    ) as vm:
         if substatus_callback is not None:
             substatus_callback(AnalysisSubstatus.preparing_vm)
         agent = LinuxAgent(f"/var/run/drakrun/{vm.vm_name}.sock")
@@ -199,17 +266,33 @@ def analyze_linux_file(
             exec_argv = None
             if options.host_sample_path is not None:
                 guest_path = f"{GUEST_WORK_DIR}/{guest_file_name(options.sample_filename or options.host_sample_path.name)}"
-                upload = upload_sample(vm.vm_name, kernel_profile, agent_info["pid"], options.host_sample_path, guest_path)
+                upload = upload_sample(
+                    vm.vm_name,
+                    kernel_profile,
+                    agent_info["pid"],
+                    options.host_sample_path,
+                    guest_path,
+                )
                 stat = agent.call("stat", {"path": guest_path})
                 if metadata.file is not None and stat["sha256"] != metadata.file.sha256:
-                    raise RuntimeError(f"Uploaded sample hash mismatch: {stat['sha256']}")
+                    raise RuntimeError(
+                        f"Uploaded sample hash mismatch: {stat['sha256']}"
+                    )
                 agent.call("chmod", {"path": guest_path, "mode": 0o755})
-                agent.call("sh", {"cmd": f"chown -- {DESKTOP_USER}: {shlex.quote(guest_path)}"})
-                linux_info["upload"] = {"guest_path": guest_path, "sha256": stat["sha256"], "size": stat["size"],
-                                        "injector": upload.get("Status")}
+                agent.call(
+                    "sh", {"cmd": f"chown -- {DESKTOP_USER}: {shlex.quote(guest_path)}"}
+                )
+                linux_info["upload"] = {
+                    "guest_path": guest_path,
+                    "sha256": stat["sha256"],
+                    "size": stat["size"],
+                    "injector": upload.get("Status"),
+                }
                 exec_argv = [guest_path]
                 if options.start_command:
-                    options.start_command = fill_sample_placeholder(options.start_command, guest_path)
+                    options.start_command = fill_sample_placeholder(
+                        options.start_command, guest_path
+                    )
             if isinstance(options.start_command, list) and options.start_command:
                 exec_argv = [str(a) for a in options.start_command]
             elif isinstance(options.start_command, str) and options.start_command:
@@ -219,20 +302,43 @@ def analyze_linux_file(
             if substatus_callback is not None:
                 substatus_callback(AnalysisSubstatus.analyzing, updated_options=True)
 
-            cmdline = linux_drakvuf_cmdline(vm.vm_name, kernel_profile, options.plugins, timeout,
-                                            output_dir, options.extra_drakvuf_args)
+            cmdline = linux_drakvuf_cmdline(
+                vm.vm_name,
+                kernel_profile,
+                options.plugins,
+                timeout,
+                output_dir,
+                options.extra_drakvuf_args,
+            )
             log.info("Starting DRAKVUF: %s", cmdline)
             stop_watchdog = threading.Event()
-            watchdog = threading.Thread(target=log_activity_watchdog, args=(drakmon_file, stop_watchdog),
-                                        daemon=True, name="drakvuf-watchdog")
+            watchdog = threading.Thread(
+                target=log_activity_watchdog,
+                args=(drakmon_file, stop_watchdog),
+                daemon=True,
+                name="drakvuf-watchdog",
+            )
             watchdog.start()
-            with run_tcpdump(vm.get_network_info(), output_dir / "dump.pcap"), \
-                    run_screenshotter(vm_id, install_info, output_dir, enabled=not options.no_screenshotter,
-                                      settings=config.screenshots), \
-                    drakmon_file.open("wb") as out, drakvuf_err_file.open("wb") as err:
-                drakvuf = subprocess.Popen(cmdline, stdout=out, stderr=err, cwd=output_dir)
+            with run_tcpdump(
+                vm.get_network_info(), output_dir / "dump.pcap"
+            ), run_screenshotter(
+                vm_id,
+                install_info,
+                output_dir,
+                enabled=not options.no_screenshotter,
+                settings=config.screenshots,
+            ), drakmon_file.open(
+                "wb"
+            ) as out, drakvuf_err_file.open(
+                "wb"
+            ) as err:
+                drakvuf = subprocess.Popen(
+                    cmdline, stdout=out, stderr=err, cwd=output_dir
+                )
                 stall_monitor.on_stall = drakvuf.terminate
-                stall_thread = threading.Thread(target=stall_monitor.run, args=(stop_watchdog,), daemon=True)
+                stall_thread = threading.Thread(
+                    target=stall_monitor.run, args=(stop_watchdog,), daemon=True
+                )
                 stall_thread.start()
                 with process_graceful_exit(drakvuf):
                     started = time.monotonic()
@@ -240,22 +346,41 @@ def analyze_linux_file(
                     # (a random argument only: the sample can list processes too)
                     marker = secrets.token_hex(8)
                     agent.call("exec", {"argv": ["/bin/true", marker]})
-                    linux_info["monitor_ready"] = wait_for_marker(drakmon_file, marker, READY_TIMEOUT_S)
+                    linux_info["monitor_ready"] = wait_for_marker(
+                        drakmon_file, marker, READY_TIMEOUT_S
+                    )
                     linux_info["monitor_ready_s"] = round(time.monotonic() - started, 1)
                     if not linux_info["monitor_ready"]:
-                        log.warning("Marker not seen in %d s; starting the sample anyway", READY_TIMEOUT_S)
+                        log.warning(
+                            "Marker not seen in %d s; starting the sample anyway",
+                            READY_TIMEOUT_S,
+                        )
                     if exec_argv:
-                        launched = agent.call("exec", {"argv": exec_argv, "cwd": GUEST_WORK_DIR, "env": SAMPLE_ENV,
-                                                       "user": DESKTOP_USER})
+                        launched = agent.call(
+                            "exec",
+                            {
+                                "argv": exec_argv,
+                                "cwd": GUEST_WORK_DIR,
+                                "env": SAMPLE_ENV,
+                                "user": DESKTOP_USER,
+                            },
+                        )
                         linux_info["sample_uid"] = launched.get("uid")
-                        inject = {"Plugin": "inject", "Method": "AgentExec", "Status": "Success",
-                                  "ProcessName": exec_argv[0], "Arguments": " ".join(exec_argv[1:]),
-                                  "InjectedPid": launched["pid"]}
+                        inject = {
+                            "Plugin": "inject",
+                            "Method": "AgentExec",
+                            "Status": "Success",
+                            "ProcessName": exec_argv[0],
+                            "Arguments": " ".join(exec_argv[1:]),
+                            "InjectedPid": launched["pid"],
+                        }
                     else:
                         inject = None
                     agent.close()  # nothing more from the agent while the sample runs
                     if inject is not None:
-                        (output_dir / "inject.log").write_text(json.dumps(inject) + "\n")
+                        (output_dir / "inject.log").write_text(
+                            json.dumps(inject) + "\n"
+                        )
                     try:
                         drakvuf.wait(timeout + 30)
                     except subprocess.TimeoutExpired:
@@ -275,9 +400,14 @@ def analyze_linux_file(
 
     def telemetry():
         return summarize_telemetry(
-            output_dir, options.plugins, drakvuf_returncode, drakvuf_hard_timeout,
-            drakvuf_runtime_s=drakvuf_runtime_s, analysis_timeout_s=timeout,
-            vm_stalled=stall_monitor.stalled, vm_max_stall_s=stall_monitor.max_stall_s,
+            output_dir,
+            options.plugins,
+            drakvuf_returncode,
+            drakvuf_hard_timeout,
+            drakvuf_runtime_s=drakvuf_runtime_s,
+            analysis_timeout_s=timeout,
+            vm_stalled=stall_monitor.stalled,
+            vm_max_stall_s=stall_monitor.max_stall_s,
         )
 
     metadata.model_extra["telemetry"] = telemetry()

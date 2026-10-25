@@ -8,9 +8,9 @@ from .drakvuf_cmdline import drakvuf_cmdline
 from .evasion_smoke_test import evasion_smoke_test
 from .evasion_worker import evasion_worker
 from .injector import injector
+from .install import install
 from .intel import intel
 from .intel_worker import intel_worker
-from .install import install
 from .make_profile import make_profile
 from .modify_vm0 import modify_vm0
 from .mount import mount

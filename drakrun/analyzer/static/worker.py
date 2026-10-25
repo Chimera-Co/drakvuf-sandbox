@@ -34,7 +34,10 @@ STATIC_ONLY_QUEUE_NAME = "chimera-static-only"
 INTEL_QUEUE_NAME = "chimera-intel"
 DEEP_QUEUE_NAME = "chimera-static-deep"
 DEEP_FORMATS = {"pe", "elf"}  # what capa (and FLOSS, PE only) can disassemble
-MOBILE_FORMATS = {"apk", "ipa"}  # MobSF's report instead of the deep pass and the classifier
+MOBILE_FORMATS = {
+    "apk",
+    "ipa",
+}  # MobSF's report instead of the deep pass and the classifier
 
 
 class StaticAnalysisFailed(RuntimeError):

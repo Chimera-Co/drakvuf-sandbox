@@ -300,11 +300,11 @@ class PerdedorAdapter(VerifierAdapter):
         )
 
     def _run_linux_phases(self, session, options, scan_dir, deadline):
-        from drakrun.lib.linux_install import DESKTOP_USER, GUEST_WORK_DIR
         from drakrun.evasion.verifiers.perdedor_linux import (
             build_linux_helper,
             build_linux_zipapp,
         )
+        from drakrun.lib.linux_install import DESKTOP_USER, GUEST_WORK_DIR
 
         start = time.time()
         raw = scan_dir / "raw" / TOOL_ID

@@ -67,7 +67,10 @@ log = logging.getLogger(__name__)
     is_eager=True,
 )
 @click.option(
-    "--disk-size", "disk_size", default=None, help="Disk size  [default: 100G, Linux 128G]"
+    "--disk-size",
+    "disk_size",
+    default=None,
+    help="Disk size  [default: 100G, Linux 128G]",
 )
 @click.option(
     "--zfs-tank-name",
@@ -93,7 +96,9 @@ def install(
     lvm_volume_group,
 ):
     if guest_os == "linux":
-        install_linux_guest(iso_path, vcpus, memory, disk_size, linux_profile, linux_built_image)
+        install_linux_guest(
+            iso_path, vcpus, memory, disk_size, linux_profile, linux_built_image
+        )
         return
     vcpus = vcpus or 2
     memory = memory or 4096

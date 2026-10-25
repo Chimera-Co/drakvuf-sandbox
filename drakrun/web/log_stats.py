@@ -17,7 +17,9 @@ def get_stats(task_uid, log_type, s3_config):
     ):
         raise FileNotFoundError(log_type)
     if is_s3_enabled(s3_config):
-        with storage.open_seekable_stream(task_uid, f"{log_type}.log", s3_config) as stream:
+        with storage.open_seekable_stream(
+            task_uid, f"{log_type}.log", s3_config
+        ) as stream:
             return compute_stats(stream, log_type)
     base = storage.ANALYSES_DIR / task_uid
     storage.check_path(base / f"{log_type}.log", base)

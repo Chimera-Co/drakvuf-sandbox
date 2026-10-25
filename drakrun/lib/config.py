@@ -70,7 +70,9 @@ class DrakrunConfigSection(BaseModel):
     # drakrun has always passed it. Switchable to test the apimon crash.
     fast_singlestep: bool = True
     # INetSim terminates TLS for both guest OSes. Unreadable logs are optional.
-    inetsim_service_log: pathlib.Path = pathlib.Path("/var/log/chimera-inetsim/service.log")
+    inetsim_service_log: pathlib.Path = pathlib.Path(
+        "/var/log/chimera-inetsim/service.log"
+    )
 
 
 class DrakrunDefaultsPresetSection(BaseModel):
@@ -183,7 +185,9 @@ class StaticConfigSection(BaseModel):
     # runs out; the budget keeps one dump-heavy run from holding the deep queue for long.
     memdump_scan_max: int = Field(default=512, ge=1, le=4096)
     memdump_scan_max_mb: int = Field(default=64, ge=1)
-    memdump_scan_budget_s: float = Field(default=1200, gt=0, le=6 * 3600, allow_inf_nan=False)
+    memdump_scan_budget_s: float = Field(
+        default=1200, gt=0, le=6 * 3600, allow_inf_nan=False
+    )
     # Android APKs through MobSF (static scan only) in a fresh dom0 container per sample: no network,
     # no capabilities, no new privileges, removed afterwards. Off until the image has been pulled.
     mobsf_enabled: bool = False
@@ -304,7 +308,9 @@ class DrakrunConfig(BaseSettings):
     intel: IntelConfigSection = Field(default_factory=IntelConfigSection)
     static: StaticConfigSection = Field(default_factory=StaticConfigSection)
     memdump: MemdumpConfigSection = MemdumpConfigSection()
-    screenshots: ScreenshotConfigSection = Field(default_factory=ScreenshotConfigSection)
+    screenshots: ScreenshotConfigSection = Field(
+        default_factory=ScreenshotConfigSection
+    )
     karton: KartonConfigSection = KartonConfigSection()
     s3: Optional[S3StorageConfigSection] = None
     preset: Dict[str, DrakrunDefaultsPresetSection] = Field(default_factory=dict)

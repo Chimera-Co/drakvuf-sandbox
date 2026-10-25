@@ -54,7 +54,10 @@ def make_profile(vm_id, no_restore, guest_os, debug_package):
 
         if debug_package is None:
             raise click.UsageError("--debug-package is required for --guest-os linux")
-        log.info("Profile successfully created: %s", make_linux_profile(pathlib.Path(debug_package)))
+        log.info(
+            "Profile successfully created: %s",
+            make_linux_profile(pathlib.Path(debug_package)),
+        )
         return
     config = load_config()
     install_info = InstallInfo.load(INSTALL_INFO_PATH)

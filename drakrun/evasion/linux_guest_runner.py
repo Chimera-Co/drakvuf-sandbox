@@ -63,7 +63,13 @@ os.rename(base+'.done.tmp',base+'.done')
 
 class LinuxGuestSession:
     def __init__(
-        self, vm_name, kernel_profile, agent, agent_info, uploader=None, hide_cpuid=False
+        self,
+        vm_name,
+        kernel_profile,
+        agent,
+        agent_info,
+        uploader=None,
+        hide_cpuid=False,
     ):
         self.vm_name = vm_name
         self.kernel_profile = pathlib.Path(kernel_profile)
@@ -230,9 +236,7 @@ def connect_linux_guest_session(vm_name, kernel_profile):
     try:
         info = agent.wait_ready(60)
         agent.call("prepare")
-        return LinuxGuestSession(
-            vm_name, kernel_profile, agent, info, hide_cpuid=True
-        )
+        return LinuxGuestSession(vm_name, kernel_profile, agent, info, hide_cpuid=True)
     except BaseException:
         agent.close()
         raise

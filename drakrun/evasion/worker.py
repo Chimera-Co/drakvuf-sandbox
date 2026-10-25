@@ -94,7 +94,9 @@ def evasion_queue_for_guest_os(guest_os: str) -> str:
     raise ValueError(f"Invalid evasion guest OS: {guest_os}")
 
 
-def evasion_worker_main(vm_id: int, burst: bool = False, guest_os: Optional[str] = None) -> None:
+def evasion_worker_main(
+    vm_id: int, burst: bool = False, guest_os: Optional[str] = None
+) -> None:
     """Start an RQ worker listening on the evasion queues only.
 
     Mirrors drakrun.analyzer.worker.worker_main (same vm_id global
@@ -545,7 +547,9 @@ def enqueue_verification(
     result_ttl: int,
     job_timeout: int,
 ) -> Job:
-    queue = Queue(name=evasion_queue_for_guest_os(sandbox.platform), connection=connection)
+    queue = Queue(
+        name=evasion_queue_for_guest_os(sandbox.platform), connection=connection
+    )
     return queue.enqueue(
         worker_verify,
         options,

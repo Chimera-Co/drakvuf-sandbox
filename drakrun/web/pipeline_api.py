@@ -158,14 +158,24 @@ def pipeline(analysis_id: str) -> Optional[dict]:
     fmt = ((static or {}).get("type") or {}).get("format")
     deep = _read_json(static_dir / "deep.json")
     mobsf = _read_json(static_dir / "mobsf.json")
-    if fmt in ("apk", "ipa") and (mobsf is not None or _job_state(f"static-mobsf-{analysis_id}")):
+    if fmt in ("apk", "ipa") and (
+        mobsf is not None or _job_state(f"static-mobsf-{analysis_id}")
+    ):
         # APKs take MobSF on the deep queue instead of capa/FLOSS/Ghidra.
         if mobsf is not None:
             score = mobsf.get("security_score")
-            add("deep", "Deep static (MobSF)", "failed" if mobsf.get("error") else "done",
-                f"security score {score}" if score is not None else "")
+            add(
+                "deep",
+                "Deep static (MobSF)",
+                "failed" if mobsf.get("error") else "done",
+                f"security score {score}" if score is not None else "",
+            )
         else:
-            add("deep", "Deep static (MobSF)", _from_job(_job_state(f"static-mobsf-{analysis_id}")))
+            add(
+                "deep",
+                "Deep static (MobSF)",
+                _from_job(_job_state(f"static-mobsf-{analysis_id}")),
+            )
     elif deep is not None:
         add("deep", DEEP_LABEL, "failed" if deep.get("error") else "done")
     elif mode == "dynamic-only" or (static is not None and fmt not in ("pe", "elf")):

@@ -10,6 +10,7 @@ snapshot_dir), except that its disk is built from the official Debian 12 cloud i
     drakrun modify-vm0 begin|commit|rollback --guest-os linux        change the golden image
     drakrun make-profile --guest-os linux --debug-package X.deb      kernel.json for DRAKVUF
 """
+
 import json
 import logging
 import pathlib
@@ -60,11 +61,18 @@ def agent_for(vm: VirtualMachine) -> LinuxAgent:
 
 def prepare_for_snapshot(agent: LinuxAgent) -> Dict[str, Any]:
     """Leave nothing of the setup work in the image: work directory, journal, pending writes."""
-    out = agent.call("sh", {"cmd": (
-        f"rm -rf {GUEST_AGENT_DIR}/*; "
-        "journalctl --rotate >/dev/null 2>&1; journalctl --vacuum-time=1s >/dev/null 2>&1; "
-        "systemctl --failed --no-legend --no-pager; uname -r; sync"
-    ), "timeout": 60}, timeout=90)
+    out = agent.call(
+        "sh",
+        {
+            "cmd": (
+                f"rm -rf {GUEST_AGENT_DIR}/*; "
+                "journalctl --rotate >/dev/null 2>&1; journalctl --vacuum-time=1s >/dev/null 2>&1; "
+                "systemctl --failed --no-legend --no-pager; uname -r; sync"
+            ),
+            "timeout": 60,
+        },
+        timeout=90,
+    )
     lines = out["stdout"].strip().splitlines()
     return {"kernel": lines[-1].strip() if lines else None, "failed_units": lines[:-1]}
 
@@ -86,12 +94,26 @@ def install_linux(
     """Write install.json, build vm-0.img from the cloud image (or take an already built one), boot vm-0."""
     LINUX_GOLDEN_DIR.mkdir(parents=True, exist_ok=True)
     install_cfg_template()
-    previous = InstallInfo.load(LINUX_INSTALL_INFO_PATH) if LINUX_INSTALL_INFO_PATH.exists() else None
-    vnc_passwd = previous.vnc_passwd if previous else "".join(
-        secrets.choice(string.ascii_letters + string.digits) for _ in range(8))
+    previous = (
+        InstallInfo.load(LINUX_INSTALL_INFO_PATH)
+        if LINUX_INSTALL_INFO_PATH.exists()
+        else None
+    )
+    vnc_passwd = (
+        previous.vnc_passwd
+        if previous
+        else "".join(
+            secrets.choice(string.ascii_letters + string.digits) for _ in range(8)
+        )
+    )
     install_info = InstallInfo(
-        vcpus=vcpus, memory=memory, storage_backend="qcow2", disk_size=disk_size, vnc_passwd=vnc_passwd,
-        xl_cfg_template=LINUX_CFG_TEMPLATE.as_posix(), snapshot_dir=LINUX_GOLDEN_DIR.as_posix(),
+        vcpus=vcpus,
+        memory=memory,
+        storage_backend="qcow2",
+        disk_size=disk_size,
+        vnc_passwd=vnc_passwd,
+        xl_cfg_template=LINUX_CFG_TEMPLATE.as_posix(),
+        snapshot_dir=LINUX_GOLDEN_DIR.as_posix(),
     )
     vm0 = VirtualMachine(0, install_info, network_conf)
     cpuid_hide.stop_detached(vm0.vm_name)
@@ -101,11 +123,24 @@ def install_linux(
             (LINUX_GOLDEN_DIR / name).replace(LINUX_GOLDEN_DIR / f"{name}.prev")
     disk = LINUX_GOLDEN_DIR / "vm-0.img"
     if built_image is not None:
-        subprocess.run(["cp", "--sparse=always", built_image.as_posix(), disk.as_posix()], check=True)
+        subprocess.run(
+            ["cp", "--sparse=always", built_image.as_posix(), disk.as_posix()],
+            check=True,
+        )
     else:
         subprocess.run(
-            ["bash", (LINUX_DATA_PATH / "build-image.sh").as_posix(), source_image.as_posix(), disk.as_posix()],
-            env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "SIZE": disk_size, "PROFILE": profile}, check=True,
+            [
+                "bash",
+                (LINUX_DATA_PATH / "build-image.sh").as_posix(),
+                source_image.as_posix(),
+                disk.as_posix(),
+            ],
+            env={
+                "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+                "SIZE": disk_size,
+                "PROFILE": profile,
+            },
+            check=True,
         )
     install_info.save(LINUX_INSTALL_INFO_PATH)
     LINUX_INSTALL_INFO_PATH.chmod(0o600)
@@ -134,7 +169,9 @@ def boot_hidden(vm: VirtualMachine, cold_boot_restore: bool = False) -> None:
     xen_unpause_vm(vm.vm_name)
 
 
-def postinstall_linux(network_conf: NetworkConfigSection, settle_s: int = 120) -> Dict[str, Any]:
+def postinstall_linux(
+    network_conf: NetworkConfigSection, settle_s: int = 120
+) -> Dict[str, Any]:
     """Settle, clean up and save vm-0 as the golden snapshot, then check that vm-1 restores from it."""
     install_info = InstallInfo.load(LINUX_INSTALL_INFO_PATH)
     vm0 = VirtualMachine(0, install_info, network_conf)
@@ -147,7 +184,9 @@ def postinstall_linux(network_conf: NetworkConfigSection, settle_s: int = 120) -
         time.sleep(settle_s)
         state = prepare_for_snapshot(agent)
     if state["kernel"] != LINUX_KERNEL:
-        raise RuntimeError(f"Guest kernel {state['kernel']} does not match the profile ({LINUX_KERNEL})")
+        raise RuntimeError(
+            f"Guest kernel {state['kernel']} does not match the profile ({LINUX_KERNEL})"
+        )
     cpuid_hide.stop_detached(vm0.vm_name)
     vm0.save()
     vm0.storage.snapshot_vm0_volume()
@@ -155,7 +194,9 @@ def postinstall_linux(network_conf: NetworkConfigSection, settle_s: int = 120) -
     return {**state, "restore_check": check_restore(install_info, network_conf)}
 
 
-def check_restore(install_info: InstallInfo, network_conf: NetworkConfigSection) -> Dict[str, Any]:
+def check_restore(
+    install_info: InstallInfo, network_conf: NetworkConfigSection
+) -> Dict[str, Any]:
     # The Linux worker's slot: vm-1 belongs to the Windows worker, which may be running an analysis.
     vm = VirtualMachine(LINUX_CHECK_VM_ID, install_info, network_conf)
     started = time.monotonic()
@@ -168,7 +209,9 @@ def check_restore(install_info: InstallInfo, network_conf: NetworkConfigSection)
         vm.destroy()
 
 
-def begin_modify(network_conf: NetworkConfigSection, cold_boot: bool = False) -> InstallInfo:
+def begin_modify(
+    network_conf: NetworkConfigSection, cold_boot: bool = False
+) -> InstallInfo:
     install_info = InstallInfo.load(LINUX_INSTALL_INFO_PATH)
     vm0 = VirtualMachine(0, install_info, network_conf)
     if cold_boot:
@@ -206,7 +249,9 @@ def rollback_modify(network_conf: NetworkConfigSection) -> None:
     vm0.storage.delete_vm0_modify_storage()
 
 
-def make_linux_profile(debug_package: pathlib.Path, dwarf2json: str = "dwarf2json") -> pathlib.Path:
+def make_linux_profile(
+    debug_package: pathlib.Path, dwarf2json: str = "dwarf2json"
+) -> pathlib.Path:
     """kernel.json for DRAKVUF from Debian's linux-image-<version>-dbg package."""
     LINUX_GOLDEN_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
@@ -214,7 +259,11 @@ def make_linux_profile(debug_package: pathlib.Path, dwarf2json: str = "dwarf2jso
         vmlinux = next(pathlib.Path(tmp).glob("usr/lib/debug/boot/vmlinux-*"))
         original = LINUX_GOLDEN_DIR / "kernel.orig.json"
         with original.open("wb") as out:
-            subprocess.run([dwarf2json, "linux", "--elf", vmlinux.as_posix()], stdout=out, check=True)
+            subprocess.run(
+                [dwarf2json, "linux", "--elf", vmlinux.as_posix()],
+                stdout=out,
+                check=True,
+            )
     profile = json.loads(original.read_text())
     added = flatten(profile, FLATTEN_STRUCTS)
     target = LINUX_GOLDEN_DIR / "kernel.json"
@@ -226,5 +275,7 @@ def make_linux_profile(debug_package: pathlib.Path, dwarf2json: str = "dwarf2jso
 def check_kernel_profile() -> None:
     profile = LINUX_GOLDEN_DIR / "kernel.json"
     if not profile.exists():
-        raise RuntimeError(f"{profile} is missing: run drakrun make-profile --guest-os linux --debug-package "
-                           f"linux-image-{LINUX_KERNEL}-dbg_*.deb")
+        raise RuntimeError(
+            f"{profile} is missing: run drakrun make-profile --guest-os linux --debug-package "
+            f"linux-image-{LINUX_KERNEL}-dbg_*.deb"
+        )

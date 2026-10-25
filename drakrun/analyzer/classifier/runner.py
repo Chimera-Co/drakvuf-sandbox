@@ -7,12 +7,12 @@ process isolation for crashes/timeouts, not a security sandbox for untrusted cod
 import importlib.util
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
-import re
 from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -63,7 +63,9 @@ class Verdict(BaseModel):
     components: Optional[dict[str, ComponentVerdict]] = None
     # Only from a model calibrated on held-out CHIMERA runs (docs/chimera/plan/calibration-cohort.md); the UI then
     # shows it as a probability. `calibration` names how, e.g. "platt, grouped 5-fold, cohort 2026-10".
-    calibrated_probability: Optional[float] = Field(default=None, ge=0, le=1, allow_inf_nan=False)
+    calibrated_probability: Optional[float] = Field(
+        default=None, ge=0, le=1, allow_inf_nan=False
+    )
     calibration: Optional[str] = Field(default=None, max_length=200)
 
     @field_validator("score", "calibrated_probability", mode="before")
@@ -87,7 +89,9 @@ class Verdict(BaseModel):
         result = self.model_dump(by_alias=True)
         for key in ("components", "calibrated_probability", "calibration"):
             if result.get(key) is None:
-                result.pop(key, None)  # keep verdicts without these optional parts unchanged
+                result.pop(
+                    key, None
+                )  # keep verdicts without these optional parts unchanged
         return result
 
 
@@ -152,9 +156,7 @@ def _worker(model_path, request_path, response_path, analysis_dir):
         sys.modules[spec.name] = module
         spec.loader.exec_module(module)
         features = json.loads(Path(request_path).read_text(encoding="utf-8"))
-        result = Verdict.model_validate(
-            module.classify(features, analysis_dir)
-        ).dump()
+        result = Verdict.model_validate(module.classify(features, analysis_dir)).dump()
         encoded = json.dumps(result, allow_nan=False)
     except BaseException as error:
         encoded = json.dumps(unknown_verdict(f"{type(error).__name__}: {error}"))

@@ -26,13 +26,13 @@ from .analysis_options import AnalysisOptions, StartMethod
 from .post_restore import get_post_restore_command, prepare_ps_command, set_guest_clock
 from .postprocessing import postprocess_analysis_dir
 from .run_tools import StallMonitor, run_drakvuf, run_screenshotter, run_tcpdump, run_vm
-from .telemetry import summarize_telemetry
 from .startup_command import (
     fill_sample_placeholder,
     get_sample_filename_from_host_path,
     get_startup_method_and_argv,
     make_exec_parameters,
 )
+from .telemetry import summarize_telemetry
 
 log = logging.getLogger(__name__)
 

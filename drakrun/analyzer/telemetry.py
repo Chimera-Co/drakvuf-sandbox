@@ -33,7 +33,9 @@ NO_LOG_PLUGINS = {"hidsim"}
 # DRAKVUF reports internal failures on stderr but can still exit with code 0,
 # e.g. "Critical error in re-copying remapped gfn" (seen with apimon under
 # heavy registry/WMI load on this host).
-DRAKVUF_ERROR_PATTERN = re.compile(r"Critical error|VMI_ERROR|Failed to|Segmentation fault|Assertion")
+DRAKVUF_ERROR_PATTERN = re.compile(
+    r"Critical error|VMI_ERROR|Failed to|Segmentation fault|Assertion"
+)
 MAX_ERROR_LINES = 10
 # DRAKVUF stopping this much earlier than the analysis window counts as an early exit.
 EARLY_EXIT_MARGIN_S = 10
@@ -82,7 +84,9 @@ def summarize_telemetry(
         plugin_status[plugin] = entry
 
     screenshots_dir = analysis_dir / "screenshots"
-    screenshots = len(list(screenshots_dir.iterdir())) if screenshots_dir.is_dir() else 0
+    screenshots = (
+        len(list(screenshots_dir.iterdir())) if screenshots_dir.is_dir() else 0
+    )
 
     errors = drakvuf_error_lines(analysis_dir / "drakvuf_stderr.log")
     exited_early = (
@@ -94,7 +98,9 @@ def summarize_telemetry(
     return {
         "drakvuf_returncode": drakvuf_returncode,
         "drakvuf_hard_timeout": drakvuf_hard_timeout,
-        "drakvuf_runtime_s": None if drakvuf_runtime_s is None else round(drakvuf_runtime_s, 1),
+        "drakvuf_runtime_s": (
+            None if drakvuf_runtime_s is None else round(drakvuf_runtime_s, 1)
+        ),
         "drakvuf_exited_early": exited_early,
         "drakvuf_errors": errors,
         # Guest vCPUs made no progress while DRAKVUF was attached (see StallMonitor).
@@ -108,7 +114,9 @@ def summarize_telemetry(
         and not vm_stalled,
         "plugins": plugin_status,
         "missing_plugins": sorted(
-            name for name, entry in plugin_status.items() if entry["status"] not in ("produced", "no_log")
+            name
+            for name, entry in plugin_status.items()
+            if entry["status"] not in ("produced", "no_log")
         ),
         "pcap": file_status(analysis_dir / "dump.pcap"),
         "screenshots": screenshots,

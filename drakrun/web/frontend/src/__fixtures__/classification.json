@@ -1,46 +1,46 @@
 {
-  "schema": "chimera-verdict/1",
-  "label": "suspicious",
-  "score": 0.1046,
-  "family": null,
-  "model": "chimera-fusion",
-  "model_version": "0.1+fusion0.1",
-  "explanation": [
-    "Suspicious (combined score 0.10 from dynamic + static; 0.50 = malicious threshold).",
-    "Dynamic and static disagree: dynamic says benign, static says suspicious.",
-    "Dynamic: no anti-analysis / environment checks",
-    "Dynamic: 1 registry value writes",
-    "Dynamic: did not call IsDebuggerPresent",
-    "Static: Static PE model (EMBER2024): p=0.26.",
-    "Static: TLS callbacks (code runs before the entry point)",
-    "Fusion weights are fixed (not yet fitted on paired CHIMERA runs)."
-  ],
-  "components": {
-    "dynamic": {
-      "label": "benign",
-      "score": 0.3595,
-      "family": null,
-      "model": "chimera-lgbm-rf",
-      "model_version": "0.1",
-      "weight": 1.0,
-      "explanation": [
-        "no anti-analysis / environment checks",
-        "1 registry value writes",
-        "did not call IsDebuggerPresent",
-        "API call pattern GetSystemMetrics \u2192 SystemParametersInfoW \u2192 GetSystemMetrics (\u00d74)"
-      ]
-    },
-    "static": {
-      "label": "suspicious",
-      "score": 0.2584,
-      "family": null,
-      "model": "chimera-static-pe",
-      "model_version": "0.1",
-      "weight": 1.0,
-      "explanation": [
-        "Static PE model (EMBER2024): p=0.26.",
-        "TLS callbacks (code runs before the entry point)"
-      ]
+    "schema": "chimera-verdict/1",
+    "label": "suspicious",
+    "score": 0.1046,
+    "family": null,
+    "model": "chimera-fusion",
+    "model_version": "0.1+fusion0.1",
+    "explanation": [
+        "Suspicious (combined score 0.10 from dynamic + static; 0.50 = malicious threshold).",
+        "Dynamic and static disagree: dynamic says benign, static says suspicious.",
+        "Dynamic: no anti-analysis / environment checks",
+        "Dynamic: 1 registry value writes",
+        "Dynamic: did not call IsDebuggerPresent",
+        "Static: Static PE model (EMBER2024): p=0.26.",
+        "Static: TLS callbacks (code runs before the entry point)",
+        "Fusion weights are fixed (not yet fitted on paired CHIMERA runs)."
+    ],
+    "components": {
+        "dynamic": {
+            "label": "benign",
+            "score": 0.3595,
+            "family": null,
+            "model": "chimera-lgbm-rf",
+            "model_version": "0.1",
+            "weight": 1.0,
+            "explanation": [
+                "no anti-analysis / environment checks",
+                "1 registry value writes",
+                "did not call IsDebuggerPresent",
+                "API call pattern GetSystemMetrics \u2192 SystemParametersInfoW \u2192 GetSystemMetrics (\u00d74)"
+            ]
+        },
+        "static": {
+            "label": "suspicious",
+            "score": 0.2584,
+            "family": null,
+            "model": "chimera-static-pe",
+            "model_version": "0.1",
+            "weight": 1.0,
+            "explanation": [
+                "Static PE model (EMBER2024): p=0.26.",
+                "TLS callbacks (code runs before the entry point)"
+            ]
+        }
     }
-  }
 }

@@ -73,20 +73,20 @@ export function ReportTable({ label, rows, processes = {}, onSelect, id }) {
         if (PROCESS_KEY.test(key)) {
             const seqids = Array.isArray(value) ? value : [value];
             const chips = seqids.slice(0, PROCESS_CHIPS).map((seqid) => {
-                    const process = processes[seqid];
-                    return (
-                        <button
-                            key={String(seqid)}
-                            type="button"
-                            className="btn btn-sm btn-outline-secondary me-1 mb-1 text-nowrap"
-                            onClick={() => onSelect?.(seqid)}
-                        >
-                            {process
-                                ? `${(process.procname || process.name || "process").split(/[\\/]/).pop()} (${process.pid})`
-                                : displayValue(seqid)}
-                        </button>
-                    );
-                });
+                const process = processes[seqid];
+                return (
+                    <button
+                        key={String(seqid)}
+                        type="button"
+                        className="btn btn-sm btn-outline-secondary me-1 mb-1 text-nowrap"
+                        onClick={() => onSelect?.(seqid)}
+                    >
+                        {process
+                            ? `${(process.procname || process.name || "process").split(/[\\/]/).pop()} (${process.pid})`
+                            : displayValue(seqid)}
+                    </button>
+                );
+            });
             return seqids.length > PROCESS_CHIPS ? (
                 <>
                     {chips}

@@ -45,7 +45,9 @@ class VmUnavailable(RuntimeError):
 
 
 def _run(argv, timeout=30, check=True) -> subprocess.CompletedProcess:
-    return subprocess.run(argv, capture_output=True, text=True, timeout=timeout, check=check)
+    return subprocess.run(
+        argv, capture_output=True, text=True, timeout=timeout, check=check
+    )
 
 
 def domid(name: str) -> Optional[int]:
@@ -67,7 +69,9 @@ def xs_read(dom: int, key: str) -> Optional[str]:
 def xs_write(dom: int, key: str, value: str) -> None:
     path = _xs_path(dom, key)
     _run(["xenstore-write", path, value])
-    _run(["xenstore-chmod", path, "n0", f"r{dom}"])  # dom0 owns it; the guest may only read
+    _run(
+        ["xenstore-chmod", path, "n0", f"r{dom}"]
+    )  # dom0 owns it; the guest may only read
 
 
 def ready(settings) -> Optional[int]:
@@ -79,7 +83,11 @@ def ready(settings) -> Optional[int]:
 
 def restart_vm(settings) -> Optional[int]:
     logger.warning("Restarting static-analysis VM %s", settings.vm_name)
-    subprocess.run(["systemctl", "restart", "chimera-static-vm.service"], capture_output=True, timeout=180)
+    subprocess.run(
+        ["systemctl", "restart", "chimera-static-vm.service"],
+        capture_output=True,
+        timeout=180,
+    )
     deadline = time.monotonic() + settings.vm_boot_timeout_s
     while time.monotonic() < deadline:
         dom = ready(settings)
@@ -130,8 +138,14 @@ def stop_if_idle(settings, now: Optional[float] = None) -> str:
             return "idle clock started"
         if idle < settings.vm_idle_shutdown_s:
             return f"in use ({idle:.0f}s idle)"
-        logger.info("Stopping static-analysis VM %s after %.0fs idle", settings.vm_name, idle)
-        subprocess.run(["systemctl", "stop", "chimera-static-vm.service"], capture_output=True, timeout=180)
+        logger.info(
+            "Stopping static-analysis VM %s after %.0fs idle", settings.vm_name, idle
+        )
+        subprocess.run(
+            ["systemctl", "stop", "chimera-static-vm.service"],
+            capture_output=True,
+            timeout=180,
+        )
         return "stopped"
 
 
@@ -179,8 +193,15 @@ def read_result_disk(path: Path, max_bytes: int) -> dict:
 
 
 def _attach(settings, disk: str, target: Path, access: str) -> None:
-    _run(["xl", "block-attach", settings.vm_name,
-          f"format=raw,vdev={disk},access={access},backendtype=phy,target={target}"], timeout=60)
+    _run(
+        [
+            "xl",
+            "block-attach",
+            settings.vm_name,
+            f"format=raw,vdev={disk},access={access},backendtype=phy,target={target}",
+        ],
+        timeout=60,
+    )
 
 
 def _detach(settings, disk: str) -> bool:
@@ -197,10 +218,16 @@ def _attached(settings) -> set[str]:
     except (subprocess.SubprocessError, FileNotFoundError):
         return set()
     names = {"51728": JOB_DISK, "51744": RESULT_DISK}  # xvdb / xvdc device numbers
-    return {names[line.split()[0]] for line in out.splitlines()[1:] if line.split() and line.split()[0] in names}
+    return {
+        names[line.split()[0]]
+        for line in out.splitlines()[1:]
+        if line.split() and line.split()[0] in names
+    }
 
 
-def run_job(settings, steps: list[dict], sample: Path, uid: Optional[int] = None) -> dict:
+def run_job(
+    settings, steps: list[dict], sample: Path, uid: Optional[int] = None
+) -> dict:
     """Send one job (a list of podman steps) to the VM; return the guest's envelope. Raises VmUnavailable when
     the VM is not there; any other failure is returned as {"error": ...}."""
     job_id = uuid.uuid4().hex
@@ -208,8 +235,14 @@ def run_job(settings, steps: list[dict], sample: Path, uid: Optional[int] = None
     with sample.open("rb") as fh:
         while chunk := fh.read(1 << 20):
             digest.update(chunk)
-    spec = {"job": job_id, "sample_size": sample.stat().st_size, "sample_sha256": digest.hexdigest(),
-            "uid": settings.container_uid if uid is None else uid, "gid": settings.container_gid, "steps": steps}
+    spec = {
+        "job": job_id,
+        "sample_size": sample.stat().st_size,
+        "sample_sha256": digest.hexdigest(),
+        "uid": settings.container_uid if uid is None else uid,
+        "gid": settings.container_gid,
+        "steps": steps,
+    }
     wall = sum(float(step["timeout_s"]) for step in steps) + JOB_SLACK_S
     with _vm_lock():
         _mark_used()
@@ -224,7 +257,9 @@ def run_job(settings, steps: list[dict], sample: Path, uid: Optional[int] = None
         healthy = True
         try:
             write_job_disk(job_disk, spec, sample)
-            fd = os.open(result_disk, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            fd = os.open(
+                result_disk, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600
+            )
             os.ftruncate(fd, settings.vm_result_disk_mb << 20)
             os.close(fd)
             _attach(settings, JOB_DISK, job_disk, "ro")
@@ -257,14 +292,19 @@ def run_job(settings, steps: list[dict], sample: Path, uid: Optional[int] = None
             _mark_used()
 
 
-def _step_status(envelope: dict, name: str) -> tuple[dict, Optional[str], Optional[str]]:
+def _step_status(
+    envelope: dict, name: str
+) -> tuple[dict, Optional[str], Optional[str]]:
     """(status, file text, error) of the job's single step."""
     steps = envelope.get("steps") if isinstance(envelope.get("steps"), list) else []
     step = steps[0] if steps and isinstance(steps[0], dict) else {}
     files = step.get("files") if isinstance(step.get("files"), dict) else {}
     text = files.get(name)
-    status = {"exit_code": step.get("exit_code"), "stderr": str(step.get("stderr", ""))[-2000:],
-              "backend": "vm"}
+    status = {
+        "exit_code": step.get("exit_code"),
+        "stderr": str(step.get("stderr", ""))[-2000:],
+        "backend": "vm",
+    }
     if envelope.get("error") or step.get("error"):
         return status, None, str(envelope.get("error") or step.get("error"))[:300]
     if step.get("timed_out"):
@@ -272,19 +312,35 @@ def _step_status(envelope: dict, name: str) -> tuple[dict, Optional[str], Option
     return status, text if isinstance(text, str) else None, None
 
 
-def analyze_in_vm(settings, analysis_id: str, job_dir: Path, file_name: str, deep: bool) -> dict:
+def analyze_in_vm(
+    settings, analysis_id: str, job_dir: Path, file_name: str, deep: bool
+) -> dict:
     from .sandbox import DEEP_SCHEMA, GRACE_S, SCHEMA, build_command, container_name
 
     schema, output = (DEEP_SCHEMA, "deep.json") if deep else (SCHEMA, "static.json")
-    argv = build_command(settings, analysis_id, GUEST_WORK / "in" / "sample", GUEST_WORK / "out", file_name,
-                         deep)
+    argv = build_command(
+        settings,
+        analysis_id,
+        GUEST_WORK / "in" / "sample",
+        GUEST_WORK / "out",
+        file_name,
+        deep,
+    )
     timeout = (settings.deep_timeout_s if deep else settings.timeout_s) + GRACE_S
-    step = {"name": "deep" if deep else "static", "argv": argv, "timeout_s": timeout,
-            "container": container_name(analysis_id, deep), "prepare": {"dirs": ["out"]},
-            "outputs": [f"out/{output}"]}
+    step = {
+        "name": "deep" if deep else "static",
+        "argv": argv,
+        "timeout_s": timeout,
+        "container": container_name(analysis_id, deep),
+        "prepare": {"dirs": ["out"]},
+        "outputs": [f"out/{output}"],
+    }
     envelope = run_job(settings, [step], job_dir / "in" / "sample")
     if "steps" not in envelope:
-        return {"schema": schema, "error": envelope.get("error", "static VM returned nothing")}
+        return {
+            "schema": schema,
+            "error": envelope.get("error", "static VM returned nothing"),
+        }
     status, text, error = _step_status(envelope, f"out/{output}")
     if error:
         return {"schema": schema, "error": error, "container": status}
@@ -302,16 +358,31 @@ def analyze_in_vm(settings, analysis_id: str, job_dir: Path, file_name: str, dee
     return result
 
 
-def ghidra_in_vm(settings, analysis_id: str, job_dir: Path, targets: list[dict]) -> dict:
+def ghidra_in_vm(
+    settings, analysis_id: str, job_dir: Path, targets: list[dict]
+) -> dict:
     from .sandbox import build_ghidra_command, ghidra_wall_s
 
-    argv = build_ghidra_command(settings, analysis_id, GUEST_WORK / "in" / "sample", GUEST_WORK / "ghidra-work",
-                                GUEST_WORK / "ghidra-out")
-    step = {"name": "ghidra", "argv": argv, "timeout_s": ghidra_wall_s(settings),
-            "container": f"chimera-ghidra-{uuid.UUID(analysis_id)}",
-            "prepare": {"dirs": ["ghidra-work", "ghidra-out"],
-                        "files": {"ghidra-work/targets.json": json.dumps({"addresses": targets[:200]})}},
-            "outputs": ["ghidra-out/ghidra.json"]}
+    argv = build_ghidra_command(
+        settings,
+        analysis_id,
+        GUEST_WORK / "in" / "sample",
+        GUEST_WORK / "ghidra-work",
+        GUEST_WORK / "ghidra-out",
+    )
+    step = {
+        "name": "ghidra",
+        "argv": argv,
+        "timeout_s": ghidra_wall_s(settings),
+        "container": f"chimera-ghidra-{uuid.UUID(analysis_id)}",
+        "prepare": {
+            "dirs": ["ghidra-work", "ghidra-out"],
+            "files": {
+                "ghidra-work/targets.json": json.dumps({"addresses": targets[:200]})
+            },
+        },
+        "outputs": ["ghidra-out/ghidra.json"],
+    }
     envelope = run_job(settings, [step], job_dir / "in" / "sample")
     if "steps" not in envelope:
         return {"error": envelope.get("error", "static VM returned nothing")}
@@ -319,7 +390,9 @@ def ghidra_in_vm(settings, analysis_id: str, job_dir: Path, targets: list[dict])
     if error:
         return {"error": error}
     if status.get("exit_code") != 0:
-        return {"error": f"decompiler exited with {status.get('exit_code')}: {status.get('stderr', '')[-500:]}"}
+        return {
+            "error": f"decompiler exited with {status.get('exit_code')}: {status.get('stderr', '')[-500:]}"
+        }
     if not text:
         return {"error": "no ghidra.json written"}
     if len(text) > settings.max_output_bytes:
@@ -331,31 +404,77 @@ def ghidra_in_vm(settings, analysis_id: str, job_dir: Path, targets: list[dict])
     return doc if isinstance(doc, dict) else {"error": "ghidra.json is not an object"}
 
 
-def mobsf_in_vm(settings, analysis_id: str, job_dir: Path, fmt: str, driver: str, driver_args: list[str],
-                api_key: str) -> dict:
+def mobsf_in_vm(
+    settings,
+    analysis_id: str,
+    job_dir: Path,
+    fmt: str,
+    driver: str,
+    driver_args: list[str],
+    api_key: str,
+) -> dict:
     """MobSF inside the static VM: one podman step starts its server and runs the driver, which writes the
     report envelope to mobsf-out/mobsf.json. The container runs as MobSF's own user (the image's), reads the
-    root:gid 0440 sample through --group-add and writes into a directory the agent hands to that user."""
+    root:gid 0440 sample through --group-add and writes into a directory the agent hands to that user.
+    """
     from .mobsf import MOBSF_UID, container_name
 
     memory = f"{settings.mobsf_vm_memory_mb}m"
     upload = f"sample.{fmt}"  # MobSF picks its analyzer by the extension
     argv = [
-        "podman", "run", "--rm", "--name", container_name(analysis_id),
-        "--network", "none", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
-        "--pids-limit", "1024", "--memory", memory, "--memory-swap", memory, "--cpus", "2",
-        "--ulimit", "core=0", "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=512m",
-        "--user", f"{MOBSF_UID}:{MOBSF_UID}", "--group-add", str(settings.container_gid),
-        "--volume", f"{GUEST_WORK / 'in'}:/input:ro,noexec,nosuid,nodev",
-        "--volume", f"{GUEST_WORK / 'mobsf-out'}:/out:rw,noexec,nosuid,nodev",
-        "--env", f"MOBSF_API_KEY={api_key}", "--env", f"CHIMERA_DRIVER={driver}",
-        "--entrypoint", "/bin/sh", settings.mobsf_image, "-c",
+        "podman",
+        "run",
+        "--rm",
+        "--name",
+        container_name(analysis_id),
+        "--network",
+        "none",
+        "--cap-drop",
+        "ALL",
+        "--security-opt",
+        "no-new-privileges",
+        "--pids-limit",
+        "1024",
+        "--memory",
+        memory,
+        "--memory-swap",
+        memory,
+        "--cpus",
+        "2",
+        "--ulimit",
+        "core=0",
+        "--tmpfs",
+        "/tmp:rw,noexec,nosuid,nodev,size=512m",
+        "--user",
+        f"{MOBSF_UID}:{MOBSF_UID}",
+        "--group-add",
+        str(settings.container_gid),
+        "--volume",
+        f"{GUEST_WORK / 'in'}:/input:ro,noexec,nosuid,nodev",
+        "--volume",
+        f"{GUEST_WORK / 'mobsf-out'}:/out:rw,noexec,nosuid,nodev",
+        "--env",
+        f"MOBSF_API_KEY={api_key}",
+        "--env",
+        f"CHIMERA_DRIVER={driver}",
+        "--entrypoint",
+        "/bin/sh",
+        settings.mobsf_image,
+        "-c",
         'scripts/entrypoint.sh >/dev/null 2>&1 & python3 -c "$CHIMERA_DRIVER" "$@" > /out/mobsf.json',
-        "chimera-mobsf", "/input/sample", *driver_args, upload,
+        "chimera-mobsf",
+        "/input/sample",
+        *driver_args,
+        upload,
     ]
-    step = {"name": "mobsf", "argv": argv, "timeout_s": settings.mobsf_timeout_s + 60,
-            "container": container_name(analysis_id), "prepare": {"dirs": ["mobsf-out"]},
-            "outputs": ["mobsf-out/mobsf.json"]}
+    step = {
+        "name": "mobsf",
+        "argv": argv,
+        "timeout_s": settings.mobsf_timeout_s + 60,
+        "container": container_name(analysis_id),
+        "prepare": {"dirs": ["mobsf-out"]},
+        "outputs": ["mobsf-out/mobsf.json"],
+    }
     envelope = run_job(settings, [step], job_dir / "in" / "sample", uid=MOBSF_UID)
     if "steps" not in envelope:
         return {"error": envelope.get("error", "static VM returned nothing")}
@@ -363,7 +482,9 @@ def mobsf_in_vm(settings, analysis_id: str, job_dir: Path, fmt: str, driver: str
     if error:
         return {"error": error}
     if status.get("exit_code") != 0:
-        return {"error": f"MobSF exited with {status.get('exit_code')}: {status.get('stderr', '')[-500:]}"}
+        return {
+            "error": f"MobSF exited with {status.get('exit_code')}: {status.get('stderr', '')[-500:]}"
+        }
     if not text:
         return {"error": "MobSF wrote no report (or it was over the VM's output limit)"}
     return {"text": text}

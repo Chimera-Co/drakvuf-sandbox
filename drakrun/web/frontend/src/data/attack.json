@@ -1,1202 +1,834 @@
 {
- "source": "capa rules in this repository plus CHIMERA finding ids (ATT&CK Enterprise)",
- "tactics": [
-  "Reconnaissance",
-  "Resource Development",
-  "Initial Access",
-  "Execution",
-  "Persistence",
-  "Privilege Escalation",
-  "Defense Evasion",
-  "Credential Access",
-  "Discovery",
-  "Lateral Movement",
-  "Collection",
-  "Command and Control",
-  "Exfiltration",
-  "Impact"
- ],
- "techniques": {
-  "T1003": {
-   "name": "OS Credential Dumping",
-   "tactics": [
-    "Credential Access"
-   ]
-  },
-  "T1003.001": {
-   "name": "LSASS Memory",
-   "tactics": [
-    "Credential Access"
-   ],
-   "parent": "T1003"
-  },
-  "T1005": {
-   "name": "Data from Local System",
-   "tactics": [
-    "Collection"
-   ]
-  },
-  "T1007": {
-   "name": "System Service Discovery",
-   "tactics": [
-    "Discovery"
-   ]
-  },
-  "T1010": {
-   "name": "Application Window Discovery",
-   "tactics": [
-    "Discovery"
-   ]
-  },
-  "T1012": {
-   "name": "Query Registry",
-   "tactics": [
-    "Discovery"
-   ]
-  },
-  "T1014": {
-   "name": "Rootkit",
-   "tactics": [
-    "Defense Evasion"
-   ]
-  },
-  "T1016": {
-   "name": "System Network Configuration Discovery",
-   "tactics": [
-    "Discovery"
-   ]
-  },
-  "T1016.001": {
-   "name": "Internet Connection Discovery",
-   "tactics": [
-    "Discovery"
-   ],
-   "parent": "T1016"
-  },
-  "T1018": {
-   "name": "Remote System Discovery",
-   "tactics": [
-    "Discovery"
-   ]
-  },
-  "T1027": {
-   "name": "Obfuscated Files or Information",
-   "tactics": [
-    "Defense Evasion"
-   ]
-  },
-  "T1027.002": {
-   "name": "Software Packing",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1027"
-  },
-  "T1027.004": {
-   "name": "Compile After Delivery",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1027"
-  },
-  "T1027.005": {
-   "name": "Indicator Removal from Tools",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1027"
-  },
-  "T1027.006": {
-   "name": "HTML Smuggling",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1027"
-  },
-  "T1027.007": {
-   "name": "Dynamic API Resolution",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1027"
-  },
-  "T1027.009": {
-   "name": "Embedded Payloads",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1027"
-  },
-  "T1027.013": {
-   "name": "Encrypted/Encoded File",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1027"
-  },
-  "T1033": {
-   "name": "System Owner/User Discovery",
-   "tactics": [
-    "Discovery"
-   ]
-  },
-  "T1036": {
-   "name": "Masquerading",
-   "tactics": [
-    "Defense Evasion"
-   ]
-  },
-  "T1036.002": {
-   "name": "Right-to-Left Override",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1036"
-  },
-  "T1036.005": {
-   "name": "Match Legitimate Name or Location",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1036"
-  },
-  "T1036.007": {
-   "name": "Double File Extension",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1036"
-  },
-  "T1036.008": {
-   "name": "Masquerade File Type",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1036"
-  },
-  "T1037": {
-   "name": "Boot or Logon Initialization Scripts",
-   "tactics": [
-    "Persistence"
-   ]
-  },
-  "T1037.004": {
-   "name": "RC Scripts",
-   "tactics": [
-    "Persistence"
-   ],
-   "parent": "T1037"
-  },
-  "T1040": {
-   "name": "Network Sniffing",
-   "tactics": [
-    "Discovery"
-   ]
-  },
-  "T1041": {
-   "name": "Exfiltration Over C2 Channel",
-   "tactics": [
-    "Exfiltration"
-   ]
-  },
-  "T1047": {
-   "name": "Windows Management Instrumentation",
-   "tactics": [
-    "Execution"
-   ]
-  },
-  "T1053": {
-   "name": "Scheduled Task/Job",
-   "tactics": [
-    "Execution",
-    "Persistence",
-    "Privilege Escalation"
-   ]
-  },
-  "T1053.002": {
-   "name": "At",
-   "tactics": [
-    "Persistence"
-   ],
-   "parent": "T1053"
-  },
-  "T1053.003": {
-   "name": "Cron",
-   "tactics": [
-    "Execution",
-    "Persistence",
-    "Privilege Escalation"
-   ],
-   "parent": "T1053"
-  },
-  "T1053.005": {
-   "name": "Scheduled Task",
-   "tactics": [
-    "Persistence"
-   ],
-   "parent": "T1053"
-  },
-  "T1055": {
-   "name": "Process Injection",
-   "tactics": [
-    "Defense Evasion"
-   ]
-  },
-  "T1055.001": {
-   "name": "Dynamic-link Library Injection",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1055"
-  },
-  "T1055.002": {
-   "name": "Portable Executable Injection",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1055"
-  },
-  "T1055.003": {
-   "name": "Thread Execution Hijacking",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1055"
-  },
-  "T1055.004": {
-   "name": "Asynchronous Procedure Call",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1055"
-  },
-  "T1055.011": {
-   "name": "Extra Window Memory Injection",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1055"
-  },
-  "T1055.012": {
-   "name": "Process Hollowing",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1055"
-  },
-  "T1055.013": {
-   "name": "Process Doppelg\u00e4nging",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1055"
-  },
-  "T1056": {
-   "name": "Input Capture",
-   "tactics": [
-    "Collection"
-   ]
-  },
-  "T1056.001": {
-   "name": "Keylogging",
-   "tactics": [
-    "Collection"
-   ],
-   "parent": "T1056"
-  },
-  "T1057": {
-   "name": "Process Discovery",
-   "tactics": [
-    "Discovery"
-   ]
-  },
-  "T1059": {
-   "name": "Command and Scripting Interpreter",
-   "tactics": [
-    "Execution"
-   ]
-  },
-  "T1059.001": {
-   "name": "PowerShell",
-   "tactics": [
-    "Execution"
-   ],
-   "parent": "T1059"
-  },
-  "T1059.003": {
-   "name": "Windows Command Shell",
-   "tactics": [
-    "Execution"
-   ],
-   "parent": "T1059"
-  },
-  "T1059.004": {
-   "name": "Unix Shell",
-   "tactics": [
-    "Execution"
-   ],
-   "parent": "T1059"
-  },
-  "T1059.005": {
-   "name": "Visual Basic",
-   "tactics": [
-    "Execution"
-   ],
-   "parent": "T1059"
-  },
-  "T1059.006": {
-   "name": "Python",
-   "tactics": [
-    "Execution"
-   ],
-   "parent": "T1059"
-  },
-  "T1059.007": {
-   "name": "JavaScript",
-   "tactics": [
-    "Execution"
-   ],
-   "parent": "T1059"
-  },
-  "T1069": {
-   "name": "Permission Groups Discovery",
-   "tactics": [
-    "Discovery"
-   ]
-  },
-  "T1070": {
-   "name": "Indicator Removal",
-   "tactics": [
-    "Defense Evasion"
-   ]
-  },
-  "T1070.001": {
-   "name": "Clear Windows Event Logs",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1070"
-  },
-  "T1070.004": {
-   "name": "File Deletion",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1070"
-  },
-  "T1070.006": {
-   "name": "Timestomp",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1070"
-  },
-  "T1071": {
-   "name": "Application Layer Protocol",
-   "tactics": [
-    "Command and Control"
-   ]
-  },
-  "T1071.001": {
-   "name": "Web Protocols",
-   "tactics": [
-    "Command and Control"
-   ],
-   "parent": "T1071"
-  },
-  "T1082": {
-   "name": "System Information Discovery",
-   "tactics": [
-    "Discovery"
-   ]
-  },
-  "T1083": {
-   "name": "File and Directory Discovery",
-   "tactics": [
-    "Discovery"
-   ]
-  },
-  "T1087": {
-   "name": "Account Discovery",
-   "tactics": [
-    "Discovery"
-   ]
-  },
-  "T1090": {
-   "name": "Proxy",
-   "tactics": [
-    "Command and Control"
-   ]
-  },
-  "T1090.003": {
-   "name": "Multi-hop Proxy",
-   "tactics": [
-    "Command and Control"
-   ],
-   "parent": "T1090"
-  },
-  "T1095": {
-   "name": "Non-Application Layer Protocol",
-   "tactics": [
-    "Command and Control"
-   ]
-  },
-  "T1098": {
-   "name": "Account Manipulation",
-   "tactics": [
-    "Persistence",
-    "Privilege Escalation"
-   ]
-  },
-  "T1098.004": {
-   "name": "SSH Authorized Keys",
-   "tactics": [
-    "Persistence",
-    "Privilege Escalation"
-   ],
-   "parent": "T1098"
-  },
-  "T1105": {
-   "name": "Ingress Tool Transfer",
-   "tactics": [
-    "Command and Control"
-   ]
-  },
-  "T1106": {
-   "name": "Native API",
-   "tactics": [
-    "Execution"
-   ]
-  },
-  "T1112": {
-   "name": "Modify Registry",
-   "tactics": [
-    "Defense Evasion"
-   ]
-  },
-  "T1113": {
-   "name": "Screen Capture",
-   "tactics": [
-    "Collection"
-   ]
-  },
-  "T1115": {
-   "name": "Clipboard Data",
-   "tactics": [
-    "Collection"
-   ]
-  },
-  "T1123": {
-   "name": "Audio Capture",
-   "tactics": [
-    "Collection"
-   ]
-  },
-  "T1125": {
-   "name": "Video Capture",
-   "tactics": [
-    "Collection"
-   ]
-  },
-  "T1129": {
-   "name": "Shared Modules",
-   "tactics": [
-    "Execution"
-   ]
-  },
-  "T1134": {
-   "name": "Access Token Manipulation",
-   "tactics": [
-    "Privilege Escalation",
-    "Defense Evasion"
-   ]
-  },
-  "T1134.001": {
-   "name": "Token Impersonation/Theft",
-   "tactics": [
-    "Privilege Escalation"
-   ],
-   "parent": "T1134"
-  },
-  "T1134.004": {
-   "name": "Parent PID Spoofing",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1134"
-  },
-  "T1135": {
-   "name": "Network Share Discovery",
-   "tactics": [
-    "Discovery"
-   ]
-  },
-  "T1136": {
-   "name": "Create Account",
-   "tactics": [
-    "Persistence"
-   ]
-  },
-  "T1137": {
-   "name": "Office Application Startup",
-   "tactics": [
-    "Persistence"
-   ]
-  },
-  "T1137.006": {
-   "name": "Add-ins",
-   "tactics": [
-    "Persistence"
-   ],
-   "parent": "T1137"
-  },
-  "T1140": {
-   "name": "Deobfuscate/Decode Files or Information",
-   "tactics": [
-    "Defense Evasion"
-   ]
-  },
-  "T1197": {
-   "name": "BITS Jobs",
-   "tactics": [
-    "Persistence",
-    "Defense Evasion"
-   ]
-  },
-  "T1203": {
-   "name": "Exploitation for Client Execution",
-   "tactics": [
-    "Execution"
-   ]
-  },
-  "T1204": {
-   "name": "User Execution",
-   "tactics": [
-    "Execution"
-   ]
-  },
-  "T1204.002": {
-   "name": "Malicious File",
-   "tactics": [
-    "Execution"
-   ],
-   "parent": "T1204"
-  },
-  "T1205": {
-   "name": "Traffic Signaling",
-   "tactics": [
-    "Persistence"
-   ]
-  },
-  "T1205.002": {
-   "name": "Socket Filters",
-   "tactics": [
-    "Persistence"
-   ],
-   "parent": "T1205"
-  },
-  "T1213": {
-   "name": "Data from Information Repositories",
-   "tactics": [
-    "Collection"
-   ]
-  },
-  "T1218": {
-   "name": "System Binary Proxy Execution",
-   "tactics": [
-    "Defense Evasion"
-   ]
-  },
-  "T1221": {
-   "name": "Template Injection",
-   "tactics": [
-    "Defense Evasion"
-   ]
-  },
-  "T1222": {
-   "name": "File and Directory Permissions Modification",
-   "tactics": [
-    "Defense Evasion"
-   ]
-  },
-  "T1222.002": {
-   "name": "Linux and Mac File and Directory Permissions Modification",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1222"
-  },
-  "T1482": {
-   "name": "Domain Trust Discovery",
-   "tactics": [
-    "Discovery"
-   ]
-  },
-  "T1486": {
-   "name": "Data Encrypted for Impact",
-   "tactics": [
-    "Impact"
-   ]
-  },
-  "T1489": {
-   "name": "Service Stop",
-   "tactics": [
-    "Impact"
-   ]
-  },
-  "T1490": {
-   "name": "Inhibit System Recovery",
-   "tactics": [
-    "Impact"
-   ]
-  },
-  "T1496": {
-   "name": "Resource Hijacking",
-   "tactics": [
-    "Impact"
-   ]
-  },
-  "T1497": {
-   "name": "Virtualization/Sandbox Evasion",
-   "tactics": [
-    "Defense Evasion"
-   ]
-  },
-  "T1497.001": {
-   "name": "System Checks",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1497"
-  },
-  "T1497.002": {
-   "name": "User Activity Based Checks",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1497"
-  },
-  "T1499": {
-   "name": "Endpoint Denial of Service",
-   "tactics": [
-    "Impact"
-   ]
-  },
-  "T1505": {
-   "name": "Server Software Component",
-   "tactics": [
-    "Persistence"
-   ]
-  },
-  "T1505.002": {
-   "name": "Transport Agent",
-   "tactics": [
-    "Persistence"
-   ],
-   "parent": "T1505"
-  },
-  "T1505.004": {
-   "name": "IIS Components",
-   "tactics": [
-    "Persistence"
-   ],
-   "parent": "T1505"
-  },
-  "T1518": {
-   "name": "Software Discovery",
-   "tactics": [
-    "Discovery"
-   ]
-  },
-  "T1518.001": {
-   "name": "Security Software Discovery",
-   "tactics": [
-    "Discovery"
-   ],
-   "parent": "T1518"
-  },
-  "T1529": {
-   "name": "System Shutdown/Reboot",
-   "tactics": [
-    "Impact"
-   ]
-  },
-  "T1531": {
-   "name": "Account Access Removal",
-   "tactics": [
-    "Impact"
-   ]
-  },
-  "T1542": {
-   "name": "Pre-OS Boot",
-   "tactics": [
-    "Persistence"
-   ]
-  },
-  "T1542.001": {
-   "name": "System Firmware",
-   "tactics": [
-    "Persistence"
-   ],
-   "parent": "T1542"
-  },
-  "T1543": {
-   "name": "Create or Modify System Process",
-   "tactics": [
-    "Persistence",
-    "Privilege Escalation"
-   ]
-  },
-  "T1543.002": {
-   "name": "Systemd Service",
-   "tactics": [
-    "Persistence",
-    "Privilege Escalation"
-   ],
-   "parent": "T1543"
-  },
-  "T1543.003": {
-   "name": "Windows Service",
-   "tactics": [
-    "Persistence"
-   ],
-   "parent": "T1543"
-  },
-  "T1546": {
-   "name": "Event Triggered Execution",
-   "tactics": [
-    "Persistence"
-   ]
-  },
-  "T1546.002": {
-   "name": "Screensaver",
-   "tactics": [
-    "Persistence"
-   ],
-   "parent": "T1546"
-  },
-  "T1546.004": {
-   "name": "Unix Shell Configuration Modification",
-   "tactics": [
-    "Persistence"
-   ],
-   "parent": "T1546"
-  },
-  "T1546.010": {
-   "name": "AppInit DLLs",
-   "tactics": [
-    "Persistence"
-   ],
-   "parent": "T1546"
-  },
-  "T1547": {
-   "name": "Boot or Logon Autostart Execution",
-   "tactics": [
-    "Persistence",
-    "Privilege Escalation"
-   ]
-  },
-  "T1547.001": {
-   "name": "Registry Run Keys / Startup Folder",
-   "tactics": [
-    "Persistence"
-   ],
-   "parent": "T1547"
-  },
-  "T1547.002": {
-   "name": "Authentication Package",
-   "tactics": [
-    "Persistence"
-   ],
-   "parent": "T1547"
-  },
-  "T1547.003": {
-   "name": "Time Providers",
-   "tactics": [
-    "Persistence"
-   ],
-   "parent": "T1547"
-  },
-  "T1547.004": {
-   "name": "Winlogon Helper DLL",
-   "tactics": [
-    "Persistence"
-   ],
-   "parent": "T1547"
-  },
-  "T1547.005": {
-   "name": "Security Support Provider",
-   "tactics": [
-    "Persistence"
-   ],
-   "parent": "T1547"
-  },
-  "T1547.006": {
-   "name": "Kernel Modules and Extensions",
-   "tactics": [
-    "Persistence",
-    "Privilege Escalation"
-   ],
-   "parent": "T1547"
-  },
-  "T1547.009": {
-   "name": "Shortcut Modification",
-   "tactics": [
-    "Persistence"
-   ],
-   "parent": "T1547"
-  },
-  "T1547.013": {
-   "name": "XDG Autostart Entries",
-   "tactics": [
-    "Persistence"
-   ],
-   "parent": "T1547"
-  },
-  "T1547.014": {
-   "name": "Active Setup",
-   "tactics": [
-    "Persistence"
-   ],
-   "parent": "T1547"
-  },
-  "T1548": {
-   "name": "Abuse Elevation Control Mechanism",
-   "tactics": [
-    "Privilege Escalation",
-    "Defense Evasion"
-   ]
-  },
-  "T1548.001": {
-   "name": "Setuid and Setgid",
-   "tactics": [
-    "Privilege Escalation",
-    "Defense Evasion"
-   ],
-   "parent": "T1548"
-  },
-  "T1548.002": {
-   "name": "Bypass User Account Control",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1548"
-  },
-  "T1552": {
-   "name": "Unsecured Credentials",
-   "tactics": [
-    "Credential Access"
-   ]
-  },
-  "T1552.004": {
-   "name": "Private Keys",
-   "tactics": [
-    "Credential Access"
-   ],
-   "parent": "T1552"
-  },
-  "T1553": {
-   "name": "Subvert Trust Controls",
-   "tactics": [
-    "Defense Evasion"
-   ]
-  },
-  "T1553.002": {
-   "name": "Code Signing",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1553"
-  },
-  "T1553.005": {
-   "name": "Mark-of-the-Web Bypass",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1553"
-  },
-  "T1553.006": {
-   "name": "Code Signing Policy Modification",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1553"
-  },
-  "T1555": {
-   "name": "Credentials from Password Stores",
-   "tactics": [
-    "Credential Access"
-   ]
-  },
-  "T1555.003": {
-   "name": "Credentials from Web Browsers",
-   "tactics": [
-    "Credential Access"
-   ],
-   "parent": "T1555"
-  },
-  "T1555.004": {
-   "name": "Windows Credential Manager",
-   "tactics": [
-    "Credential Access"
-   ],
-   "parent": "T1555"
-  },
-  "T1555.005": {
-   "name": "Password Managers",
-   "tactics": [
-    "Credential Access"
-   ],
-   "parent": "T1555"
-  },
-  "T1556": {
-   "name": "Modify Authentication Process",
-   "tactics": [
-    "Persistence"
-   ]
-  },
-  "T1556.002": {
-   "name": "Password Filter DLL",
-   "tactics": [
-    "Persistence"
-   ],
-   "parent": "T1556"
-  },
-  "T1556.008": {
-   "name": "Network Provider DLL",
-   "tactics": [
-    "Persistence"
-   ],
-   "parent": "T1556"
-  },
-  "T1560": {
-   "name": "Archive Collected Data",
-   "tactics": [
-    "Collection"
-   ]
-  },
-  "T1560.002": {
-   "name": "Archive via Library",
-   "tactics": [
-    "Collection"
-   ],
-   "parent": "T1560"
-  },
-  "T1561": {
-   "name": "Disk Wipe",
-   "tactics": [
-    "Impact"
-   ]
-  },
-  "T1561.002": {
-   "name": "Disk Structure Wipe",
-   "tactics": [
-    "Impact"
-   ],
-   "parent": "T1561"
-  },
-  "T1562": {
-   "name": "Impair Defenses",
-   "tactics": [
-    "Defense Evasion"
-   ]
-  },
-  "T1562.001": {
-   "name": "Disable or Modify Tools",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1562"
-  },
-  "T1562.002": {
-   "name": "Disable Windows Event Logging",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1562"
-  },
-  "T1562.004": {
-   "name": "Disable or Modify System Firewall",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1562"
-  },
-  "T1562.009": {
-   "name": "Safe Mode Boot",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1562"
-  },
-  "T1564": {
-   "name": "Hide Artifacts",
-   "tactics": [
-    "Defense Evasion"
-   ]
-  },
-  "T1564.003": {
-   "name": "Hidden Window",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1564"
-  },
-  "T1564.005": {
-   "name": "Hidden File System",
-   "tactics": [
-    "Defense Evasion"
-   ],
-   "parent": "T1564"
-  },
-  "T1565": {
-   "name": "Data Manipulation",
-   "tactics": [
-    "Impact"
-   ]
-  },
-  "T1565.002": {
-   "name": "Transmitted Data Manipulation",
-   "tactics": [
-    "Impact"
-   ],
-   "parent": "T1565"
-  },
-  "T1566": {
-   "name": "Phishing",
-   "tactics": [
-    "Initial Access"
-   ]
-  },
-  "T1566.001": {
-   "name": "Spearphishing Attachment",
-   "tactics": [
-    "Initial Access"
-   ],
-   "parent": "T1566"
-  },
-  "T1567": {
-   "name": "Exfiltration Over Web Service",
-   "tactics": [
-    "Exfiltration"
-   ]
-  },
-  "T1567.002": {
-   "name": "Exfiltration to Cloud Storage",
-   "tactics": [
-    "Exfiltration"
-   ],
-   "parent": "T1567"
-  },
-  "T1569": {
-   "name": "System Services",
-   "tactics": [
-    "Execution"
-   ]
-  },
-  "T1569.002": {
-   "name": "Service Execution",
-   "tactics": [
-    "Execution"
-   ],
-   "parent": "T1569"
-  },
-  "T1571": {
-   "name": "Non-Standard Port",
-   "tactics": [
-    "Command and Control"
-   ]
-  },
-  "T1574": {
-   "name": "Hijack Execution Flow",
-   "tactics": [
-    "Persistence",
-    "Privilege Escalation",
-    "Defense Evasion"
-   ]
-  },
-  "T1574.006": {
-   "name": "Dynamic Linker Hijacking",
-   "tactics": [
-    "Persistence",
-    "Privilege Escalation",
-    "Defense Evasion"
-   ],
-   "parent": "T1574"
-  },
-  "T1592": {
-   "name": "Gather Victim Host Information",
-   "tactics": [
-    "Reconnaissance"
-   ]
-  },
-  "T1592.003": {
-   "name": "Firmware",
-   "tactics": [
-    "Reconnaissance"
-   ],
-   "parent": "T1592"
-  },
-  "T1609": {
-   "name": "Container Administration Command",
-   "tactics": [
-    "Execution"
-   ]
-  },
-  "T1610": {
-   "name": "Deploy Container",
-   "tactics": [
-    "Execution"
-   ]
-  },
-  "T1612": {
-   "name": "Build Image on Host",
-   "tactics": [
-    "Defense Evasion"
-   ]
-  },
-  "T1613": {
-   "name": "Container and Resource Discovery",
-   "tactics": [
-    "Discovery"
-   ]
-  },
-  "T1614": {
-   "name": "System Location Discovery",
-   "tactics": [
-    "Discovery"
-   ]
-  },
-  "T1614.001": {
-   "name": "System Language Discovery",
-   "tactics": [
-    "Discovery"
-   ],
-   "parent": "T1614"
-  },
-  "T1615": {
-   "name": "Group Policy Discovery",
-   "tactics": [
-    "Discovery"
-   ]
-  },
-  "T1620": {
-   "name": "Reflective Code Loading",
-   "tactics": [
-    "Defense Evasion"
-   ]
-  },
-  "T1622": {
-   "name": "Debugger Evasion",
-   "tactics": [
-    "Defense Evasion"
-   ]
-  },
-  "T1652": {
-   "name": "Device Driver Discovery",
-   "tactics": [
-    "Discovery"
-   ]
-  }
- }
+    "source": "capa rules in this repository plus CHIMERA finding ids (ATT&CK Enterprise)",
+    "tactics": [
+        "Reconnaissance",
+        "Resource Development",
+        "Initial Access",
+        "Execution",
+        "Persistence",
+        "Privilege Escalation",
+        "Defense Evasion",
+        "Credential Access",
+        "Discovery",
+        "Lateral Movement",
+        "Collection",
+        "Command and Control",
+        "Exfiltration",
+        "Impact"
+    ],
+    "techniques": {
+        "T1003": {
+            "name": "OS Credential Dumping",
+            "tactics": ["Credential Access"]
+        },
+        "T1003.001": {
+            "name": "LSASS Memory",
+            "tactics": ["Credential Access"],
+            "parent": "T1003"
+        },
+        "T1005": {
+            "name": "Data from Local System",
+            "tactics": ["Collection"]
+        },
+        "T1007": {
+            "name": "System Service Discovery",
+            "tactics": ["Discovery"]
+        },
+        "T1010": {
+            "name": "Application Window Discovery",
+            "tactics": ["Discovery"]
+        },
+        "T1012": {
+            "name": "Query Registry",
+            "tactics": ["Discovery"]
+        },
+        "T1014": {
+            "name": "Rootkit",
+            "tactics": ["Defense Evasion"]
+        },
+        "T1016": {
+            "name": "System Network Configuration Discovery",
+            "tactics": ["Discovery"]
+        },
+        "T1016.001": {
+            "name": "Internet Connection Discovery",
+            "tactics": ["Discovery"],
+            "parent": "T1016"
+        },
+        "T1018": {
+            "name": "Remote System Discovery",
+            "tactics": ["Discovery"]
+        },
+        "T1027": {
+            "name": "Obfuscated Files or Information",
+            "tactics": ["Defense Evasion"]
+        },
+        "T1027.002": {
+            "name": "Software Packing",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1027"
+        },
+        "T1027.004": {
+            "name": "Compile After Delivery",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1027"
+        },
+        "T1027.005": {
+            "name": "Indicator Removal from Tools",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1027"
+        },
+        "T1027.006": {
+            "name": "HTML Smuggling",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1027"
+        },
+        "T1027.007": {
+            "name": "Dynamic API Resolution",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1027"
+        },
+        "T1027.009": {
+            "name": "Embedded Payloads",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1027"
+        },
+        "T1027.013": {
+            "name": "Encrypted/Encoded File",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1027"
+        },
+        "T1033": {
+            "name": "System Owner/User Discovery",
+            "tactics": ["Discovery"]
+        },
+        "T1036": {
+            "name": "Masquerading",
+            "tactics": ["Defense Evasion"]
+        },
+        "T1036.002": {
+            "name": "Right-to-Left Override",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1036"
+        },
+        "T1036.005": {
+            "name": "Match Legitimate Name or Location",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1036"
+        },
+        "T1036.007": {
+            "name": "Double File Extension",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1036"
+        },
+        "T1036.008": {
+            "name": "Masquerade File Type",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1036"
+        },
+        "T1037": {
+            "name": "Boot or Logon Initialization Scripts",
+            "tactics": ["Persistence"]
+        },
+        "T1037.004": {
+            "name": "RC Scripts",
+            "tactics": ["Persistence"],
+            "parent": "T1037"
+        },
+        "T1040": {
+            "name": "Network Sniffing",
+            "tactics": ["Discovery"]
+        },
+        "T1041": {
+            "name": "Exfiltration Over C2 Channel",
+            "tactics": ["Exfiltration"]
+        },
+        "T1047": {
+            "name": "Windows Management Instrumentation",
+            "tactics": ["Execution"]
+        },
+        "T1053": {
+            "name": "Scheduled Task/Job",
+            "tactics": ["Execution", "Persistence", "Privilege Escalation"]
+        },
+        "T1053.002": {
+            "name": "At",
+            "tactics": ["Persistence"],
+            "parent": "T1053"
+        },
+        "T1053.003": {
+            "name": "Cron",
+            "tactics": ["Execution", "Persistence", "Privilege Escalation"],
+            "parent": "T1053"
+        },
+        "T1053.005": {
+            "name": "Scheduled Task",
+            "tactics": ["Persistence"],
+            "parent": "T1053"
+        },
+        "T1055": {
+            "name": "Process Injection",
+            "tactics": ["Defense Evasion"]
+        },
+        "T1055.001": {
+            "name": "Dynamic-link Library Injection",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1055"
+        },
+        "T1055.002": {
+            "name": "Portable Executable Injection",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1055"
+        },
+        "T1055.003": {
+            "name": "Thread Execution Hijacking",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1055"
+        },
+        "T1055.004": {
+            "name": "Asynchronous Procedure Call",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1055"
+        },
+        "T1055.011": {
+            "name": "Extra Window Memory Injection",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1055"
+        },
+        "T1055.012": {
+            "name": "Process Hollowing",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1055"
+        },
+        "T1055.013": {
+            "name": "Process Doppelg\u00e4nging",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1055"
+        },
+        "T1056": {
+            "name": "Input Capture",
+            "tactics": ["Collection"]
+        },
+        "T1056.001": {
+            "name": "Keylogging",
+            "tactics": ["Collection"],
+            "parent": "T1056"
+        },
+        "T1057": {
+            "name": "Process Discovery",
+            "tactics": ["Discovery"]
+        },
+        "T1059": {
+            "name": "Command and Scripting Interpreter",
+            "tactics": ["Execution"]
+        },
+        "T1059.001": {
+            "name": "PowerShell",
+            "tactics": ["Execution"],
+            "parent": "T1059"
+        },
+        "T1059.003": {
+            "name": "Windows Command Shell",
+            "tactics": ["Execution"],
+            "parent": "T1059"
+        },
+        "T1059.004": {
+            "name": "Unix Shell",
+            "tactics": ["Execution"],
+            "parent": "T1059"
+        },
+        "T1059.005": {
+            "name": "Visual Basic",
+            "tactics": ["Execution"],
+            "parent": "T1059"
+        },
+        "T1059.006": {
+            "name": "Python",
+            "tactics": ["Execution"],
+            "parent": "T1059"
+        },
+        "T1059.007": {
+            "name": "JavaScript",
+            "tactics": ["Execution"],
+            "parent": "T1059"
+        },
+        "T1069": {
+            "name": "Permission Groups Discovery",
+            "tactics": ["Discovery"]
+        },
+        "T1070": {
+            "name": "Indicator Removal",
+            "tactics": ["Defense Evasion"]
+        },
+        "T1070.001": {
+            "name": "Clear Windows Event Logs",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1070"
+        },
+        "T1070.004": {
+            "name": "File Deletion",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1070"
+        },
+        "T1070.006": {
+            "name": "Timestomp",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1070"
+        },
+        "T1071": {
+            "name": "Application Layer Protocol",
+            "tactics": ["Command and Control"]
+        },
+        "T1071.001": {
+            "name": "Web Protocols",
+            "tactics": ["Command and Control"],
+            "parent": "T1071"
+        },
+        "T1082": {
+            "name": "System Information Discovery",
+            "tactics": ["Discovery"]
+        },
+        "T1083": {
+            "name": "File and Directory Discovery",
+            "tactics": ["Discovery"]
+        },
+        "T1087": {
+            "name": "Account Discovery",
+            "tactics": ["Discovery"]
+        },
+        "T1090": {
+            "name": "Proxy",
+            "tactics": ["Command and Control"]
+        },
+        "T1090.003": {
+            "name": "Multi-hop Proxy",
+            "tactics": ["Command and Control"],
+            "parent": "T1090"
+        },
+        "T1095": {
+            "name": "Non-Application Layer Protocol",
+            "tactics": ["Command and Control"]
+        },
+        "T1098": {
+            "name": "Account Manipulation",
+            "tactics": ["Persistence", "Privilege Escalation"]
+        },
+        "T1098.004": {
+            "name": "SSH Authorized Keys",
+            "tactics": ["Persistence", "Privilege Escalation"],
+            "parent": "T1098"
+        },
+        "T1105": {
+            "name": "Ingress Tool Transfer",
+            "tactics": ["Command and Control"]
+        },
+        "T1106": {
+            "name": "Native API",
+            "tactics": ["Execution"]
+        },
+        "T1112": {
+            "name": "Modify Registry",
+            "tactics": ["Defense Evasion"]
+        },
+        "T1113": {
+            "name": "Screen Capture",
+            "tactics": ["Collection"]
+        },
+        "T1115": {
+            "name": "Clipboard Data",
+            "tactics": ["Collection"]
+        },
+        "T1123": {
+            "name": "Audio Capture",
+            "tactics": ["Collection"]
+        },
+        "T1125": {
+            "name": "Video Capture",
+            "tactics": ["Collection"]
+        },
+        "T1129": {
+            "name": "Shared Modules",
+            "tactics": ["Execution"]
+        },
+        "T1134": {
+            "name": "Access Token Manipulation",
+            "tactics": ["Privilege Escalation", "Defense Evasion"]
+        },
+        "T1134.001": {
+            "name": "Token Impersonation/Theft",
+            "tactics": ["Privilege Escalation"],
+            "parent": "T1134"
+        },
+        "T1134.004": {
+            "name": "Parent PID Spoofing",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1134"
+        },
+        "T1135": {
+            "name": "Network Share Discovery",
+            "tactics": ["Discovery"]
+        },
+        "T1136": {
+            "name": "Create Account",
+            "tactics": ["Persistence"]
+        },
+        "T1137": {
+            "name": "Office Application Startup",
+            "tactics": ["Persistence"]
+        },
+        "T1137.006": {
+            "name": "Add-ins",
+            "tactics": ["Persistence"],
+            "parent": "T1137"
+        },
+        "T1140": {
+            "name": "Deobfuscate/Decode Files or Information",
+            "tactics": ["Defense Evasion"]
+        },
+        "T1197": {
+            "name": "BITS Jobs",
+            "tactics": ["Persistence", "Defense Evasion"]
+        },
+        "T1203": {
+            "name": "Exploitation for Client Execution",
+            "tactics": ["Execution"]
+        },
+        "T1204": {
+            "name": "User Execution",
+            "tactics": ["Execution"]
+        },
+        "T1204.002": {
+            "name": "Malicious File",
+            "tactics": ["Execution"],
+            "parent": "T1204"
+        },
+        "T1205": {
+            "name": "Traffic Signaling",
+            "tactics": ["Persistence"]
+        },
+        "T1205.002": {
+            "name": "Socket Filters",
+            "tactics": ["Persistence"],
+            "parent": "T1205"
+        },
+        "T1213": {
+            "name": "Data from Information Repositories",
+            "tactics": ["Collection"]
+        },
+        "T1218": {
+            "name": "System Binary Proxy Execution",
+            "tactics": ["Defense Evasion"]
+        },
+        "T1221": {
+            "name": "Template Injection",
+            "tactics": ["Defense Evasion"]
+        },
+        "T1222": {
+            "name": "File and Directory Permissions Modification",
+            "tactics": ["Defense Evasion"]
+        },
+        "T1222.002": {
+            "name": "Linux and Mac File and Directory Permissions Modification",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1222"
+        },
+        "T1482": {
+            "name": "Domain Trust Discovery",
+            "tactics": ["Discovery"]
+        },
+        "T1486": {
+            "name": "Data Encrypted for Impact",
+            "tactics": ["Impact"]
+        },
+        "T1489": {
+            "name": "Service Stop",
+            "tactics": ["Impact"]
+        },
+        "T1490": {
+            "name": "Inhibit System Recovery",
+            "tactics": ["Impact"]
+        },
+        "T1496": {
+            "name": "Resource Hijacking",
+            "tactics": ["Impact"]
+        },
+        "T1497": {
+            "name": "Virtualization/Sandbox Evasion",
+            "tactics": ["Defense Evasion"]
+        },
+        "T1497.001": {
+            "name": "System Checks",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1497"
+        },
+        "T1497.002": {
+            "name": "User Activity Based Checks",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1497"
+        },
+        "T1499": {
+            "name": "Endpoint Denial of Service",
+            "tactics": ["Impact"]
+        },
+        "T1505": {
+            "name": "Server Software Component",
+            "tactics": ["Persistence"]
+        },
+        "T1505.002": {
+            "name": "Transport Agent",
+            "tactics": ["Persistence"],
+            "parent": "T1505"
+        },
+        "T1505.004": {
+            "name": "IIS Components",
+            "tactics": ["Persistence"],
+            "parent": "T1505"
+        },
+        "T1518": {
+            "name": "Software Discovery",
+            "tactics": ["Discovery"]
+        },
+        "T1518.001": {
+            "name": "Security Software Discovery",
+            "tactics": ["Discovery"],
+            "parent": "T1518"
+        },
+        "T1529": {
+            "name": "System Shutdown/Reboot",
+            "tactics": ["Impact"]
+        },
+        "T1531": {
+            "name": "Account Access Removal",
+            "tactics": ["Impact"]
+        },
+        "T1542": {
+            "name": "Pre-OS Boot",
+            "tactics": ["Persistence"]
+        },
+        "T1542.001": {
+            "name": "System Firmware",
+            "tactics": ["Persistence"],
+            "parent": "T1542"
+        },
+        "T1543": {
+            "name": "Create or Modify System Process",
+            "tactics": ["Persistence", "Privilege Escalation"]
+        },
+        "T1543.002": {
+            "name": "Systemd Service",
+            "tactics": ["Persistence", "Privilege Escalation"],
+            "parent": "T1543"
+        },
+        "T1543.003": {
+            "name": "Windows Service",
+            "tactics": ["Persistence"],
+            "parent": "T1543"
+        },
+        "T1546": {
+            "name": "Event Triggered Execution",
+            "tactics": ["Persistence"]
+        },
+        "T1546.002": {
+            "name": "Screensaver",
+            "tactics": ["Persistence"],
+            "parent": "T1546"
+        },
+        "T1546.004": {
+            "name": "Unix Shell Configuration Modification",
+            "tactics": ["Persistence"],
+            "parent": "T1546"
+        },
+        "T1546.010": {
+            "name": "AppInit DLLs",
+            "tactics": ["Persistence"],
+            "parent": "T1546"
+        },
+        "T1547": {
+            "name": "Boot or Logon Autostart Execution",
+            "tactics": ["Persistence", "Privilege Escalation"]
+        },
+        "T1547.001": {
+            "name": "Registry Run Keys / Startup Folder",
+            "tactics": ["Persistence"],
+            "parent": "T1547"
+        },
+        "T1547.002": {
+            "name": "Authentication Package",
+            "tactics": ["Persistence"],
+            "parent": "T1547"
+        },
+        "T1547.003": {
+            "name": "Time Providers",
+            "tactics": ["Persistence"],
+            "parent": "T1547"
+        },
+        "T1547.004": {
+            "name": "Winlogon Helper DLL",
+            "tactics": ["Persistence"],
+            "parent": "T1547"
+        },
+        "T1547.005": {
+            "name": "Security Support Provider",
+            "tactics": ["Persistence"],
+            "parent": "T1547"
+        },
+        "T1547.006": {
+            "name": "Kernel Modules and Extensions",
+            "tactics": ["Persistence", "Privilege Escalation"],
+            "parent": "T1547"
+        },
+        "T1547.009": {
+            "name": "Shortcut Modification",
+            "tactics": ["Persistence"],
+            "parent": "T1547"
+        },
+        "T1547.013": {
+            "name": "XDG Autostart Entries",
+            "tactics": ["Persistence"],
+            "parent": "T1547"
+        },
+        "T1547.014": {
+            "name": "Active Setup",
+            "tactics": ["Persistence"],
+            "parent": "T1547"
+        },
+        "T1548": {
+            "name": "Abuse Elevation Control Mechanism",
+            "tactics": ["Privilege Escalation", "Defense Evasion"]
+        },
+        "T1548.001": {
+            "name": "Setuid and Setgid",
+            "tactics": ["Privilege Escalation", "Defense Evasion"],
+            "parent": "T1548"
+        },
+        "T1548.002": {
+            "name": "Bypass User Account Control",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1548"
+        },
+        "T1552": {
+            "name": "Unsecured Credentials",
+            "tactics": ["Credential Access"]
+        },
+        "T1552.004": {
+            "name": "Private Keys",
+            "tactics": ["Credential Access"],
+            "parent": "T1552"
+        },
+        "T1553": {
+            "name": "Subvert Trust Controls",
+            "tactics": ["Defense Evasion"]
+        },
+        "T1553.002": {
+            "name": "Code Signing",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1553"
+        },
+        "T1553.005": {
+            "name": "Mark-of-the-Web Bypass",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1553"
+        },
+        "T1553.006": {
+            "name": "Code Signing Policy Modification",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1553"
+        },
+        "T1555": {
+            "name": "Credentials from Password Stores",
+            "tactics": ["Credential Access"]
+        },
+        "T1555.003": {
+            "name": "Credentials from Web Browsers",
+            "tactics": ["Credential Access"],
+            "parent": "T1555"
+        },
+        "T1555.004": {
+            "name": "Windows Credential Manager",
+            "tactics": ["Credential Access"],
+            "parent": "T1555"
+        },
+        "T1555.005": {
+            "name": "Password Managers",
+            "tactics": ["Credential Access"],
+            "parent": "T1555"
+        },
+        "T1556": {
+            "name": "Modify Authentication Process",
+            "tactics": ["Persistence"]
+        },
+        "T1556.002": {
+            "name": "Password Filter DLL",
+            "tactics": ["Persistence"],
+            "parent": "T1556"
+        },
+        "T1556.008": {
+            "name": "Network Provider DLL",
+            "tactics": ["Persistence"],
+            "parent": "T1556"
+        },
+        "T1560": {
+            "name": "Archive Collected Data",
+            "tactics": ["Collection"]
+        },
+        "T1560.002": {
+            "name": "Archive via Library",
+            "tactics": ["Collection"],
+            "parent": "T1560"
+        },
+        "T1561": {
+            "name": "Disk Wipe",
+            "tactics": ["Impact"]
+        },
+        "T1561.002": {
+            "name": "Disk Structure Wipe",
+            "tactics": ["Impact"],
+            "parent": "T1561"
+        },
+        "T1562": {
+            "name": "Impair Defenses",
+            "tactics": ["Defense Evasion"]
+        },
+        "T1562.001": {
+            "name": "Disable or Modify Tools",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1562"
+        },
+        "T1562.002": {
+            "name": "Disable Windows Event Logging",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1562"
+        },
+        "T1562.004": {
+            "name": "Disable or Modify System Firewall",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1562"
+        },
+        "T1562.009": {
+            "name": "Safe Mode Boot",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1562"
+        },
+        "T1564": {
+            "name": "Hide Artifacts",
+            "tactics": ["Defense Evasion"]
+        },
+        "T1564.003": {
+            "name": "Hidden Window",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1564"
+        },
+        "T1564.005": {
+            "name": "Hidden File System",
+            "tactics": ["Defense Evasion"],
+            "parent": "T1564"
+        },
+        "T1565": {
+            "name": "Data Manipulation",
+            "tactics": ["Impact"]
+        },
+        "T1565.002": {
+            "name": "Transmitted Data Manipulation",
+            "tactics": ["Impact"],
+            "parent": "T1565"
+        },
+        "T1566": {
+            "name": "Phishing",
+            "tactics": ["Initial Access"]
+        },
+        "T1566.001": {
+            "name": "Spearphishing Attachment",
+            "tactics": ["Initial Access"],
+            "parent": "T1566"
+        },
+        "T1567": {
+            "name": "Exfiltration Over Web Service",
+            "tactics": ["Exfiltration"]
+        },
+        "T1567.002": {
+            "name": "Exfiltration to Cloud Storage",
+            "tactics": ["Exfiltration"],
+            "parent": "T1567"
+        },
+        "T1569": {
+            "name": "System Services",
+            "tactics": ["Execution"]
+        },
+        "T1569.002": {
+            "name": "Service Execution",
+            "tactics": ["Execution"],
+            "parent": "T1569"
+        },
+        "T1571": {
+            "name": "Non-Standard Port",
+            "tactics": ["Command and Control"]
+        },
+        "T1574": {
+            "name": "Hijack Execution Flow",
+            "tactics": [
+                "Persistence",
+                "Privilege Escalation",
+                "Defense Evasion"
+            ]
+        },
+        "T1574.006": {
+            "name": "Dynamic Linker Hijacking",
+            "tactics": [
+                "Persistence",
+                "Privilege Escalation",
+                "Defense Evasion"
+            ],
+            "parent": "T1574"
+        },
+        "T1592": {
+            "name": "Gather Victim Host Information",
+            "tactics": ["Reconnaissance"]
+        },
+        "T1592.003": {
+            "name": "Firmware",
+            "tactics": ["Reconnaissance"],
+            "parent": "T1592"
+        },
+        "T1609": {
+            "name": "Container Administration Command",
+            "tactics": ["Execution"]
+        },
+        "T1610": {
+            "name": "Deploy Container",
+            "tactics": ["Execution"]
+        },
+        "T1612": {
+            "name": "Build Image on Host",
+            "tactics": ["Defense Evasion"]
+        },
+        "T1613": {
+            "name": "Container and Resource Discovery",
+            "tactics": ["Discovery"]
+        },
+        "T1614": {
+            "name": "System Location Discovery",
+            "tactics": ["Discovery"]
+        },
+        "T1614.001": {
+            "name": "System Language Discovery",
+            "tactics": ["Discovery"],
+            "parent": "T1614"
+        },
+        "T1615": {
+            "name": "Group Policy Discovery",
+            "tactics": ["Discovery"]
+        },
+        "T1620": {
+            "name": "Reflective Code Loading",
+            "tactics": ["Defense Evasion"]
+        },
+        "T1622": {
+            "name": "Debugger Evasion",
+            "tactics": ["Defense Evasion"]
+        },
+        "T1652": {
+            "name": "Device Driver Discovery",
+            "tactics": ["Discovery"]
+        }
+    }
 }

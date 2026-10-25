@@ -49,7 +49,10 @@ def run_postprocessing(context: PostprocessContext):
         if plugin_name == "classify_sample" and not context.config.classifier.enabled:
             outcomes[plugin_name] = "skipped"
             continue
-        if plugin_name in GUEST_OS_ONLY and context.options.guest_os != GUEST_OS_ONLY[plugin_name]:
+        if (
+            plugin_name in GUEST_OS_ONLY
+            and context.options.guest_os != GUEST_OS_ONLY[plugin_name]
+        ):
             outcomes[plugin_name] = "skipped"
             continue
         if not check_plugin_requirements(context.analysis_dir, plugin):

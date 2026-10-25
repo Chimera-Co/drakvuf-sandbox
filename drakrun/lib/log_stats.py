@@ -27,7 +27,13 @@ BUCKETS = 120
 STATS_DIR = "log_stats"
 STATS_VERSION = 3
 PLAIN_LOGS = ("drakrun", "drakvuf_stderr")
-REGISTRY_WRITES = {"NtSetValueKey", "NtCreateKey", "NtDeleteKey", "NtDeleteValueKey", "NtRenameKey"}
+REGISTRY_WRITES = {
+    "NtSetValueKey",
+    "NtCreateKey",
+    "NtDeleteKey",
+    "NtDeleteValueKey",
+    "NtRenameKey",
+}
 VALUE_FIELDS = {
     "files": ("FileName", "DumpFilename"),
     "keys": ("Key",),
@@ -88,7 +94,9 @@ class _Counter:
             self.pruned = True
 
     def top(self):
-        return sorted(self.counts.items(), key=lambda item: (-item[1], str(item[0])))[:TOP]
+        return sorted(self.counts.items(), key=lambda item: (-item[1], str(item[0])))[
+            :TOP
+        ]
 
 
 def compute_stats(stream, log_type: str) -> dict:
@@ -96,7 +104,7 @@ def compute_stats(stream, log_type: str) -> dict:
     plain = log_type in PLAIN_LOGS
     counters = {kind: _Counter() for kind in ("methods", "processes", *VALUE_FIELDS)}
     stamps = array("d")
-    for event in (lines(stream) if plain else events(stream)):
+    for event in lines(stream) if plain else events(stream):
         if event is None:
             errors += 1
             continue
@@ -111,10 +119,14 @@ def compute_stats(stream, log_type: str) -> dict:
         if log_type == "regmon" and method in REGISTRY_WRITES:
             registry_writes += 1
         pid = event.get("PID", event.get("InjectedPid"))
-        name = str(event.get("ProcessName", event.get("RunningProcess", "")))[:MAX_VALUE]
+        name = str(event.get("ProcessName", event.get("RunningProcess", "")))[
+            :MAX_VALUE
+        ]
         counters["processes"].add((event.get("seqid", event.get("SeqId")), pid, name))
         for kind, fields in VALUE_FIELDS.items():
-            value = next((event[key] for key in fields if event.get(key) is not None), None)
+            value = next(
+                (event[key] for key in fields if event.get(key) is not None), None
+            )
             if value is not None:
                 if kind == "remote" and event.get("RemotePort") is not None:
                     value = f"{value}:{event['RemotePort']}"
@@ -129,7 +141,11 @@ def compute_stats(stream, log_type: str) -> dict:
             histogram[min(len(histogram) - 1, int((ts - first) / bucket))] += 1
     else:
         bucket, histogram = 1, []
-    values = {kind: [[v, n] for v, n in counters[kind].top()] for kind in VALUE_FIELDS if counters[kind].counts}
+    values = {
+        kind: [[v, n] for v, n in counters[kind].top()]
+        for kind in VALUE_FIELDS
+        if counters[kind].counts
+    }
     return {
         "total": total,
         "parse_errors": errors,

@@ -7,21 +7,61 @@ services). Non-public names (localhost, .local, single labels) are never sent an
 """
 
 NON_PUBLIC_SUFFIXES = (
-    "localhost", "local", "localdomain", "lan", "home", "internal", "intranet", "corp", "arpa", "invalid",
+    "localhost",
+    "local",
+    "localdomain",
+    "lan",
+    "home",
+    "internal",
+    "intranet",
+    "corp",
+    "arpa",
+    "invalid",
 )
 
 BACKGROUND_SUFFIXES = (
     # Windows and Microsoft services the guest contacts on its own
-    "microsoft.com", "windowsupdate.com", "windows.com", "live.com", "live.net", "msftncsi.com",
-    "msftconnecttest.com", "msedge.net", "bing.com", "bing.net", "msn.com", "office.com", "office.net",
-    "office365.com", "skype.com", "xboxlive.com", "microsoftonline.com", "msocsp.com",
+    "microsoft.com",
+    "windowsupdate.com",
+    "windows.com",
+    "live.com",
+    "live.net",
+    "msftncsi.com",
+    "msftconnecttest.com",
+    "msedge.net",
+    "bing.com",
+    "bing.net",
+    "msn.com",
+    "office.com",
+    "office.net",
+    "office365.com",
+    "skype.com",
+    "xboxlive.com",
+    "microsoftonline.com",
+    "msocsp.com",
     # certificate revocation and CA infrastructure
-    "digicert.com", "lencr.org", "letsencrypt.org", "sectigo.com", "usertrust.com", "globalsign.com",
-    "globalsign.net", "entrust.net", "comodoca.com", "symcd.com", "symcb.com", "verisign.com",
+    "digicert.com",
+    "lencr.org",
+    "letsencrypt.org",
+    "sectigo.com",
+    "usertrust.com",
+    "globalsign.com",
+    "globalsign.net",
+    "entrust.net",
+    "comodoca.com",
+    "symcd.com",
+    "symcb.com",
+    "verisign.com",
     # Azure AD sign-in (Windows itself) and the run's own network simulator
-    "login.windows.net", "inetsim.org",
+    "login.windows.net",
+    "inetsim.org",
     # XML and schema namespaces that appear as strings in ordinary files
-    "w3.org", "xmlsoap.org", "openxmlformats.org", "purl.org", "ns.adobe.com", "schemas.android.com",
+    "w3.org",
+    "xmlsoap.org",
+    "openxmlformats.org",
+    "purl.org",
+    "ns.adobe.com",
+    "schemas.android.com",
 )
 
 
@@ -41,7 +81,8 @@ def background(host):
 
 def string_artifact(kind, host):
     """Values that string extraction finds in ordinary files but that are almost never real indicators:
-    version numbers read as IPs (1.9.16.1), dotted settings keys read as domains, one-letter names (e.com)."""
+    version numbers read as IPs (1.9.16.1), dotted settings keys read as domains, one-letter names (e.com).
+    """
     if kind == "ip":
         try:
             return all(int(part) <= 32 for part in host.split("."))

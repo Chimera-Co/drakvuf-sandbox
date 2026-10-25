@@ -8,13 +8,13 @@ from .classify_sample import classify_sample
 from .compress_ipt import compress_ipt
 from .generate_html_report import generate_html_report
 from .generate_report import generate_report
-from .get_linux_behaviour_info import get_linux_behaviour_info
 from .generate_wireshark_key_file import generate_wireshark_key_file
 from .get_http_info import get_http_info
+from .get_linux_behaviour_info import get_linux_behaviour_info
 from .get_modified_files_info import get_modified_files_info
 from .get_socket_info import get_socket_info
-from .get_ttps_info import get_ttps_info
 from .get_tls_info import get_tls_info
+from .get_ttps_info import get_ttps_info
 from .gzip_syscalls import gzip_syscalls
 from .index_logs import index_logs
 from .karton_integration import analyze_in_karton

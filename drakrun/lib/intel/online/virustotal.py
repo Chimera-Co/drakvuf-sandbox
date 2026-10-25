@@ -46,9 +46,14 @@ class Adapter(Provider):
         # Engines that flagged it, malicious first; the label each one gave is what analysts compare.
         engines = sorted(
             (
-                {"engine": r.get("engine_name") or name, "category": r.get("category"), "result": r.get("result")}
+                {
+                    "engine": r.get("engine_name") or name,
+                    "category": r.get("category"),
+                    "result": r.get("result"),
+                }
                 for name, r in (a.get("last_analysis_results") or {}).items()
-                if isinstance(r, dict) and r.get("category") in ("malicious", "suspicious")
+                if isinstance(r, dict)
+                and r.get("category") in ("malicious", "suspicious")
             ),
             key=lambda e: (e["category"] != "malicious", e["engine"] or ""),
         )
@@ -60,20 +65,33 @@ class Adapter(Provider):
             "engines_flagged": len(engines),
             "threat": {
                 "label": threat.get("suggested_threat_label"),
-                "categories": [c.get("value") for c in threat.get("popular_threat_category") or []][:5],
-                "names": [c.get("value") for c in threat.get("popular_threat_name") or []][:5],
+                "categories": [
+                    c.get("value") for c in threat.get("popular_threat_category") or []
+                ][:5],
+                "names": [
+                    c.get("value") for c in threat.get("popular_threat_name") or []
+                ][:5],
             },
             "rules": {
-                "yara": [r.get("rule_name") for r in (a.get("crowdsourced_yara_results") or [])[:20]],
-                "sigma": [r.get("rule_title") for r in (a.get("crowdsourced_sigma_results") or [])[:20]],
+                "yara": [
+                    r.get("rule_name")
+                    for r in (a.get("crowdsourced_yara_results") or [])[:20]
+                ],
+                "sigma": [
+                    r.get("rule_title")
+                    for r in (a.get("crowdsourced_sigma_results") or [])[:20]
+                ],
                 "ids": [
                     (r.get("rule_msg") or "")[:200]
                     for r in (a.get("crowdsourced_ids_results") or [])[:10]
                 ],
             },
             "sandbox_verdicts": [
-                {"sandbox": name, "category": v.get("category"),
-                 "families": (v.get("malware_names") or [])[:5]}
+                {
+                    "sandbox": name,
+                    "category": v.get("category"),
+                    "families": (v.get("malware_names") or [])[:5],
+                }
                 for name, v in list((a.get("sandbox_verdicts") or {}).items())[:10]
                 if isinstance(v, dict)
             ],
@@ -109,7 +127,15 @@ class Adapter(Provider):
             verdict=(
                 "malicious"
                 if malicious >= 10
-                else "suspicious" if malicious >= 3 else "harmless" if stats.get("harmless", 0) >= 10 and not malicious else "unknown"
+                else (
+                    "suspicious"
+                    if malicious >= 3
+                    else (
+                        "harmless"
+                        if stats.get("harmless", 0) >= 10 and not malicious
+                        else "unknown"
+                    )
+                )
             ),
             detections={**stats, "total": sum(stats.values())},
             family=threat.get("suggested_threat_label"),

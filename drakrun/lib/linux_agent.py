@@ -5,6 +5,7 @@ The agent listens on the guest's first serial port, which Xen exposes on dom0 as
     host  -> guest:  @@C> <id> <command> <base64 JSON arguments>
     guest -> host:   @@C< <id> OK|ERR <base64 JSON result>
 """
+
 import base64
 import json
 import logging
@@ -57,7 +58,9 @@ class LinuxAgent:
     def __exit__(self, *exc):
         self.close()
 
-    def call(self, command: str, args: Optional[Dict[str, Any]] = None, timeout: float = 30.0) -> Dict[str, Any]:
+    def call(
+        self, command: str, args: Optional[Dict[str, Any]] = None, timeout: float = 30.0
+    ) -> Dict[str, Any]:
         if self.sock is None:
             self.connect()
         req_id = secrets.token_hex(4)
@@ -71,14 +74,16 @@ class LinuxAgent:
                 i = line.find(prefix)
                 if i < 0:
                     continue  # console noise or a reply to an earlier, abandoned request
-                status, body = line[i + len(prefix):].rstrip(b"\r").split(b" ", 1)
+                status, body = line[i + len(prefix) :].rstrip(b"\r").split(b" ", 1)
                 result = json.loads(base64.b64decode(body))
                 if status != b"OK":
                     raise LinuxAgentError(f"{command}: {result.get('error', result)}")
                 return result
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise TimeoutError(f"guest agent did not answer {command!r} in {timeout:.0f} s")
+                raise TimeoutError(
+                    f"guest agent did not answer {command!r} in {timeout:.0f} s"
+                )
             self.sock.settimeout(remaining)
             try:
                 data = self.sock.recv(65536)
@@ -93,7 +98,9 @@ class LinuxAgent:
         deadline = time.monotonic() + timeout
         while True:
             try:
-                return self.call("ping", timeout=min(2.0, max(0.1, deadline - time.monotonic())))
+                return self.call(
+                    "ping", timeout=min(2.0, max(0.1, deadline - time.monotonic()))
+                )
             except (TimeoutError, OSError, LinuxAgentError):
                 if time.monotonic() > deadline:
                     raise
@@ -116,7 +123,9 @@ def set_guest_clock(agent: LinuxAgent) -> Dict[str, Any]:
         return {"set": False, "error": str(exc)}
 
 
-def wait_for_vm_network(agent: LinuxAgent, vm_id: int, timeout: float = 30) -> Dict[str, Any]:
+def wait_for_vm_network(
+    agent: LinuxAgent, vm_id: int, timeout: float = 30
+) -> Dict[str, Any]:
     """Wait until the guest has its address in this VM's subnet (10.13.<vm_id>.0/24).
 
     A restored guest keeps the address it had when the snapshot was saved (vm-0's subnet) until
@@ -128,18 +137,28 @@ def wait_for_vm_network(agent: LinuxAgent, vm_id: int, timeout: float = 30) -> D
     renewed = False
     while True:
         result = agent.call("net", {"timeout": 5}, timeout=20)
-        addrs = [a for name, values in result["addr"].items() if name != "lo" for a in values]
+        addrs = [
+            a for name, values in result["addr"].items() if name != "lo" for a in values
+        ]
         if any(a.startswith(prefix) for a in addrs):
             return {**result, "ready": True, "renewed": renewed}
         if time.monotonic() > deadline:
             return {**result, "ready": False, "renewed": renewed}
         if addrs and not renewed:
-            log.info("Guest still has %s, asking DHCP for an address in %s0/24", addrs, prefix)
-            agent.call("sh", {
-                "cmd": "for i in $(ls /sys/class/net); do [ \"$i\" = lo ] && continue; "
-                       "ip -4 addr flush dev \"$i\"; networkctl reconfigure \"$i\"; done",
-                "timeout": 10,
-            }, timeout=20)
+            log.info(
+                "Guest still has %s, asking DHCP for an address in %s0/24",
+                addrs,
+                prefix,
+            )
+            agent.call(
+                "sh",
+                {
+                    "cmd": 'for i in $(ls /sys/class/net); do [ "$i" = lo ] && continue; '
+                    'ip -4 addr flush dev "$i"; networkctl reconfigure "$i"; done',
+                    "timeout": 10,
+                },
+                timeout=20,
+            )
             renewed = True
         time.sleep(0.5)
 
@@ -152,7 +171,13 @@ def main() -> int:
         if command == "wait":
             print(json.dumps(agent.wait_ready(float(args.get("timeout", 120)))))
         else:
-            print(json.dumps(agent.call(command, args, timeout=float(args.get("timeout", 30)) + 30)))
+            print(
+                json.dumps(
+                    agent.call(
+                        command, args, timeout=float(args.get("timeout", 30)) + 30
+                    )
+                )
+            )
     return 0
 
 

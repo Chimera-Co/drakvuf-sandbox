@@ -60,8 +60,8 @@ def status():
 def providers_command(test_lookup):
     """Show key presence and optionally query the EICAR hash."""
     from drakrun.lib.intel.online import inventory, providers
-    from drakrun.lib.intel.online.cache import Cache
     from drakrun.lib.intel.online.base import key_exists
+    from drakrun.lib.intel.online.cache import Cache
 
     config = load_config().intel
     cache = Cache(config.cache_path) if test_lookup else None

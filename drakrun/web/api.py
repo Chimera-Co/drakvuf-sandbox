@@ -18,6 +18,7 @@ from drakrun.analyzer.postprocessing.plugins.build_chimera_report import (
     iocs_export,
 )
 from drakrun.analyzer.postprocessing.process_tree import tree_from_dict
+from drakrun.analyzer.static.worker import enqueue_static_only, stage_and_enqueue
 from drakrun.analyzer.worker import (
     analysis_job_to_metadata,
     enqueue_analysis,
@@ -25,7 +26,6 @@ from drakrun.analyzer.worker import (
     get_redis_connection,
     truncate_analysis_list,
 )
-from drakrun.analyzer.static.worker import enqueue_static_only, stage_and_enqueue
 from drakrun.lib.config import load_config
 from drakrun.lib.intel.online.options import OnlineAnalysisOptions
 from drakrun.lib.paths import STATIC_DIR, UPLOADS_DIR
@@ -92,7 +92,9 @@ def upload_sample(form: OnlineUploadForm):
 
     if form.guest_os in ("android", "ios") and form.mode != "static-only":
         return (
-            jsonify({"error": "mobile apps are analysed statically only (mode static-only)"}),
+            jsonify(
+                {"error": "mobile apps are analysed statically only (mode static-only)"}
+            ),
             400,
         )
     request_file = form.file

@@ -27,7 +27,9 @@ def queue_memdump_scan(context: PostprocessContext) -> None:
         analysis_id,
         job_id=f"static-memdumps-{analysis_id}",
         # The scan stops itself at the budget; the margin covers the one dump still running then.
-        job_timeout=int(settings.memdump_scan_budget_s + settings.timeout_s + GRACE_S + 300),
+        job_timeout=int(
+            settings.memdump_scan_budget_s + settings.timeout_s + GRACE_S + 300
+        ),
         result_ttl=3600,
         failure_ttl=7 * 24 * 3600,
     )

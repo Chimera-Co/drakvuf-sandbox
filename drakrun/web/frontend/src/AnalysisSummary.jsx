@@ -376,7 +376,10 @@ function SummaryTLSSection() {
                                     <pre>{failure.tls_error}</pre>
                                 </details>
                                 {processSeqids(failure).map((p) => (
-                                    <SummaryProcessBadge processId={p} key={p} />
+                                    <SummaryProcessBadge
+                                        processId={p}
+                                        key={p}
+                                    />
                                 ))}
                                 {failure.matched === false && (
                                     <div className="text-warning">

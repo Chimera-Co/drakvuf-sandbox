@@ -197,11 +197,17 @@
     transition: opacity 160ms ease;
 }
 
-.chimera-shell.is-rail:not(.is-peek) .sb-sidenav .sb-sidenav-menu .sb-sidenav-menu-heading {
+.chimera-shell.is-rail:not(.is-peek)
+    .sb-sidenav
+    .sb-sidenav-menu
+    .sb-sidenav-menu-heading {
     color: transparent;
 }
 
-.chimera-shell.is-rail:not(.is-peek) .sb-sidenav .sb-sidenav-menu .sb-sidenav-menu-heading::after {
+.chimera-shell.is-rail:not(.is-peek)
+    .sb-sidenav
+    .sb-sidenav-menu
+    .sb-sidenav-menu-heading::after {
     opacity: 1;
 }
 

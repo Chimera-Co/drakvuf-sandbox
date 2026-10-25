@@ -11,6 +11,7 @@ it should not use.
 
     python3 flatten_profile.py IN.json OUT.json [STRUCT ...]
 """
+
 import json
 import sys
 
@@ -26,7 +27,9 @@ def flatten(profile, only):
         for name, field in inner["fields"].items():
             offset = base_offset + field["offset"]
             if field.get("anonymous"):
-                yield from anonymous_fields(field["type"].get("name"), offset, depth + 1)
+                yield from anonymous_fields(
+                    field["type"].get("name"), offset, depth + 1
+                )
             else:
                 yield name, {**field, "offset": offset}
 
@@ -35,8 +38,13 @@ def flatten(profile, only):
         fields = struct.get("fields", {})
         extra = {}
         for field in list(fields.values()):
-            if field.get("anonymous") and field["type"].get("kind") in ("union", "struct"):
-                for name, flat in anonymous_fields(field["type"]["name"], field["offset"]):
+            if field.get("anonymous") and field["type"].get("kind") in (
+                "union",
+                "struct",
+            ):
+                for name, flat in anonymous_fields(
+                    field["type"]["name"], field["offset"]
+                ):
                     if name not in fields and name not in extra:
                         extra[name] = flat
         fields.update(extra)

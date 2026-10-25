@@ -8,14 +8,14 @@ import time
 
 from drakrun.evasion.constants import Category, CheckStatus, Severity, ToolStatus
 from drakrun.evasion.models import NormalizedCheck, ToolResult
-from drakrun.lib.linux_install import GUEST_AGENT_DIR, GUEST_WORK_DIR
-from drakrun.lib.paths import PACKAGE_DATA_PATH
 from drakrun.evasion.verifiers.base import (
     VerifierAdapter,
     VerifierError,
     VerifierTimeout,
     read_report_bytes,
 )
+from drakrun.lib.linux_install import GUEST_AGENT_DIR, GUEST_WORK_DIR
+from drakrun.lib.paths import PACKAGE_DATA_PATH
 
 TOOL_ID = "chimera-vmcheck"
 # Shipped with the other Linux guest assets (drakrun/data/linux)

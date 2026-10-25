@@ -101,7 +101,9 @@ def _iter_process_cmdlines() -> Iterator[Tuple[int, List[str]]]:
         except OSError:
             continue
         if raw:
-            yield int(entry.name), raw.rstrip(b"\0").decode(errors="replace").split("\0")
+            yield int(entry.name), raw.rstrip(b"\0").decode(errors="replace").split(
+                "\0"
+            )
 
 
 def find_device_models() -> Dict[int, int]:
@@ -151,14 +153,18 @@ def reap_device_models(domid: int, grace: float = DEVICE_MODEL_EXIT_GRACE) -> Li
     pids = [pid for pid, dm_domid in find_device_models().items() if dm_domid == domid]
     stuck = _wait_for_exit(pids, grace)
     for pid in stuck:
-        log.warning("Device model (pid %d) of domain %d did not exit, killing it", pid, domid)
+        log.warning(
+            "Device model (pid %d) of domain %d did not exit, killing it", pid, domid
+        )
         try:
             os.kill(pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
     still_alive = _wait_for_exit(stuck, grace)
     if still_alive:
-        raise RuntimeError(f"Device model(s) {still_alive} of domain {domid} survived SIGKILL")
+        raise RuntimeError(
+            f"Device model(s) {still_alive} of domain {domid} survived SIGKILL"
+        )
     return stuck
 
 

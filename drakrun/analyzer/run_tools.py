@@ -11,7 +11,11 @@ from rq import get_current_job
 
 from drakrun.analyzer.screenshotter import Screenshotter
 from drakrun.analyzer.startup_command import ExecParameters
-from drakrun.lib.config import NetworkConfigSection, ScreenshotConfigSection, load_config
+from drakrun.lib.config import (
+    NetworkConfigSection,
+    ScreenshotConfigSection,
+    load_config,
+)
 from drakrun.lib.drakvuf_cmdline import get_base_drakvuf_cmdline
 from drakrun.lib.install_info import InstallInfo
 from drakrun.lib.libvmi import VmiInfo

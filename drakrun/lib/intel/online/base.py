@@ -151,7 +151,11 @@ class Provider:
                 "reason": (
                     "bad key"
                     if error.code in (401, 403)
-                    else "not in the provider's data" if error.code == 404 else "HTTP failure"
+                    else (
+                        "not in the provider's data"
+                        if error.code == 404
+                        else "HTTP failure"
+                    )
                 ),
                 "http_status": error.code,
             }
