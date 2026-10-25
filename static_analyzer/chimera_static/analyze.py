@@ -13,7 +13,7 @@ from .safety import read_sample, write_output
 
 SEVERITY_POINTS = {"info": 0, "low": 4, "medium": 12, "high": 25}
 ML_FORMATS = {"pe", "elf", "pdf"}
-TYPE_PLUGINS = {"pe", "elf", "pdf", "ole", "ooxml", "zip"}
+TYPE_PLUGINS = {"pe", "elf", "pdf", "ole", "ooxml", "zip", "apk"}
 EMBER_MAX_BYTES = 128 * 1024 * 1024
 
 
@@ -144,6 +144,16 @@ def analyze(path: str, out_dir: str | None = None, file_name: str = "", timeout_
         if got:
             result[fmt], f = got
             result["findings"] += f
+    elif fmt == "apk":
+        from .plugins.apk import analyze_apk
+        got = stage("apk", lambda: analyze_apk(data), heavy=True)
+        if got:
+            result["apk"], f = got
+            result["findings"] += f
+        # The manifest, permissions and DEX strings are read; DEX code is not analyzed and APK signatures are
+        # parsed, not cryptographically verified.
+        result["errors"].append({"stage": "archive-contents",
+                                 "error": "DEX code is not decompiled or analyzed; signatures are not verified"})
     elif fmt == "zip":
         from .plugins.archive import analyze_zip
         got = stage("zip", lambda: analyze_zip(data), heavy=True)

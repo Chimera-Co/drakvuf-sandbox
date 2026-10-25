@@ -10,6 +10,7 @@ py-tlsh==4.7.2
 ssdeep==3.4            # built against Debian's libfuzzy (build stage); libfuzzy2 at runtime
 numpy==2.4.6            # thrember features
 oletools==0.60.2       # olevba macro indicators (no deobfuscation pass)
+androguard==4.1.4      # APK manifest, permissions, certificates, DEX string table (plugins/apk.py)
 scikit-learn==1.9.1     # thrember's FeatureHasher (same version as the classifier)
 # deep pass (chimera_static/deep.py): same capa as drakrun's memory-dump analysis, rules in capa-rules/
 flare-capa==7.4.0

@@ -24,7 +24,12 @@ from .safety import SampleError, harden_process, write_output  # noqa: E402
 
 # Import every parser *before* hardening (imports may start threads or read many files).
 from . import analyze as _analyze  # noqa: E402
-from .plugins import elf as _elf, pdf as _pdf, pe as _pe  # noqa: E402,F401
+from .plugins import archive as _archive, elf as _elf, office as _office, pdf as _pdf, pe as _pe  # noqa: E402,F401,E501
+
+try:
+    from .plugins import apk as _apk  # noqa: E402,F401  (androguard is large: load before hardening)
+except ImportError:  # pragma: no cover
+    pass
 from . import ember as _ember  # noqa: E402,F401
 from . import deep as _deep  # noqa: E402
 
