@@ -17,33 +17,41 @@ function DumpRow({ dump }) {
     const iocs = Object.values(dump.iocs || {}).flat();
     return (
         <tr>
-            <td className="text-nowrap">
-                <div className="fw-semibold">{dump.process || "–"}</div>
-                <div className="small text-muted">
-                    PID {dump.pid ?? "–"}
+            <td>
+                <div className="fw-semibold text-break" title={dump.process}>
+                    {dump.process?.split("\\").pop() || "–"}
                     {dump.sample_tree ? (
                         <span className="badge bg-primary ms-1">sample</span>
                     ) : null}
                 </div>
-            </td>
-            <td>
-                <div>{dump.reason || "–"}</div>
-                <div className="small text-muted font-monospace">
+                <div className="small text-muted">
+                    PID {dump.pid ?? "–"} · {dump.reason || "–"}
+                </div>
+                <div className="small text-muted font-monospace text-break">
                     {dump.address || ""}
                 </div>
+                <div className="small text-muted">
+                    {dump.format || "–"}
+                    {dump.pe_kind ? ` · ${dump.pe_kind}` : ""} ·{" "}
+                    {size(dump.size)}
+                </div>
+                <div
+                    className="small font-monospace text-muted"
+                    title={dump.sha256}
+                >
+                    {dump.sha256?.slice(0, 16)}
+                </div>
             </td>
-            <td className="text-nowrap">
-                {dump.format || "–"}
-                {dump.pe_kind ? ` · ${dump.pe_kind}` : ""}
-                <div className="small text-muted">{size(dump.size)}</div>
-            </td>
-            <td className={`text-nowrap ${LEVEL_CLASS[dump.level] || ""}`}>
+            <td className={LEVEL_CLASS[dump.level] || ""}>
                 {dump.error ? (
                     <span className="text-warning-emphasis" title={dump.error}>
                         error
                     </span>
                 ) : (
-                    `${dump.level || "–"} · ${dump.score ?? "–"}`
+                    <>
+                        <div className="fw-semibold">{dump.level || "–"}</div>
+                        <div className="small">{dump.score ?? "–"}/100</div>
+                    </>
                 )}
             </td>
             <td>
@@ -72,9 +80,6 @@ function DumpRow({ dump }) {
                         {iocs.join(", ")}
                     </div>
                 ) : null}
-            </td>
-            <td className="small font-monospace text-muted" title={dump.sha256}>
-                {dump.sha256?.slice(0, 12)}
             </td>
         </tr>
     );
@@ -132,16 +137,18 @@ export default function MemoryDumps({ analysisId }) {
                 <div className="table-responsive">
                     <table
                         aria-label="Scanned memory dumps"
-                        className="table table-sm align-top"
+                        className="table table-sm align-top memdump-table"
                     >
+                        <colgroup>
+                            <col style={{ width: "14rem" }} />
+                            <col style={{ width: "6rem" }} />
+                            <col />
+                        </colgroup>
                         <thead>
                             <tr>
-                                <th>Process</th>
-                                <th>Reason · address</th>
-                                <th>Format</th>
+                                <th>Dump</th>
                                 <th>Assessment</th>
                                 <th>YARA · findings · IOCs</th>
-                                <th>SHA-256</th>
                             </tr>
                         </thead>
                         <tbody>

@@ -62,7 +62,7 @@ describe("memory dumps", () => {
         expect(within(rows[1]).getByText("CobaltStrike_Beacon")).toBeTruthy();
         expect(within(rows[1]).getByText("sample")).toBeTruthy();
         expect(within(rows[1]).getByText("evil.test")).toBeTruthy();
-        expect(within(rows[2]).getByText("4 KiB")).toBeTruthy();
+        expect(within(rows[2]).getByText(/4 KiB/)).toBeTruthy();
     });
     it("explains a missing scan", async () => {
         getMemdumps.mockRejectedValue({ response: { status: 404 } });
