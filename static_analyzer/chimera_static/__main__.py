@@ -2,6 +2,8 @@
 
     python -I -m chimera_static /in/sample /out --name invoice.exe --timeout 60
 
+    python -I -m chimera_static /in/sample /out --deep --timeout 240     (capa + FLOSS -> /out/deep.json)
+
 Writes /out/static.json. Exit 0 = written (even if some stages failed, see "errors"),
 2 = the sample was refused (not a regular file, unreadable), 3 = internal error.
 """
@@ -24,6 +26,13 @@ from .safety import SampleError, harden_process, write_output  # noqa: E402
 from . import analyze as _analyze  # noqa: E402
 from .plugins import elf as _elf, pdf as _pdf, pe as _pe  # noqa: E402,F401
 from . import ember as _ember  # noqa: E402,F401
+from . import deep as _deep  # noqa: E402
+
+try:  # the deep tools are large; load them now, while threads and file opens are still allowed
+    import capa.main  # noqa: E402,F401
+    import floss.main  # noqa: E402,F401
+except ImportError:  # pragma: no cover - images without the deep tools
+    pass
 
 
 def main(argv=None) -> int:
@@ -35,8 +44,24 @@ def main(argv=None) -> int:
     ap.add_argument("--memory-mb", type=int, default=2048)
     ap.add_argument("--no-ember", action="store_true")
     ap.add_argument("--no-signature", action="store_true")
+    ap.add_argument("--deep", action="store_true", help="capa + FLOSS instead of the fast pass")
     a = ap.parse_args(argv)
     hardening = harden_process(cpu_seconds=int(a.timeout) + 10, memory_bytes=a.memory_mb * 1024 * 1024)
+    if a.deep:
+        try:
+            _deep.run_deep(a.sample, a.out_dir, file_name=a.name, timeout_s=a.timeout)
+            return 0
+        except SampleError as exc:
+            code, error = 2, str(exc)
+        except Exception as exc:  # pragma: no cover - last resort
+            code, error = 3, f"{type(exc).__name__}: {str(exc)[:500]}"
+        failed = {"schema": _deep.SCHEMA, "analyzer_version": ANALYZER_VERSION, "error": error}
+        try:
+            write_output(os.path.join(a.out_dir, "deep.json"), json.dumps(failed).encode())
+        except OSError:
+            pass
+        print(error, file=sys.stderr)
+        return code
     try:
         _analyze.analyze(a.sample, a.out_dir, file_name=a.name, timeout_s=a.timeout,
                          verify_signature=not a.no_signature, ember=not a.no_ember, hardening=hardening)

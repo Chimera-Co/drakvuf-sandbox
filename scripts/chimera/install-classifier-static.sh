@@ -112,8 +112,9 @@ fi
 say "Installing the static worker service"
 install -d "$SYSTEMD_DIR"
 install -m 644 scripts/chimera/systemd/drakrun-static-worker.service "$SYSTEMD_DIR"/
+install -m 644 scripts/chimera/systemd/drakrun-static-deep-worker.service "$SYSTEMD_DIR"/
 $SYSTEMCTL daemon-reload
-$SYSTEMCTL enable drakrun-static-worker.service
+$SYSTEMCTL enable drakrun-static-worker.service drakrun-static-deep-worker.service
 
 say "Checking $CONFIG"
 cp -a "$CONFIG" "$CONFIG.bak-$STAMP"
@@ -134,7 +135,7 @@ else:
         print(f"WARNING: [classifier] model_path is {c.get('model_path')!r}: analyses use the stub model "
               f"until it is set to {clf_dir}/model.py")
 if "static" not in cfg:
-    add.append(f'\n[static]\nenabled = true\nengine = "{engine}"\nimage = "{image}"\ntimeout_s = 90\nwait_s = 120\n')
+    add.append(f'\n[static]\nenabled = true\nengine = "{engine}"\nimage = "{image}"\ntimeout_s = 90\nwait_s = 120\ndeep_enabled = true\n')
 elif not cfg["static"].get("enabled"):
     print("NOTE: [static] enabled is not true: set it to run static analysis")
 if add:
@@ -147,7 +148,7 @@ EOF
 
 if [[ $RESTART -eq 1 ]]; then
   say "Restarting CHIMERA services (make sure no analysis is running)"
-  $SYSTEMCTL restart drakrun-static-worker.service
+  $SYSTEMCTL restart drakrun-static-worker.service drakrun-static-deep-worker.service
   $SYSTEMCTL restart drakrun-web.service || true
   for unit in $(systemctl list-units --plain --no-legend 'drakrun-worker@*' 2>/dev/null | awk '{print $1}'); do $SYSTEMCTL restart "$unit"; done
 else

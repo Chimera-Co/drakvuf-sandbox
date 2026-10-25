@@ -27,21 +27,26 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 SCHEMA = "chimera-static/1"
+DEEP_SCHEMA = "chimera-deep/1"
 GRACE_S = 30  # wall-clock allowance on top of the analyzer's own timeout
 
 
-def container_name(analysis_id: str) -> str:
-    return f"chimera-static-{uuid.UUID(analysis_id)}"
+def container_name(analysis_id: str, deep: bool = False) -> str:
+    return f"chimera-static-{uuid.UUID(analysis_id)}" + ("-deep" if deep else "")
 
 
-def build_command(settings, analysis_id: str, sample: Path, out_dir: Path, file_name: str) -> list[str]:
-    """The full container command line. Every isolation flag lives here."""
+def build_command(settings, analysis_id: str, sample: Path, out_dir: Path, file_name: str,
+                  deep: bool = False) -> list[str]:
+    """The full container command line. Every isolation flag lives here; the deep pass only changes time,
+    memory and the --deep switch."""
     sample_opts = "ro,noexec,nosuid,nodev" if settings.engine == "podman" else "ro"
     out_opts = "rw,noexec,nosuid,nodev" if settings.engine == "podman" else "rw"
-    memory = f"{settings.memory_mb}m"
+    memory_mb = settings.deep_memory_mb if deep else settings.memory_mb
+    timeout_s = settings.deep_timeout_s if deep else settings.timeout_s
+    memory = f"{memory_mb}m"
     return [
         settings.engine, "run", "--rm",
-        "--name", container_name(analysis_id),
+        "--name", container_name(analysis_id, deep),
         "--network", "none",                       # no network at all
         "--read-only",                             # read-only root filesystem
         "--cap-drop", "ALL",                       # no Linux capabilities
@@ -58,9 +63,9 @@ def build_command(settings, analysis_id: str, sample: Path, out_dir: Path, file_
         settings.image,
         "/in/sample", "/out",
         "--name", file_name[:255],
-        "--timeout", str(int(settings.timeout_s)),
-        "--memory-mb", str(settings.memory_mb),
-    ]
+        "--timeout", str(int(timeout_s)),
+        "--memory-mb", str(memory_mb),
+    ] + (["--deep"] if deep else [])
 
 
 def stage_sample(source: Path, job_dir: Path, settings) -> Path:
@@ -94,34 +99,36 @@ def _prepare_out(job_dir: Path, settings) -> Path:
     return out
 
 
-def run_in_container(settings, analysis_id: str, job_dir: Path, file_name: str) -> dict:
-    """Run the analyzer; return the parsed, validated static.json (or an error document)."""
+def run_in_container(settings, analysis_id: str, job_dir: Path, file_name: str, deep: bool = False) -> dict:
+    """Run the analyzer; return the parsed, validated static.json, or deep.json with deep=True (or an error
+    document)."""
+    schema, output = (DEEP_SCHEMA, "deep.json") if deep else (SCHEMA, "static.json")
     staged = job_dir / "in" / "sample"
     out = _prepare_out(job_dir, settings)
-    command = build_command(settings, analysis_id, staged, out, file_name)
-    wall = settings.timeout_s + GRACE_S
+    command = build_command(settings, analysis_id, staged, out, file_name, deep)
+    wall = (settings.deep_timeout_s if deep else settings.timeout_s) + GRACE_S
     try:
         proc = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                               stderr=subprocess.PIPE, timeout=wall)
         status = {"exit_code": proc.returncode, "stderr": proc.stderr.decode("utf-8", "replace")[-2000:]}
     except subprocess.TimeoutExpired:
-        subprocess.run([settings.engine, "kill", container_name(analysis_id)],
+        subprocess.run([settings.engine, "kill", container_name(analysis_id, deep)],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
-        subprocess.run([settings.engine, "rm", "-f", container_name(analysis_id)],
+        subprocess.run([settings.engine, "rm", "-f", container_name(analysis_id, deep)],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
-        return {"schema": SCHEMA, "error": f"static analysis timed out after {wall:.0f}s"}
+        return {"schema": schema, "error": f"static analysis timed out after {wall:.0f}s"}
     except FileNotFoundError:
-        return {"schema": SCHEMA, "error": f"container engine {settings.engine!r} not installed"}
-    result_path = out / "static.json"
+        return {"schema": schema, "error": f"container engine {settings.engine!r} not installed"}
+    result_path = out / output
     try:
         if result_path.is_symlink() or not result_path.is_file():
-            raise ValueError("no static.json written")
+            raise ValueError(f"no {output} written")
         if result_path.stat().st_size > settings.max_output_bytes:
-            raise ValueError("static.json too large")
+            raise ValueError(f"{output} too large")
         result = json.loads(result_path.read_bytes())
-        if not isinstance(result, dict) or result.get("schema") != SCHEMA:
-            raise ValueError("static.json has the wrong schema")
+        if not isinstance(result, dict) or result.get("schema") != schema:
+            raise ValueError(f"{output} has the wrong schema")
     except (OSError, ValueError) as exc:
-        return {"schema": SCHEMA, "error": f"{exc}", "container": status}
+        return {"schema": schema, "error": f"{exc}", "container": status}
     result["container"] = {"engine": settings.engine, "image": settings.image, **status}
     return result

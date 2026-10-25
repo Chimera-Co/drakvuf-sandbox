@@ -26,10 +26,21 @@ COPY --from=build /wheels /tmp/wheels
 RUN pip install --no-index --find-links /tmp/wheels /tmp/wheels/*.whl && pip install pytest==8.3.5
 COPY rules /opt/chimera-static/rules
 RUN python -I -m chimera_static.rules_build /opt/chimera-static/rules /opt/chimera-static/rules.yarc
+# capa rules (pinned, capa-rules/SOURCE.json) and a pre-built rule cache: the runtime root is read-only.
+# No library signatures are shipped (capa's FLIRT .sig files are not in the pip package): deep.json says so.
+ENV CHIMERA_CAPA_RULES=/opt/chimera-static/capa-rules CHIMERA_CAPA_SIGS=/opt/chimera-static/capa-sigs \
+    XDG_CACHE_HOME=/opt/chimera-static/capa-cache
+COPY capa-rules /opt/chimera-static/capa-rules
+COPY tests/fixtures/test.exe /tmp/warm.exe
+RUN mkdir -p /opt/chimera-static/capa-sigs /opt/chimera-static/capa-cache \
+ && capa -q -j -r /opt/chimera-static/capa-rules -s /opt/chimera-static/capa-sigs /tmp/warm.exe > /dev/null \
+ && test -n "$(ls /opt/chimera-static/capa-cache)" && rm /tmp/warm.exe
 COPY rules /src/rules
 COPY tests /src/tests
 WORKDIR /src
-RUN python -m pytest -q -p no:cacheprovider tests
+# extra pytest arguments for development, e.g. --build-arg PYTEST_ARGS="-k deep"
+ARG PYTEST_ARGS=""
+RUN python -m pytest -q -p no:cacheprovider tests $PYTEST_ARGS
 
 # ---- runtime stage: no compiler, no pip, nothing writable
 FROM docker.io/library/python:3.11-slim-bookworm
@@ -52,6 +63,16 @@ RUN pip install --no-index --find-links /tmp/wheels /tmp/wheels/*.whl \
 # rules.yarc.json records the rule count and each ruleset's pin (rules/<name>/SOURCE.json).
 COPY rules /opt/chimera-static/rules
 RUN python -I -m chimera_static.rules_build /opt/chimera-static/rules /opt/chimera-static/rules.yarc
+
+# capa rules (pinned, capa-rules/SOURCE.json) and a pre-built rule cache: the runtime root is read-only.
+# No library signatures are shipped (capa's FLIRT .sig files are not in the pip package): deep.json says so.
+ENV CHIMERA_CAPA_RULES=/opt/chimera-static/capa-rules CHIMERA_CAPA_SIGS=/opt/chimera-static/capa-sigs \
+    XDG_CACHE_HOME=/opt/chimera-static/capa-cache
+COPY capa-rules /opt/chimera-static/capa-rules
+COPY tests/fixtures/test.exe /tmp/warm.exe
+RUN mkdir -p /opt/chimera-static/capa-sigs /opt/chimera-static/capa-cache \
+ && capa -q -j -r /opt/chimera-static/capa-rules -s /opt/chimera-static/capa-sigs /tmp/warm.exe > /dev/null \
+ && test -n "$(ls /opt/chimera-static/capa-cache)" && rm /tmp/warm.exe
 
 USER 65534:65534
 WORKDIR /

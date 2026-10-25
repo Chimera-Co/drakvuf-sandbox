@@ -2,4 +2,5 @@
 __pycache__
 *.egg-info
 build
-# tests/ stays in the build context for the "test" stage; the runtime stage never copies it.
+# tests/ stays in the build context for the "test" stage; the runtime stage copies only tests/fixtures/test.exe
+# (a benign test program) to warm the capa rule cache, then deletes it.

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import {
     render,
     screen,
@@ -7,12 +7,21 @@ import {
     within,
     fireEvent,
 } from "@testing-library/react";
-import { StaticAnalysisTab, VerdictCard } from "./AnalysisVerdict.jsx";
-import { getClassification, getStaticReport } from "./api.js";
+import {
+    DeepSection,
+    StaticAnalysisTab,
+    VerdictCard,
+} from "./AnalysisVerdict.jsx";
+import { getClassification, getDeepStatic, getStaticReport } from "./api.js";
 
 vi.mock("./api.js");
 
 const ID = "11111111-1111-4111-8111-111111111111";
+
+// The deep pass is a separate request; unless a test says otherwise it has not run yet.
+beforeEach(() => {
+    getDeepStatic.mockRejectedValue({ response: { status: 404 } });
+});
 
 describe("VerdictCard", () => {
     it("shows the combined verdict and each component", async () => {
@@ -330,5 +339,62 @@ describe("static hashes", () => {
         expect(screen.getAllByText("not computed")).toHaveLength(3);
         fireEvent.click(screen.getByRole("button", { name: "Copy SHA-256" }));
         expect(await screen.findByText(/Copy unavailable/)).toBeTruthy();
+    });
+});
+
+describe("deep pass", () => {
+    it("lists capa capabilities and FLOSS strings", async () => {
+        getDeepStatic.mockResolvedValue({
+            schema: "chimera-deep/1",
+            errors: [{ stage: "floss", error: "timed out after 90s" }],
+            capa: {
+                version: "7.4.0",
+                rules_total: 1,
+                library_signatures: false,
+                rules: [
+                    {
+                        name: "inject thread",
+                        namespace: "host-interaction/process/inject",
+                        attack: ["T1055"],
+                        mbc: ["E1055"],
+                    },
+                ],
+            },
+            floss: {
+                version: "3.2.0",
+                stack: { count: 1, sample: ["kernel32.dll"] },
+                tight: { count: 0, sample: [] },
+                decoded: { count: 0, sample: [] },
+            },
+        });
+        render(<DeepSection analysisId={ID} />);
+        const block = await screen.findByRole("region", {
+            name: "Capabilities",
+        });
+        expect(within(block).getByText("inject thread")).toBeTruthy();
+        expect(within(block).getByText("T1055")).toBeTruthy();
+        expect(within(block).getByText(/no signatures/)).toBeTruthy();
+        expect(within(block).getByText("Stack strings (1)")).toBeTruthy();
+        expect(
+            within(block).getByText("floss: timed out after 90s"),
+        ).toBeTruthy();
+    });
+
+    it("waits while the deep pass has not run", async () => {
+        getDeepStatic.mockRejectedValue({ response: { status: 404 } });
+        render(<DeepSection analysisId={ID} />);
+        expect(
+            await screen.findByText(/capa and FLOSS run after/),
+        ).toBeTruthy();
+    });
+
+    it("is shown only for PE and ELF files", async () => {
+        getDeepStatic.mockRejectedValue({ response: { status: 404 } });
+        getStaticReport.mockResolvedValue({ type: { format: "pdf" } });
+        render(<StaticAnalysisTab analysisId={ID} />);
+        await screen.findByText("Findings (0)");
+        expect(
+            screen.queryByRole("region", { name: "Capabilities" }),
+        ).toBeNull();
     });
 });

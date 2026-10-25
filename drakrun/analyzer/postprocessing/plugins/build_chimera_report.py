@@ -164,7 +164,89 @@ def _stage_static(static, ev: _Evidence) -> dict:
     }
 
 
-def build_report(analysis_dir: pathlib.Path) -> dict:
+def _stage_deep(deep, ev: "_Evidence", claim, attack: list) -> dict:
+    """capa + FLOSS (deep.json beside static.json). Informational: it never changes completeness."""
+    if not isinstance(deep, dict):
+        return {
+            "status": "unavailable",
+            "reason": "no deep pass (off, not a PE/ELF file, or still running)",
+            "producer": {},
+            "payload": None,
+            "evidence_ids": [],
+        }
+    producer = {
+        "name": "chimera-static --deep",
+        "capa": (deep.get("capa") or {}).get("version"),
+        "floss": (deep.get("floss") or {}).get("version"),
+    }
+    eid = ev.add("deep.json", "", "chimera-static:deep")
+    if deep.get("error"):
+        return {
+            "status": "failed",
+            "reason": str(deep["error"])[:300],
+            "producer": producer,
+            "payload": None,
+            "evidence_ids": [eid],
+        }
+    capa = deep.get("capa") or {}
+    rules = capa.get("rules") or []
+    if rules:
+        c_eid = ev.add("deep.json", "/capa/rules", "capa")
+        claim(
+            "capa",
+            f"capa matched {capa.get('rules_total', len(rules))} capabilit(y/ies) in the code: "
+            + ", ".join(r.get("name", "?") for r in rules[:8])
+            + (" ..." if len(rules) > 8 else ""),
+            "observed",
+            "medium",
+            [c_eid],
+            rationale="Code patterns found by disassembly (capa rules), not observed running."
+            + (
+                ""
+                if capa.get("library_signatures")
+                else " Library code is not filtered out (no signatures)."
+            ),
+        )
+        for i, r in enumerate(rules):
+            for tech in r.get("attack") or []:
+                attack.append(
+                    {
+                        "technique": tech,
+                        "name": r.get("name"),
+                        "source": "capa",
+                        "evidence_ids": [
+                            ev.add("deep.json", f"/capa/rules/{i}", "capa")
+                        ],
+                    }
+                )
+    floss = deep.get("floss") or {}
+    decoded = sum(
+        (floss.get(k) or {}).get("count", 0) for k in ("stack", "tight", "decoded")
+    )
+    if decoded:
+        claim(
+            "floss",
+            f"FLOSS recovered {decoded} hidden string(s) (stack, tight or decoded)",
+            "observed",
+            "medium",
+            [ev.add("deep.json", "/floss", "floss")],
+            rationale="Strings the program builds at run time, recovered by emulating its code.",
+        )
+    errors = deep.get("errors") or []
+    status = "ok" if not errors else "partial"
+    return {
+        "status": status,
+        "reason": "; ".join(f"{e.get('stage')}: {e.get('error')}" for e in errors)[:300]
+        or None,
+        "producer": producer,
+        "payload": {"capabilities": capa.get("rules_total"), "hidden_strings": decoded},
+        "evidence_ids": [eid],
+    }
+
+
+def build_report(
+    analysis_dir: pathlib.Path, static_dir: Optional[pathlib.Path] = None
+) -> dict:
     analysis_dir = pathlib.Path(analysis_dir)
     loaded = {
         name: _read(analysis_dir / name)
@@ -175,8 +257,15 @@ def build_report(analysis_dir: pathlib.Path) -> dict:
             "classification.json",
         )
     }
-    hashes = {name: digest for name, (_, digest) in loaded.items() if digest}
     meta = loaded["metadata.json"][0] or {}
+    if static_dir is None:
+        from drakrun.lib.paths import STATIC_DIR as static_dir
+    loaded["deep.json"] = _read(
+        pathlib.Path(static_dir)
+        / str(meta.get("id") or analysis_dir.name)
+        / "deep.json"
+    )
+    hashes = {name: digest for name, (_, digest) in loaded.items() if digest}
     report = loaded["report.json"][0] or {}
     features = loaded["features.json"][0] or {}
     verdict = loaded["classification.json"][0]
@@ -455,6 +544,8 @@ def build_report(analysis_dir: pathlib.Path) -> dict:
                 }
             )
 
+    deep_stage = _stage_deep(loaded["deep.json"][0], ev, claim, attack)
+
     # ---- classifier
     if isinstance(verdict, dict):
         v_eid = ev.add("classification.json", "", "chimera-fusion")
@@ -551,6 +642,7 @@ def build_report(analysis_dir: pathlib.Path) -> dict:
         "static": static_stage,
         "dynamic": dynamic_stage,
         "classifier": classifier_stage,
+        "deep": deep_stage,
         "intel": {
             "status": "unavailable",
             "reason": "no threat-intelligence lookup in this version",
@@ -603,7 +695,7 @@ def build_report(analysis_dir: pathlib.Path) -> dict:
             if all(
                 s["status"] in ("ok", "not_requested")
                 for k, s in stages.items()
-                if k != "intel"
+                if k not in ("intel", "deep")
             )
             else "partial"
         )

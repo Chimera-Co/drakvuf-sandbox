@@ -118,6 +118,11 @@ class StaticConfigSection(BaseModel):
     # How long classify_sample waits for static.json once the detonation has finished.
     wait_s: float = Field(default=120, ge=0, allow_inf_nan=False)
     max_output_bytes: int = 32 * 1024 * 1024
+    # Deep pass (capa + FLOSS) for PE and ELF files, after the fast pass, on its own queue and worker
+    # (`drakrun static-worker --deep`), so it never delays the fast result or the verdict.
+    deep_enabled: bool = False
+    deep_timeout_s: float = Field(default=240, gt=0, allow_inf_nan=False)
+    deep_memory_mb: int = Field(default=2048, ge=512)
 
 
 class MemdumpConfigSection(BaseModel):

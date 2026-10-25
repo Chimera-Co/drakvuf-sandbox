@@ -423,6 +423,18 @@ def static_analysis(path: AnalysisRequestPath):
     )
 
 
+@api.get("/static/<task_uid>/deep", responses={404: APIErrorResponse})
+def static_deep(path: AnalysisRequestPath):
+    """Deep static pass (chimera-deep/1: capa + FLOSS); 404 until it has run, or when it does not apply."""
+    return send_entity_file(
+        path.task_uid,
+        "deep.json",
+        "application/json",
+        None,  # static reports always stay on the host (not in S3)
+        base_dir=STATIC_DIR,
+    )
+
+
 @api.get("/features/<task_uid>", responses={404: APIErrorResponse})
 def features(path: AnalysisRequestPath):
     return send_analysis_file(

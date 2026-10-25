@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getClassification, getStaticReport } from "./api.js";
+import { getClassification, getDeepStatic, getStaticReport } from "./api.js";
 
 const LABEL_CLASS = {
     malicious: "bg-danger",
@@ -235,6 +235,135 @@ function HashValue({ label, value }) {
     );
 }
 
+function DeepStrings({ label, block }) {
+    if (!block?.count) return null;
+    return (
+        <details className="mb-2">
+            <summary>
+                {label} ({block.count})
+            </summary>
+            <ul className="small font-monospace text-break mb-0">
+                {(block.sample || []).map((value, idx) => (
+                    <li key={idx}>{value}</li>
+                ))}
+            </ul>
+        </details>
+    );
+}
+
+export function DeepSection({ analysisId }) {
+    const { loading, data, missing, polling, error } = useOptionalJson(
+        getDeepStatic,
+        analysisId,
+    );
+    let body;
+    if (loading) body = <div className="text-muted">Loading...</div>;
+    else if (missing)
+        body = (
+            <div className="text-muted">
+                {polling
+                    ? "Not run yet: capa and FLOSS run after the fast pass (this updates by itself)."
+                    : "No deep pass for this analysis (off on this server, or it has not finished)."}
+            </div>
+        );
+    else if (error)
+        body = <div className="text-danger">Error: {error.toString()}</div>;
+    else if (data.error)
+        body = (
+            <div className="text-danger">Deep pass failed: {data.error}</div>
+        );
+    else {
+        const capa = data.capa;
+        const floss = data.floss;
+        const hidden = floss
+            ? ["stack", "tight", "decoded"].reduce(
+                  (sum, kind) => sum + (floss[kind]?.count || 0),
+                  0,
+              )
+            : 0;
+        body = (
+            <>
+                {capa ? (
+                    <>
+                        <div className="small text-muted mb-1">
+                            capa {capa.version}: {capa.rules_total} capabilities
+                            {capa.library_signatures
+                                ? ""
+                                : " (library code not filtered: no signatures)"}
+                        </div>
+                        {capa.rules?.length ? (
+                            <table className="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Capability</th>
+                                        <th>Namespace</th>
+                                        <th>ATT&amp;CK</th>
+                                        <th>MBC</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {capa.rules.map((rule) => (
+                                        <tr key={rule.name}>
+                                            <td>{rule.name}</td>
+                                            <td className="small text-muted">
+                                                {rule.namespace}
+                                            </td>
+                                            <td className="small">
+                                                {(rule.attack || []).join(", ")}
+                                            </td>
+                                            <td className="small">
+                                                {(rule.mbc || []).join(", ")}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        ) : (
+                            <div className="text-muted mb-2">
+                                No capabilities matched.
+                            </div>
+                        )}
+                    </>
+                ) : null}
+                {floss ? (
+                    <>
+                        <div className="small text-muted mb-1">
+                            FLOSS {floss.version}: {hidden} hidden strings
+                        </div>
+                        <DeepStrings
+                            label="Stack strings"
+                            block={floss.stack}
+                        />
+                        <DeepStrings
+                            label="Tight strings"
+                            block={floss.tight}
+                        />
+                        <DeepStrings
+                            label="Decoded strings"
+                            block={floss.decoded}
+                        />
+                    </>
+                ) : null}
+                {data.errors?.length ? (
+                    <ul className="small text-warning-emphasis">
+                        {data.errors.map((entry, idx) => (
+                            <li key={idx}>
+                                {entry.stage}: {entry.error}
+                            </li>
+                        ))}
+                    </ul>
+                ) : null}
+            </>
+        );
+    }
+    return (
+        <section aria-label="Capabilities" className="mb-3">
+            <h6>Capabilities and hidden strings (capa, FLOSS)</h6>
+            {body}
+        </section>
+    );
+}
+
 export function StaticAnalysisTab({ analysisId }) {
     const { loading, data, missing, polling, error } = useOptionalJson(
         getStaticReport,
@@ -380,6 +509,9 @@ export function StaticAnalysisTab({ analysisId }) {
             ) : (
                 <div className="text-muted">No findings.</div>
             )}
+            {["pe", "elf"].includes(type.format) ? (
+                <DeepSection analysisId={analysisId} />
+            ) : null}
             {data.errors?.length ? (
                 <>
                     <h6>Analyzer errors</h6>

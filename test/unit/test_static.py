@@ -30,9 +30,18 @@ FAKE_ENGINE = textwrap.dedent("""\
     mode = os.environ.get("FAKE_MODE", "ok")
     if mode == "sleep":
         time.sleep(5)
+    elif "--deep" in args:
+        json.dump({{"schema": "chimera-deep/1", "format": "pe", "errors": [],
+                   "capa": {{"version": "7.4.0", "rules_total": 1, "library_signatures": False,
+                            "rules": [{{"name": "write file on Windows", "namespace": "host-interaction/file-system",
+                                       "attack": ["T1105"], "mbc": [], "matches": 1}}]}},
+                   "floss": {{"version": "3.2.0", "stack": {{"count": 0, "sample": []}},
+                             "tight": {{"count": 0, "sample": []}}, "decoded": {{"count": 2, "sample": ["a", "b"]}}}}}},
+                  open(os.path.join(out, "deep.json"), "w"))
     elif mode == "ok":
         data = open(sample, "rb").read()
-        json.dump({{"schema": "chimera-static/1", "score": 12, "level": "clean", "size": len(data)}},
+        json.dump({{"schema": "chimera-static/1", "score": 12, "level": "clean", "size": len(data),
+                   "type": {{"format": os.environ.get("FAKE_FORMAT", "pe")}}}},
                   open(os.path.join(out, "static.json"), "w"))
     elif mode == "wrong":
         json.dump({{"schema": "other"}}, open(os.path.join(out, "static.json"), "w"))
@@ -173,3 +182,71 @@ def test_static_api_route(monkeypatch, base_config, tmp_path):
     assert response.status_code == 200 and response.json == {"schema": "chimera-static/1"}
     assert client.get("/api/static/not-a-uuid").status_code in (400, 422)
     sys.modules.pop("drakrun.web.api", None)
+
+
+def test_deep_command_only_changes_time_memory_and_switch(tmp_path, settings):
+    fast = sandbox.build_command(settings, AID, tmp_path / "s", tmp_path / "o", "x")
+    deep = sandbox.build_command(settings, AID, tmp_path / "s", tmp_path / "o", "x", deep=True)
+    assert deep[-1] == "--deep" and deep[deep.index("--name") + 1].endswith("-deep")
+    assert deep[deep.index("--timeout") + 1] == str(int(settings.deep_timeout_s))
+    isolation = [a for a in fast if a.startswith("--") and a not in ("--name", "--timeout", "--memory-mb")]
+    assert [a for a in deep if a in isolation] == isolation
+
+
+@pytest.mark.parametrize("enabled,fmt,queued", [(True, "pe", True), (True, "pdf", False), (False, "pe", False)])
+def test_deep_pass_is_queued_only_for_pe_elf_when_enabled(tmp_path, settings, engine, monkeypatch, enabled, fmt,
+                                                           queued):
+    from drakrun.analyzer.static import worker
+
+    settings = settings.model_copy(update={"deep_enabled": enabled})
+    monkeypatch.setenv("FAKE_MODE", "ok")
+    monkeypatch.setenv("FAKE_FORMAT", fmt)
+    monkeypatch.setattr(worker, "load_config", lambda: type("C", (), {"static": settings})())
+    calls = []
+
+    class FakeQueue:
+        def __init__(self, name, connection):
+            calls.append(name)
+
+        def enqueue(self, *args, **kwargs):
+            calls.append(kwargs["job_id"])
+
+    monkeypatch.setattr(worker, "Queue", FakeQueue)
+    monkeypatch.setattr("rq.get_current_job", lambda: type("J", (), {"connection": object()})())
+    staged(tmp_path, settings)
+    worker.run_static_job(AID, "x", str(tmp_path / "static"))
+    assert bool(calls) == queued
+    assert (tmp_path / "static" / AID / "in" / "sample").exists() == queued
+    if queued:
+        assert calls == [worker.DEEP_QUEUE_NAME, f"static-deep-{AID}"]
+
+
+def test_deep_job_writes_result_and_removes_the_sample(tmp_path, settings, engine, monkeypatch):
+    from drakrun.analyzer.static import worker
+
+    monkeypatch.setattr(worker, "load_config", lambda: type("C", (), {"static": settings})())
+    staged(tmp_path, settings)
+    assert worker.run_deep_job(AID, "x", str(tmp_path / "static"))["error"] is None
+    deep = worker.load_deep(AID, tmp_path / "static")
+    assert deep["capa"]["rules"][0]["name"] == "write file on Windows"
+    assert not (tmp_path / "static" / AID / "in").exists()
+
+
+def test_report_includes_the_deep_pass(tmp_path):
+    from drakrun.analyzer.postprocessing.plugins.build_chimera_report import build_report
+
+    analysis = tmp_path / "analyses" / AID
+    analysis.mkdir(parents=True)
+    (analysis / "metadata.json").write_text(json.dumps({"id": AID, "status": "finished"}))
+    static_dir = tmp_path / "static"
+    (static_dir / AID).mkdir(parents=True)
+    deep = {"schema": "chimera-deep/1", "errors": [], "capa": {"version": "7.4.0", "rules_total": 1,
+            "rules": [{"name": "inject thread", "attack": ["T1055"]}]}, "floss": {"decoded": {"count": 3}}}
+    (static_dir / AID / "deep.json").write_text(json.dumps(deep))
+    r = build_report(analysis, static_dir=static_dir)
+    assert r["stages"]["deep"]["status"] == "ok"
+    assert {c["id"] for c in r["claims"]} >= {"capa", "floss"}
+    assert {"technique": "T1055", "source": "capa"}.items() <= next(a for a in r["attack"] if a["source"] == "capa").items()
+    assert any(e["artifact"] == "deep.json" and e["sha256"] != "0" * 64 for e in r["evidence"])
+    missing = build_report(analysis, static_dir=tmp_path / "none")
+    assert missing["stages"]["deep"]["status"] == "unavailable"

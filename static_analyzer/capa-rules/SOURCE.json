@@ -1,0 +1,9 @@
+{
+ "name": "capa-rules",
+ "upstream": "https://github.com/mandiant/capa-rules",
+ "commit": "64b174e50253cbd506df40e7728531b801636a56",
+ "licence": "Apache-2.0",
+ "copied_from": "drakrun/data/capa-rules submodule (same pin drakrun uses for memory dumps)",
+ "rules": 918,
+ "sha256_of_sorted_file_hashes": "122c7958ada37955f98b870a1468cd02ee51cdba3087094aa9edb6a7459fcfbb"
+}

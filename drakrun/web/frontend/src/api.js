@@ -166,3 +166,9 @@ export async function getStaticReport({ analysisId }) {
     const request = await axios.get(`/static/${analysisId}`);
     return request.data;
 }
+
+// Deep static pass (chimera-deep/1: capa + FLOSS); 404 until it has run, or when it does not apply
+export async function getDeepStatic({ analysisId }) {
+    const request = await axios.get(`/static/${analysisId}/deep`);
+    return request.data;
+}

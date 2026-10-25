@@ -11,3 +11,7 @@ ssdeep==3.4            # built against Debian's libfuzzy (build stage); libfuzzy
 numpy==2.4.6            # thrember features
 oletools==0.60.2       # olevba macro indicators (no deobfuscation pass)
 scikit-learn==1.9.1     # thrember's FeatureHasher (same version as the classifier)
+# deep pass (chimera_static/deep.py): same capa as drakrun's memory-dump analysis, rules in capa-rules/
+flare-capa==7.4.0
+flare-floss==3.2.0
+vivisect==1.3.2
