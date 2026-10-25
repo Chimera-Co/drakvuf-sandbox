@@ -9,6 +9,7 @@ from .evasion_smoke_test import evasion_smoke_test
 from .evasion_worker import evasion_worker
 from .injector import injector
 from .intel import intel
+from .intel_worker import intel_worker
 from .install import install
 from .make_profile import make_profile
 from .modify_vm0 import modify_vm0
@@ -35,6 +36,7 @@ def main():
 
 
 main.add_command(intel)
+main.add_command(intel_worker)
 main.add_command(analyze)
 main.add_command(postprocess)
 main.add_command(install)

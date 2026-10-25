@@ -78,7 +78,7 @@ def observations(metadata, report, static, tls):
     return out
 
 
-def stage(directory, config, metadata, report, static, ev, static_path=None):
+def _offline_stage(directory, config, metadata, report, static, ev, static_path=None):
     base = {
         "status": "unavailable",
         "reason": "offline intel disabled or database missing",
@@ -143,5 +143,47 @@ def stage(directory, config, metadata, report, static, ev, static_path=None):
         "status": status,
         "reason": summary,
         "payload": payload,
+        "evidence_ids": eids,
+    }
+
+
+def stage(directory, config, metadata, report, static, ev, static_path=None):
+    offline = _offline_stage(
+        directory, config, metadata, report, static, ev, static_path
+    )
+    from .online.run import read_json
+
+    path = (
+        Path(static_path).parent / "intel-online.json"
+        if static_path
+        else Path(directory) / "intel-online.json"
+    )
+    online = read_json(path)
+    if online.get("schema") != "chimera-intel-online/1":
+        return offline
+    artifact = "intel-online.json"
+    raw = path.read_bytes()
+    # Evidence artifacts travel with the portable analysis report.
+    if path != Path(directory) / artifact:
+        temporary = Path(directory) / ".intel-online.json.tmp"
+        temporary.write_bytes(raw)
+        temporary.replace(Path(directory) / artifact)
+    ev.hashes[artifact] = digest(raw)
+    eids = list(offline["evidence_ids"])
+    for index, row in enumerate(online.get("results", [])):
+        row["evidence_ids"] = [
+            ev.add(artifact, f"/results/{index}", "intel:" + row["provider"])
+        ]
+        eids.extend(row["evidence_ids"])
+    has_data = any(r.get("status") == "ok" for r in online.get("results", []))
+    return {
+        **offline,
+        "status": (
+            "ok" if has_data or offline["status"] in {"ok", "stale"} else "unavailable"
+        ),
+        "reason": offline["reason"]
+        + "; online intel: "
+        + online.get("connectivity", "offline"),
+        "payload": {**(offline.get("payload") or {}), "online": online},
         "evidence_ids": eids,
     }

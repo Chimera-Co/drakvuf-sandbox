@@ -98,3 +98,19 @@ def test_report_includes_memdump_yara_hits_without_changing_completeness(tmp_pat
     assert "Beacon" in hit["text"] and hit["confidence"] == "high"
     assert any(i["value"] == "evil.test" and i["type"] == "domain" for i in r["iocs"])
     assert r["status"] == baseline["status"]
+
+
+def test_scan_stops_at_time_budget_and_says_so(tmp_path, monkeypatch):
+    adir = make_analysis(tmp_path, {"a_sample_mz": b"MZ" + b"a" * 10, "b_other_mz": b"MZ" + b"b" * 50,
+                                    "c_other_data": b"x" * 500, "e_huge": b"MZ" + b"z" * (2 << 20)})
+    clock = iter(range(0, 1000, 7))
+    monkeypatch.setattr(memdumps.time, "time", lambda: next(clock))
+    monkeypatch.setattr(sandbox, "run_in_container", lambda *a, **k: {
+        "indicators": [{"title": "Process injection imports", "severity": 3, "category": "imports",
+                        "attack": ["T1055"]}, {"title": "noise", "severity": 1}]})
+    settings = StaticConfigSection(memdump_scan_max_mb=1, memdump_scan_budget_s=10)
+    doc = memdumps.scan(AID, analyses_dir=adir.parent, static_dir=tmp_path / "static", settings=settings)
+    assert doc["stopped"] == "time budget" and len(doc["scanned"]) == 1
+    assert doc["too_large_or_empty"] == 1 and doc["skipped"] == 2  # 4 dumps: 1 scanned, 1 too large, 2 left
+    assert doc["scanned"][0]["indicators"] == [{"title": "Process injection imports", "severity": 3,
+                                                "category": "imports", "attack": ["T1055"]}]

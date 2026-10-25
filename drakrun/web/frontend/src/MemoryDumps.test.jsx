@@ -69,4 +69,41 @@ describe("memory dumps", () => {
         render(<MemoryDumps analysisId="x" />);
         expect(await screen.findByText(/not scanned yet/)).toBeTruthy();
     });
+    it("explains a budget stop and hides empty dumps when there are many", async () => {
+        const many = Array.from({ length: 30 }, (_, i) => ({
+            ...doc.scanned[1],
+            member: `dumps/n${i}.mm`,
+            sha256: String(i).padStart(64, "0"),
+        }));
+        getMemdumps.mockResolvedValue({
+            ...doc,
+            stopped: "time budget",
+            too_large_or_empty: 3,
+            scanned: [
+                ...many,
+                {
+                    ...doc.scanned[1],
+                    member: "dumps/inj.mm",
+                    indicators: [
+                        {
+                            title: "Injection imports",
+                            severity: 3,
+                            attack: ["T1055"],
+                        },
+                    ],
+                },
+            ],
+        });
+        render(<MemoryDumps analysisId="x" />);
+        await screen.findByText(/stopped at its time budget/);
+        const table = screen.getByRole("table", {
+            name: "Scanned memory dumps",
+        });
+        // Only the dump with an indicator is listed until the switch is turned off.
+        expect(within(table).getAllByRole("row")).toHaveLength(2);
+        expect(within(table).getByText("Injection imports")).toBeTruthy();
+        expect(
+            screen.getByText(/Only dumps with results \(1 of 31\)/),
+        ).toBeTruthy();
+    });
 });

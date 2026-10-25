@@ -2,8 +2,9 @@ import axios from "axios";
 
 axios.defaults.baseURL = "/api";
 
+// Every analysis: live jobs plus the ones only on disk (the job registry keeps the newest 100)
 export async function getAnalysisList({ abortController }) {
-    const listRequest = await axios.get("/list", {
+    const listRequest = await axios.get("/analyses", {
         signal: abortController.signal,
     });
     return listRequest.data;
@@ -173,8 +174,26 @@ export async function getDeepStatic({ analysisId }) {
     return request.data;
 }
 
+// MobSF APK scan (chimera-mobsf/1); 404 until it has run, or for anything but an APK
+export async function getMobsf({ analysisId }) {
+    const request = await axios.get(`/static/${analysisId}/mobsf`);
+    return request.data;
+}
+
 // Memory-dump scan (chimera-memdumps/1); 404 until the deep worker has scanned the run's dumps
 export async function getMemdumps({ analysisId }) {
     const request = await axios.get(`/static/${analysisId}/memdumps`);
+    return request.data;
+}
+
+// Analyst report (chimera-report/1: assessment, claims, ATT&CK, IOCs); 404 until postprocessing has written it
+export async function getChimeraReport({ analysisId }) {
+    const request = await axios.get(`/chimera_report/${analysisId}`);
+    return request.data;
+}
+
+// Where each stage of the analysis is (upload, static, VM run, classifier, deep, memory dumps, intel, report)
+export async function getPipeline({ analysisId }) {
+    const request = await axios.get(`/pipeline/${analysisId}`);
     return request.data;
 }

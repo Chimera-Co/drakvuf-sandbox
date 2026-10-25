@@ -31,6 +31,7 @@ from .sandbox import SCHEMA, ghidra_wall_s, run_ghidra, run_in_container, stage_
 logger = logging.getLogger(__name__)
 STATIC_QUEUE_NAME = "chimera-static"
 STATIC_ONLY_QUEUE_NAME = "chimera-static-only"
+INTEL_QUEUE_NAME = "chimera-intel"
 DEEP_QUEUE_NAME = "chimera-static-deep"
 DEEP_FORMATS = {"pe", "elf"}  # what capa (and FLOSS, PE only) can disassemble
 
@@ -109,9 +110,12 @@ def run_static_job(
 def _enqueue_deep(
     settings, analysis_id: str, file_name: str, base, result: dict
 ) -> bool:
-    if not settings.deep_enabled or result.get("error"):
+    if result.get("error"):
         return False
-    if (result.get("type") or {}).get("format") not in DEEP_FORMATS:
+    file_format = (result.get("type") or {}).get("format")
+    if file_format == "apk" and settings.mobsf_enabled:
+        return _enqueue_mobsf(settings, analysis_id, base)
+    if not settings.deep_enabled or file_format not in DEEP_FORMATS:
         return False
     from rq import get_current_job
 
@@ -136,6 +140,30 @@ def _enqueue_deep(
         )
     except Exception:
         logger.exception("[static] deep pass could not be queued for %s", analysis_id)
+        return False
+    return True
+
+
+def _enqueue_mobsf(settings, analysis_id: str, base) -> bool:
+    """APKs go to MobSF on the deep queue (drakrun/analyzer/static/mobsf.py), which deletes the staged copy."""
+    from rq import get_current_job
+
+    from .mobsf import run_mobsf_job
+
+    job = get_current_job()
+    if job is None:
+        return False
+    try:
+        Queue(name=DEEP_QUEUE_NAME, connection=job.connection).enqueue(
+            run_mobsf_job,
+            analysis_id,
+            str(base or STATIC_DIR),
+            job_id=f"static-mobsf-{analysis_id}",
+            job_timeout=int(settings.mobsf_timeout_s + 300),
+            result_ttl=24 * 3600,
+        )
+    except Exception:
+        logger.exception("[static] MobSF scan could not be queued for %s", analysis_id)
         return False
     return True
 
@@ -373,5 +401,9 @@ def run_static_only_analysis(analysis_id: str, file_metadata: dict, options: dic
     if job is not None:
         job.meta["extra_metadata"] = metadata
         job.save_meta()
+    if job is not None and static:
+        from drakrun.lib.intel.online.run import enqueue
+
+        enqueue(analysis_id, job.connection, options)
     if failed:
         raise StaticAnalysisFailed("static-only analysis failed")

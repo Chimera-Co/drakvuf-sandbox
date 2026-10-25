@@ -102,6 +102,32 @@ class ClassifierConfigSection(BaseModel):
 
 
 class IntelConfigSection(BaseModel):
+    online_enabled: bool = False
+    online_default: bool = True
+    keys_dir: pathlib.Path = pathlib.Path("/etc/chimera/keys")
+    abusech_key_file: pathlib.Path = pathlib.Path("/etc/chimera/abusech-auth-key")
+    cache_path: pathlib.Path = pathlib.Path(
+        "/var/lib/drakrun/intel/online-cache.sqlite"
+    )
+    providers: Dict[str, bool] = Field(
+        default_factory=lambda: dict.fromkeys(
+            (
+                "virustotal",
+                "malwarebazaar",
+                "threatfox",
+                "urlhaus",
+                "otx",
+                "abuseipdb",
+                "greynoise",
+                "hashlookup",
+                "hybridanalysis",
+                "urlscan",
+            ),
+            True,
+        )
+    )
+    max_observables: int = Field(default=20, gt=0, le=1000)
+    request_timeout_s: float = Field(default=10, gt=0, le=10, allow_inf_nan=False)
     enabled: bool = False
     db_path: pathlib.Path = pathlib.Path("/var/lib/drakrun/intel/intel.db")
     max_bundle_bytes: int = Field(default=200 * 1024 * 1024, gt=0)
@@ -150,8 +176,17 @@ class StaticConfigSection(BaseModel):
     # Static analysis of the run's memory dumps (dumps.zip) on the deep queue after the analysis:
     # unpacked payloads show their YARA matches and PE structure there. Never feeds the classifier.
     memdump_scan_enabled: bool = False
-    memdump_scan_max: int = Field(default=16, ge=1, le=64)
-    memdump_scan_max_mb: int = Field(default=32, ge=1)
+    # Every distinct dump is scanned (about 3-4 s each in the static VM) until the count or the time budget
+    # runs out; the budget keeps one dump-heavy run from holding the deep queue for long.
+    memdump_scan_max: int = Field(default=512, ge=1, le=4096)
+    memdump_scan_max_mb: int = Field(default=64, ge=1)
+    memdump_scan_budget_s: float = Field(default=1200, gt=0, le=6 * 3600, allow_inf_nan=False)
+    # Android APKs through MobSF (static scan only) in a fresh dom0 container per sample: no network,
+    # no capabilities, no new privileges, removed afterwards. Off until the image has been pulled.
+    mobsf_enabled: bool = False
+    mobsf_image: str = "docker.io/opensecurity/mobile-security-framework-mobsf:v4.5.3"
+    mobsf_timeout_s: float = Field(default=900, gt=0, le=3600, allow_inf_nan=False)
+    mobsf_memory_mb: int = Field(default=4096, ge=1024)
 
 
 class ScreenshotConfigSection(BaseModel):

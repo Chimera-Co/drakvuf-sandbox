@@ -3,6 +3,7 @@ import axios from "axios";
 import Select from "react-select";
 import { selectStyles } from "./themes.js";
 import { getLogLoader, LogViewer } from "./LogViewer.jsx";
+import { Pagination, useLocalPagination } from "./Pagination.jsx";
 import {
     BarChart,
     Bar,
@@ -105,13 +106,8 @@ export function StructuredTable({
 }) {
     const [query, setQuery] = useState("");
     const [methods, setMethods] = useState([]);
-    const [page, setPage] = useState(0);
     const [detail, setDetail] = useState(null);
     const [sort, setSort] = useState({ key: "TimeStamp", direction: 1 });
-    useEffect(() => {
-        setPage(0);
-        setDetail(null);
-    }, [rows]);
     const columns = [
         ["Time", "TimeStamp", "timestamp"],
         ["Process", "ProcessName", "RunningProcess", "PID"],
@@ -136,6 +132,12 @@ export function StructuredTable({
                     { numeric: true },
                 ) * sort.direction,
         );
+    const pager = useLocalPagination(filtered.length, 50);
+    useEffect(() => {
+        pager.setPage(1);
+        setDetail(null);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rows]);
     const times = rows.map(eventTime).filter(Number.isFinite);
     const startTs = times.length ? Math.min(...times.slice(0, 5000)) : null;
     const options = [
@@ -153,7 +155,7 @@ export function StructuredTable({
                     value={query}
                     onChange={(e) => {
                         setQuery(e.target.value);
-                        setPage(0);
+                        pager.setPage(1);
                     }}
                 />
                 <div style={{ minWidth: 220 }}>
@@ -165,7 +167,7 @@ export function StructuredTable({
                         value={methods}
                         onChange={(value) => {
                             setMethods(value);
-                            setPage(0);
+                            pager.setPage(1);
                         }}
                     />
                 </div>
@@ -173,14 +175,25 @@ export function StructuredTable({
                     {filtered.length} loaded matches
                 </span>
             </div>
-            <div className="table-responsive">
-                <table className="table table-sm table-hover analysis-event-table">
+            <div className="chimera-table-scroll">
+                <table className="table table-sm table-hover chimera-data-table">
                     <thead>
                         <tr>
                             {columns.map(([label, key]) => (
-                                <th scope="col" key={label}>
+                                <th
+                                    scope="col"
+                                    key={label}
+                                    aria-sort={
+                                        sort.key === key
+                                            ? sort.direction > 0
+                                                ? "ascending"
+                                                : "descending"
+                                            : undefined
+                                    }
+                                >
                                     <button
-                                        className="btn btn-sm btn-inline-link"
+                                        type="button"
+                                        className="chimera-sort"
                                         onClick={() =>
                                             setSort({
                                                 key,
@@ -192,6 +205,14 @@ export function StructuredTable({
                                         }
                                     >
                                         {label}
+                                        {sort.key === key ? (
+                                            <span
+                                                className="chimera-sort-mark"
+                                                aria-hidden="true"
+                                            >
+                                                {sort.direction > 0 ? "▲" : "▼"}
+                                            </span>
+                                        ) : null}
                                     </button>
                                 </th>
                             ))}
@@ -199,110 +220,88 @@ export function StructuredTable({
                         </tr>
                     </thead>
                     <tbody>
-                        {filtered
-                            .slice(page * 50, page * 50 + 50)
-                            .map((row, index) => (
-                                <tr key={index}>
-                                    {columns.map(([label, ...keys]) => {
-                                        const value =
-                                            keys[0] === "*"
-                                                ? row
-                                                : keys
-                                                      .map((key) => row[key])
-                                                      .find((v) => v != null);
-                                        const seqid =
-                                            row.seqid ??
-                                            row.SeqId ??
-                                            Object.keys(processes).find(
-                                                (id) =>
-                                                    processes[id].pid ===
-                                                    row.PID,
-                                            );
-                                        return (
-                                            <td
-                                                key={label}
-                                                className={`font-monospace small ${NOWRAP.has(label) ? "text-nowrap" : "text-break"}`}
-                                                title={
-                                                    label === "Time" &&
-                                                    Number.isFinite(
-                                                        eventTime(row),
-                                                    )
-                                                        ? new Date(
-                                                              eventTime(row) *
-                                                                  1000,
-                                                          ).toISOString()
-                                                        : label === "Process"
-                                                          ? displayValue(value)
-                                                          : undefined
-                                                }
-                                            >
-                                                {label === "Time" &&
-                                                startTs != null &&
-                                                Number.isFinite(
-                                                    eventTime(row),
-                                                ) ? (
-                                                    `+${(eventTime(row) - startTs).toFixed(3)} s`
-                                                ) : label === "Process" &&
-                                                  seqid != null &&
-                                                  onProcessSelect ? (
-                                                    <button
-                                                        className="btn btn-sm btn-outline-secondary text-nowrap"
-                                                        onClick={() =>
-                                                            onProcessSelect(
-                                                                seqid,
-                                                            )
-                                                        }
-                                                    >
-                                                        {displayValue(value)
-                                                            .split(/[/\\]/)
-                                                            .pop()}{" "}
-                                                        ({row.PID})
-                                                    </button>
-                                                ) : label === "Process" ? (
-                                                    displayValue(value)
-                                                        .split(/[/\\]/)
-                                                        .pop()
-                                                ) : (
-                                                    displayValue(value).slice(
-                                                        0,
-                                                        500,
-                                                    )
-                                                )}
-                                            </td>
+                        {pager.slice(filtered).map((row, index) => (
+                            <tr key={pager.start + index}>
+                                {columns.map(([label, ...keys]) => {
+                                    const value =
+                                        keys[0] === "*"
+                                            ? row
+                                            : keys
+                                                  .map((key) => row[key])
+                                                  .find((v) => v != null);
+                                    const seqid =
+                                        row.seqid ??
+                                        row.SeqId ??
+                                        Object.keys(processes).find(
+                                            (id) =>
+                                                processes[id].pid === row.PID,
                                         );
-                                    })}
-                                    <td>
-                                        <button
-                                            className="btn btn-sm btn-outline-secondary px-2 py-0"
-                                            aria-label="Inspect"
-                                            title="Inspect event"
-                                            onClick={() => setDetail(row)}
+                                    return (
+                                        <td
+                                            key={label}
+                                            className={`cell-mono ${NOWRAP.has(label) ? "cell-short" : "cell-long"}`}
+                                            title={
+                                                label === "Time" &&
+                                                Number.isFinite(eventTime(row))
+                                                    ? new Date(
+                                                          eventTime(row) * 1000,
+                                                      ).toISOString()
+                                                    : label === "Process"
+                                                      ? displayValue(value)
+                                                      : undefined
+                                            }
                                         >
-                                            ⋯
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
+                                            {label === "Time" &&
+                                            startTs != null &&
+                                            Number.isFinite(eventTime(row)) ? (
+                                                `+${(eventTime(row) - startTs).toFixed(3)} s`
+                                            ) : label === "Process" &&
+                                              seqid != null &&
+                                              onProcessSelect ? (
+                                                <button
+                                                    className="btn btn-sm btn-outline-secondary text-nowrap"
+                                                    onClick={() =>
+                                                        onProcessSelect(seqid)
+                                                    }
+                                                >
+                                                    {displayValue(value)
+                                                        .split(/[/\\]/)
+                                                        .pop()}{" "}
+                                                    ({row.PID})
+                                                </button>
+                                            ) : label === "Process" ? (
+                                                displayValue(value)
+                                                    .split(/[/\\]/)
+                                                    .pop()
+                                            ) : (
+                                                displayValue(value).slice(
+                                                    0,
+                                                    500,
+                                                )
+                                            )}
+                                        </td>
+                                    );
+                                })}
+                                <td>
+                                    <button
+                                        className="btn btn-sm btn-outline-secondary px-2 py-0"
+                                        aria-label="Inspect"
+                                        title="Inspect event"
+                                        onClick={() => setDetail(row)}
+                                    >
+                                        ⋯
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
                     </tbody>
                 </table>
             </div>
-            <div className="d-flex gap-2">
-                <button
-                    className="btn btn-sm btn-outline-secondary"
-                    disabled={!page}
-                    onClick={() => setPage(page - 1)}
-                >
-                    Previous
-                </button>
-                <span>Page {page + 1}</span>
-                <button
-                    className="btn btn-sm btn-outline-secondary"
-                    disabled={(page + 1) * 50 >= filtered.length}
-                    onClick={() => setPage(page + 1)}
-                >
-                    Next
-                </button>
-            </div>
+            <Pagination
+                pager={pager}
+                label={`${logType} event pages`}
+                noun="loaded events"
+            />
             {detail && (
                 <aside
                     role="dialog"

@@ -87,8 +87,7 @@ function AnalysisViewComponent({ analysisId }) {
 export default function AnalysisView() {
     const { jobid } = useParams();
     return (
-        <div className="container-fluid px-4">
-            <h1 className="m-4 h4">Analysis report</h1>
+        <div className="container-fluid px-3 px-xl-4 pb-4">
             <AnalysisViewComponent analysisId={jobid} />
         </div>
     );

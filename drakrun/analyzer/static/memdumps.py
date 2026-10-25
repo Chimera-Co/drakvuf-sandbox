@@ -7,9 +7,10 @@ strings and IOCs. Results go to memdumps.json beside static.json (schema chimera
 report. Runs on the deep queue after the analysis, so it never delays the verdict, and its result never
 feeds the classifier.
 
-Selection (at most `memdump_scan_max`, each at most `memdump_scan_max_mb`): dumps of the sample's own process
-tree first, then ones that start with an MZ header, then injection-type reasons, then size; identical contents
-are scanned once.
+Every dump up to `memdump_scan_max_mb` is scanned, in this order: the sample's own process tree first, then
+dumps that start with an MZ header, then injection-type reasons, then size. Identical contents are scanned
+once. The scan stops at `memdump_scan_max` dumps or after `memdump_scan_budget_s` seconds; the document says
+which, so a partial scan is never mistaken for a complete one.
 """
 
 from __future__ import annotations
@@ -34,6 +35,7 @@ SCHEMA = "chimera-memdumps/1"
 INJECTION_REASONS = ("remote", "inject", "write", "apc", "hollow")
 MAX_FINDINGS = 12
 MAX_IOCS = 10
+MAX_INDICATORS = 8
 
 
 def _memdump_records(analysis_dir: Path) -> dict:
@@ -99,7 +101,7 @@ def select_dumps(analysis_dir: Path, max_dumps: int, max_bytes: int) -> tuple[li
     candidates.sort(key=lambda c: (not c["sample_tree"], not c["mz"],
                                    not any(k in (c["reason"] or "").lower() for k in INJECTION_REASONS),
                                    -c["size"], c["name"]))
-    return candidates[: max_dumps * 3], total  # extra candidates replace duplicates found while reading
+    return candidates, total
 
 
 def _summary(candidate: dict, digest: str, result: dict) -> dict:
@@ -118,6 +120,11 @@ def _summary(candidate: dict, digest: str, result: dict) -> dict:
         "yara": [m.get("rule") for m in universal.get("yara") or []][:20],
         "findings": [{"id": f.get("id"), "title": f.get("title"), "severity": f.get("severity"),
                       "attack": f.get("attack") or []} for f in findings[:MAX_FINDINGS]],
+        # Insight indicators of severity 2+ (suspicious in context): injected code shows its imports here.
+        "indicators": [{"title": i.get("title"), "severity": i.get("severity"), "category": i.get("category"),
+                        "attack": i.get("attack") or []}
+                       for i in sorted((x for x in result.get("indicators") or [] if (x.get("severity") or 0) >= 2),
+                                       key=lambda x: -(x.get("severity") or 0))[:MAX_INDICATORS]],
         "embedded_executables": sum(1 for e in universal.get("embedded") or [] if e.get("type") in ("pe", "elf")),
         "iocs": {k: (iocs.get(k) or [])[:MAX_IOCS] for k in ("urls", "domains", "ips") if iocs.get(k)},
         "backend": (result.get("container") or {}).get("backend"),
@@ -133,19 +140,26 @@ def scan(analysis_id: str, analyses_dir: Path = ANALYSES_DIR, static_dir: Option
     analysis_dir = analyses_dir / analysis_id
     started = time.time()
     doc = {"schema": SCHEMA, "analysis_id": analysis_id, "dumps_total": 0, "scanned": [], "skipped": 0,
-           "duplicates": 0}
+           "duplicates": 0, "too_large_or_empty": 0, "stopped": None,
+           "limits": {"max_dumps": settings.memdump_scan_max, "max_mb": settings.memdump_scan_max_mb,
+                      "budget_s": settings.memdump_scan_budget_s}}
     try:
         candidates, doc["dumps_total"] = select_dumps(analysis_dir, settings.memdump_scan_max,
                                                       settings.memdump_scan_max_mb << 20)
     except (OSError, zipfile.BadZipFile) as exc:
         doc["error"] = f"cannot read dumps.zip: {str(exc)[:200]}"
         return doc
+    doc["too_large_or_empty"] = doc["dumps_total"] - len(candidates)
     base = job_dir(analysis_id, static_dir) / "memdumps"
     seen = set()
     try:
         with zipfile.ZipFile(analysis_dir / "dumps.zip") as archive:
             for candidate in candidates:
                 if len(doc["scanned"]) >= settings.memdump_scan_max:
+                    doc["stopped"] = "dump limit"
+                    break
+                if time.time() - started >= settings.memdump_scan_budget_s:
+                    doc["stopped"] = "time budget"
                     break
                 work = base / str(len(doc["scanned"]))
                 shutil.rmtree(work, ignore_errors=True)
@@ -171,7 +185,8 @@ def scan(analysis_id: str, analyses_dir: Path = ANALYSES_DIR, static_dir: Option
                 shutil.rmtree(work, ignore_errors=True)
     finally:
         shutil.rmtree(base, ignore_errors=True)
-    doc["skipped"] = max(0, doc["dumps_total"] - len(doc["scanned"]) - doc["duplicates"])
+    doc["skipped"] = max(0, doc["dumps_total"] - len(doc["scanned"]) - doc["duplicates"]
+                         - doc["too_large_or_empty"])
     doc["wall_s"] = round(time.time() - started, 2)
     return doc
 

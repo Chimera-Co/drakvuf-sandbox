@@ -9,6 +9,7 @@ from drakrun.version import __version__
 
 from .api import api
 from .evasion_api import evasion_api
+from .pipeline_api import pipeline_api
 
 info = Info(title="CHIMERA", version=__version__)
 app = OpenAPI(__name__, info=info, static_folder="frontend/dist/assets")
@@ -22,6 +23,7 @@ rq_dashboard.web.setup_rq_connection(app)
 app.register_blueprint(rq_dashboard.blueprint, url_prefix="/rq")
 app.register_api(api)
 app.register_api(evasion_api)
+app.register_api(pipeline_api)
 
 
 @app.errorhandler(404)

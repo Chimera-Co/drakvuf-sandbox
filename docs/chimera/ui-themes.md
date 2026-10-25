@@ -36,6 +36,23 @@ To add or change a scheme: edit `SCHEMES` in `tools/gen_themes.py` and `SCHEMES`
 
 ## Pagination
 
-The analyses list and verification runs show 25 rows per page (10, 25, 50 or 100). The page is in the URL
-(`?page=3&per=50`), so reload, the back button and shared links keep the place; changing a filter goes back to
-page 1. The score trend chart on the verification runs page still shows every run.
+Every long table pages: the analyses list and verification runs (page in the URL, `?page=3&per=50`, so reload,
+the back button and shared links keep the place), and the report tables, structured logs, static tables and
+memory dumps (page kept in the component). The bar shows "Page X of Y · a–b of n", a page-number box once there
+are more than 7 pages, and 10, 25, 50, 100 or All rows per page (All stops at 5000 rows). Changing a filter goes
+back to page 1. The score trend chart on the verification runs page still shows every run.
+
+## Layout
+
+- The top bar stays put. The menu button (three lines) folds the sidebar to an icon rail or pins it open; on an
+  analysis report it starts folded so the report gets the width. Hovering or focusing the rail opens it over
+  the page without moving the content; Escape or a click outside closes it. The choice is remembered per page
+  type (`chimera-sidebar` in localStorage). On phones the sidebar is hidden and the menu button opens it.
+- An analysis report opens in the Simple view (key facts, what the sample did, ATT&CK matrix, indicators,
+  limits of the run); Advanced has every table, log, the static analysis and the memory dumps. The choice is
+  remembered (`chimera-report-view`).
+- Once the process tree scrolls out of view a "Process tree" tab on the left edge opens it as a drawer; an
+  "Outline" tab on the right lists the report's sections with the current one marked.
+- Tables size each column to its content: short values stay on one line, long ones wrap, process columns wrap
+  their chips (12 at most, then a count). A table wider than the page scrolls sideways inside its frame with
+  the header row fixed.

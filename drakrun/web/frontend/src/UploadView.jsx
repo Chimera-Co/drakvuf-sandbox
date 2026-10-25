@@ -1,7 +1,8 @@
 import { PluginPicker } from "./PluginPicker.jsx";
 import { useNavigate } from "react-router-dom";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { uploadSample } from "./api.js";
+import { getIntelProviders } from "./intelApi.js";
 
 function FormError({ errors, field }) {
     const error = errors[field];
@@ -75,6 +76,22 @@ function UploadForm() {
     const [extractArchive, setExtractArchive] = useState(false);
     const [guestOs, setGuestOs] = useState("windows");
     const [mode, setMode] = useState("combined");
+    const [intelSettings, setIntelSettings] = useState(null);
+    const [intelOnline, setIntelOnline] = useState(false);
+    useEffect(() => {
+        let active = true;
+        getIntelProviders()
+            .then(({ data }) => {
+                if (active) {
+                    setIntelSettings(data);
+                    setIntelOnline(data.online_default && data.online_enabled);
+                }
+            })
+            .catch(() => {});
+        return () => {
+            active = false;
+        };
+    }, []);
     const isStatic = mode === "static-only";
     const isLinux = guestOs === "linux";
     const [extraOptionsCollapsed, setExtraOptionsCollapsed] = useState(true);
@@ -127,6 +144,7 @@ function UploadForm() {
             const form = new FormData(ev.target);
             try {
                 const payload = {
+                    intel_online: intelOnline,
                     mode: form.get("mode"),
                     file: form.get("file"),
                     guest_os: form.get("guest_os"),
@@ -145,7 +163,13 @@ function UploadForm() {
                 };
                 const jobData = await uploadSample(
                     payload.mode === "static-only"
-                        ? { file: payload.file, mode: payload.mode }
+                        ? {
+                              file: payload.file,
+                              mode: payload.mode,
+                              ...(intelSettings
+                                  ? { intel_online: payload.intel_online }
+                                  : {}),
+                          }
                         : payload,
                 );
                 const jobId = jobData["task_uid"];
@@ -156,7 +180,7 @@ function UploadForm() {
                 console.error(e);
             }
         },
-        [navigate],
+        [navigate, intelSettings, intelOnline],
     );
     return (
         <form onSubmit={submitForm} ref={formRef}>
@@ -492,6 +516,27 @@ function UploadForm() {
                     </Collapse>
                 </>
             )}
+            <div className="form-check mb-3">
+                <input
+                    id="intel-online"
+                    type="checkbox"
+                    className="form-check-input"
+                    checked={intelOnline}
+                    disabled={!intelSettings?.online_enabled}
+                    onChange={(event) => setIntelOnline(event.target.checked)}
+                />
+                <label htmlFor="intel-online" className="form-check-label">
+                    Online threat-intel lookups (hashes, domains, IPs and URLs
+                    are sent to the configured providers; the sample is never
+                    uploaded)
+                </label>
+                {!intelSettings?.online_enabled && (
+                    <p>
+                        Online lookups are disabled. Enable online_enabled in
+                        [intel] and start the intel worker.
+                    </p>
+                )}
+            </div>
             <div className="d-flex align-items-center">
                 <label htmlFor="analysis-mode" className="me-2">
                     Mode

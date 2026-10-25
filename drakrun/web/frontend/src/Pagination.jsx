@@ -1,18 +1,41 @@
+import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-export const PAGE_SIZES = [10, 25, 50, 100];
+// 0 means "All". Rendering every row of a very large table would freeze the browser, so "All" is offered only up
+// to ALL_LIMIT rows.
+export const PAGE_SIZES = [10, 25, 50, 100, 0];
+export const ALL_LIMIT = 5000;
 
-// Page state lives in the URL (?page=2&per=25) so reload, back and shared links keep the place.
+function makePager(total, page, per, setPage, setPer) {
+    const size = per === 0 ? Math.max(total, 1) : per;
+    const pages = Math.max(1, Math.ceil(total / size));
+    const current = Math.min(Math.max(page, 1), pages);
+    return {
+        page: current,
+        per,
+        pages,
+        total,
+        start: (current - 1) * size,
+        end: Math.min(current * size, total),
+        slice: (items) => items.slice((current - 1) * size, current * size),
+        setPage,
+        setPer,
+    };
+}
+
+function allowed(per, total, defaultSize) {
+    return per === 0 && total > ALL_LIMIT ? defaultSize : per;
+}
+
+// Page state in the URL (?page=2&per=25) so reload, back and shared links keep the place (list pages).
 export function usePagination(total, defaultSize = 25) {
     const [params, setParams] = useSearchParams();
-    const per = PAGE_SIZES.includes(Number(params.get("per")))
-        ? Number(params.get("per"))
-        : defaultSize;
-    const pages = Math.max(1, Math.ceil(total / per));
+    const raw = params.get("per");
+    const per =
+        raw !== null && PAGE_SIZES.includes(Number(raw))
+            ? Number(raw)
+            : defaultSize;
     const requested = Number.parseInt(params.get("page"), 10);
-    const page = Number.isFinite(requested)
-        ? Math.min(Math.max(requested, 1), pages)
-        : 1;
     const update = (changes) => {
         const next = new URLSearchParams(params);
         for (const [key, value] of Object.entries(changes)) {
@@ -21,17 +44,30 @@ export function usePagination(total, defaultSize = 25) {
         }
         setParams(next, { replace: true });
     };
-    return {
-        page,
-        per,
-        pages,
+    return makePager(
         total,
-        start: (page - 1) * per,
-        slice: (items) => items.slice((page - 1) * per, page * per),
-        setPage: (p) => update({ page: p === 1 ? null : p }),
-        setPer: (size) =>
+        Number.isFinite(requested) ? requested : 1,
+        allowed(per, total, defaultSize),
+        (p) => update({ page: p === 1 ? null : p }),
+        (size) =>
             update({ per: size === defaultSize ? null : size, page: null }),
-    };
+    );
+}
+
+// Page state inside a component (tables within a report tab, several per page).
+export function useLocalPagination(total, defaultSize = 25) {
+    const [page, setPage] = useState(1);
+    const [per, setPerState] = useState(defaultSize);
+    return makePager(
+        total,
+        page,
+        allowed(per, total, defaultSize),
+        setPage,
+        (size) => {
+            setPerState(size);
+            setPage(1);
+        },
+    );
 }
 
 // 1 … 4 5 [6] 7 8 … 20
@@ -57,7 +93,7 @@ function pageList(page, pages) {
 }
 
 export function Pagination({ pager, label, noun = "items" }) {
-    const { page, pages, per, total, start, setPage, setPer } = pager;
+    const { page, pages, per, total, start, end, setPage, setPer } = pager;
     if (!total) return null;
     const item = (target, text, aria, disabled, current) => (
         <li
@@ -79,8 +115,11 @@ export function Pagination({ pager, label, noun = "items" }) {
     return (
         <div className="chimera-pagination">
             <div className="small text-muted" aria-live="polite">
-                Showing {start + 1}–{Math.min(start + per, total)} of {total}{" "}
-                {noun}
+                <strong className="chimera-pagination-page">
+                    Page {page} of {pages}
+                </strong>
+                <span className="mx-1">·</span>
+                {start + 1}–{end} of {total} {noun}
             </div>
             {pages > 1 ? (
                 <nav aria-label={label}>
@@ -101,16 +140,44 @@ export function Pagination({ pager, label, noun = "items" }) {
                     </ul>
                 </nav>
             ) : null}
+            {pages > 7 ? (
+                <label className="small d-flex align-items-center gap-2">
+                    Go to
+                    <input
+                        type="number"
+                        min={1}
+                        max={pages}
+                        className="form-control form-control-sm chimera-page-jump"
+                        aria-label="Go to page"
+                        defaultValue={page}
+                        key={page}
+                        onKeyDown={(e) => {
+                            if (e.key !== "Enter") return;
+                            const value = Number.parseInt(e.target.value, 10);
+                            if (Number.isFinite(value))
+                                setPage(Math.min(Math.max(value, 1), pages));
+                        }}
+                    />
+                </label>
+            ) : null}
             <label className="small d-flex align-items-center gap-2">
-                Per page
+                Rows per page
                 <select
                     className="form-select form-select-sm w-auto"
                     value={per}
                     onChange={(e) => setPer(Number(e.target.value))}
                 >
                     {PAGE_SIZES.map((size) => (
-                        <option key={size} value={size}>
-                            {size}
+                        <option
+                            key={size}
+                            value={size}
+                            disabled={size === 0 && total > ALL_LIMIT}
+                        >
+                            {size === 0
+                                ? total > ALL_LIMIT
+                                    ? `All (over ${ALL_LIMIT})`
+                                    : `All (${total})`
+                                : size}
                         </option>
                     ))}
                 </select>

@@ -1,49 +1,221 @@
-.analysis-workspace {
+/* ---------------------------------------------------------------------------
+   Report header: what was analysed, the view switch and the downloads.
+   ------------------------------------------------------------------------- */
+
+.report-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    margin: 1rem 0 0.75rem;
+}
+
+.report-head h1 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.report-sub {
+    color: var(--chimera-text-muted);
+    font-size: 0.8rem;
+    overflow-wrap: anywhere;
+}
+
+.report-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
+.chimera-segmented {
+    display: inline-flex;
+    overflow: hidden;
+    border: 1px solid var(--chimera-border-strong);
+    border-radius: var(--chimera-radius-sm);
+}
+
+.chimera-segmented button {
+    padding: 0.3rem 0.85rem;
+    border: 0;
+    background-color: var(--chimera-surface);
+    color: var(--chimera-text);
+    font-size: 0.85rem;
+}
+
+.chimera-segmented button + button {
+    border-left: 1px solid var(--chimera-border-strong);
+}
+
+.chimera-segmented button[aria-pressed="true"] {
+    background-color: var(--chimera-accent);
+    color: var(--chimera-on-accent);
+    font-weight: 600;
+}
+
+.chimera-menu {
+    position: relative;
+}
+
+.chimera-menu > summary {
+    list-style: none;
+}
+
+.chimera-menu > summary::-webkit-details-marker {
+    display: none;
+}
+
+.chimera-menu-list {
+    position: absolute;
+    top: calc(100% + 0.25rem);
+    right: 0;
+    z-index: 1030;
+    display: flex;
+    flex-direction: column;
+    min-width: 15rem;
+    padding: 0.35rem;
+    border: 1px solid var(--chimera-border-strong);
+    border-radius: var(--chimera-radius);
+    background-color: var(--chimera-surface);
+    box-shadow: 0 0.75rem 2rem rgba(var(--chimera-shadow-rgb), 0.25);
+}
+
+.chimera-menu-list a {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: var(--chimera-radius-sm);
+    color: var(--chimera-text);
+    font-size: 0.875rem;
+    text-decoration: none;
+}
+
+.chimera-menu-list a:hover,
+.chimera-menu-list a:focus-visible {
+    background-color: rgba(var(--chimera-accent-rgb), 0.1);
+    color: var(--chimera-strong);
+}
+
+/* ---------------------------------------------------------------------------
+   Pipeline: where each stage of the analysis is.
+   ------------------------------------------------------------------------- */
+
+.pipeline-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0 0 0.85rem;
+    padding: 0;
+    list-style: none;
+}
+
+.pipeline-step {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.2rem 0.65rem;
+    border: 1px solid var(--chimera-border);
+    border-radius: 999px;
+    background-color: var(--chimera-surface);
+    color: var(--chimera-text);
+    font-size: 0.78rem;
+}
+
+.pipeline-step.is-done .pipeline-icon {
+    color: var(--chimera-green-ink);
+}
+
+.pipeline-step.is-running,
+.pipeline-step.is-queued {
+    border-color: rgba(var(--chimera-blue-ink-rgb), 0.6);
+    background-color: rgba(var(--chimera-blue-rgb), 0.1);
+}
+
+.pipeline-step.is-running .pipeline-icon,
+.pipeline-step.is-queued .pipeline-icon {
+    color: var(--chimera-blue-ink);
+}
+
+.pipeline-step.is-failed {
+    border-color: rgba(var(--chimera-red-ink-rgb), 0.6);
+    background-color: rgba(var(--chimera-red-rgb), 0.12);
+}
+
+.pipeline-step.is-failed .pipeline-icon {
+    color: var(--chimera-red-ink);
+}
+
+.pipeline-step.is-skipped,
+.pipeline-step.is-pending {
+    color: var(--chimera-text-muted);
+    border-style: dashed;
+}
+
+.pipeline-detail {
+    color: var(--chimera-text-muted);
+    max-width: 18rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+   Overview: the process tree beside the verdict at the top of the report.
+   Below it the tabs (or the simple view) use the full width.
+   ------------------------------------------------------------------------- */
+
+.analysis-overview {
     display: grid;
-    grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+    grid-template-columns: minmax(16rem, 24rem) minmax(0, 1fr);
     gap: 1rem;
     align-items: start;
+    margin-bottom: 1rem;
 }
-/* A collapsed process tree leaves the width to the tabs. */
-.analysis-workspace:has(.analysis-process-column details:not([open])) {
-    grid-template-columns: 9rem minmax(0, 1fr);
-}
-.analysis-static-only {
+
+.analysis-overview.is-static {
     grid-template-columns: minmax(0, 1fr);
 }
-.analysis-process-column {
-    position: sticky;
-    top: 1rem;
-    max-height: calc(100vh - 2rem);
-    overflow: auto;
+
+.analysis-tree-slot {
     min-width: 0;
 }
-.analysis-main-column,
-.min-width-0 {
-    min-width: 0;
-}
-.analysis-main-column > .card:first-child {
-    height: 340px;
+
+.analysis-tree-slot > .card > .card-body {
+    max-height: 34rem;
     overflow: auto;
 }
+
+.analysis-side {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.analysis-side > .card {
+    margin-bottom: 0 !important;
+}
+
 .analysis-explorer {
     display: grid;
     grid-template-columns: minmax(180px, 25%) minmax(0, 1fr);
     gap: 1rem;
 }
+
 .analysis-explorer > aside {
     max-height: 650px;
     overflow: auto;
     border-right: 1px solid var(--bs-border-color);
 }
-.analysis-event-table {
-    table-layout: fixed;
-    min-width: 560px;
+
+.min-width-0 {
+    min-width: 0;
 }
-.analysis-event-table td {
-    overflow-wrap: anywhere;
-    vertical-align: top;
-}
+
 .analysis-drawer {
     position: fixed;
     inset: 5vh 2vw 5vh auto;
@@ -52,6 +224,7 @@
     overflow: auto;
     box-shadow: 0 1rem 3rem rgba(var(--chimera-shadow-rgb), 0.3);
 }
+
 .analysis-screenshot-stage {
     height: min(55vh, 550px);
     display: flex;
@@ -59,10 +232,49 @@
     justify-content: center;
     background: var(--chimera-shell-raised);
 }
+
 .analysis-screenshot-stage img {
     max-height: 100%;
     object-fit: contain;
 }
+
+/* Summary sections */
+.report-section {
+    margin-bottom: 1.75rem;
+}
+
+.report-section > h2,
+.report-section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 0.6rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid var(--chimera-border);
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.report-empty-list {
+    margin: 0;
+    color: var(--chimera-text-muted);
+    font-size: 0.85rem;
+}
+
+@media (max-width: 900px) {
+    .analysis-overview,
+    .analysis-explorer {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .analysis-tree-slot > .card > .card-body {
+        max-height: 20rem;
+    }
+}
+
+/* ---------------------------------------------------------------------------
+   Classifier score bar
+   ------------------------------------------------------------------------- */
+
 .decision-score {
     height: 15px;
     position: relative;
@@ -73,6 +285,7 @@
         var(--chimera-red) 50% 100%
     );
 }
+
 .decision-threshold {
     position: absolute;
     left: 50%;
@@ -80,6 +293,7 @@
     bottom: -3px;
     border-left: 2px dashed var(--bs-body-color);
 }
+
 .decision-marker {
     position: absolute;
     top: -4px;
@@ -89,58 +303,283 @@
     background: var(--chimera-strong);
     border: 1px solid var(--chimera-surface);
 }
-.syntax-function,
-.syntax-label {
-    color: var(--chimera-blue-ink);
-}
-.syntax-variable,
-.syntax-preprocessor {
-    color: var(--chimera-violet-ink);
-}
-.syntax-char {
-    color: var(--chimera-cyan-ink);
-}
-@media (max-width: 1000px) {
-    .analysis-workspace {
-        grid-template-columns: minmax(200px, 240px) minmax(0, 1fr);
-        gap: 0.5rem;
-    }
-    .analysis-main-column .card-body {
-        padding: 0.65rem;
-    }
-}
-@media (max-width: 760px) {
-    .analysis-workspace,
-    .analysis-explorer {
-        grid-template-columns: minmax(0, 1fr);
-    }
-    .analysis-process-column {
-        position: static;
-        max-height: 320px;
-    }
-}
 
 .decision-component {
     background: var(--chimera-border-strong);
 }
-.analysis-event-table th:nth-child(1) {
-    width: 5.75rem;
+
+.verdict-components {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: 0.75rem;
 }
-.analysis-event-table th:nth-child(2) {
-    width: 9rem;
+
+.verdict-component {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--chimera-border);
+    border-radius: var(--chimera-radius-sm);
+    background-color: var(--chimera-surface-2);
 }
-.analysis-event-table th:nth-child(3) {
-    width: 8.5rem;
+
+.syntax-function,
+.syntax-label {
+    color: var(--chimera-blue-ink);
 }
-.analysis-event-table th:last-child {
-    width: 2.75rem;
+
+.syntax-variable,
+.syntax-preprocessor {
+    color: var(--chimera-violet-ink);
 }
-.analysis-event-table td.text-nowrap {
-    overflow: hidden;
-    text-overflow: ellipsis;
+
+.syntax-char {
+    color: var(--chimera-cyan-ink);
 }
 
 .memdump-table {
     table-layout: fixed;
     min-width: 520px;
+}
+
+/* ---------------------------------------------------------------------------
+   ATT&CK matrix
+   ------------------------------------------------------------------------- */
+
+.attack-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    margin-bottom: 0.6rem;
+}
+
+.attack-key {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.05rem 0.5rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    color: var(--chimera-text);
+    font-size: 0.75rem;
+}
+
+.attack-key.is-observed {
+    border-color: rgba(var(--chimera-red-ink-rgb), 0.55);
+    background-color: rgba(var(--chimera-red-rgb), 0.16);
+}
+
+.attack-key.is-potential {
+    border-color: rgba(var(--chimera-yellow-ink-rgb), 0.55);
+    background-color: rgba(var(--chimera-yellow-rgb), 0.16);
+}
+
+.attack-key.is-system {
+    border-color: var(--chimera-border-strong);
+    background-color: var(--chimera-surface-3);
+}
+
+.attack-scroll {
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+}
+
+.attack-grid {
+    display: grid;
+    gap: 0.5rem;
+    min-width: min-content;
+}
+
+.attack-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
+.attack-tactic {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    border-bottom: 2px solid var(--chimera-accent);
+    background-color: var(--chimera-surface-2);
+    color: var(--chimera-text);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.attack-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.15rem;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--chimera-border);
+    border-left-width: 4px;
+    border-radius: var(--chimera-radius-sm);
+    background-color: var(--chimera-surface);
+    color: var(--chimera-text);
+    font-size: 0.78rem;
+    line-height: 1.25;
+    text-align: left;
+}
+
+.attack-cell.is-observed {
+    border-left-color: var(--chimera-red-ink);
+    background-color: rgba(var(--chimera-red-rgb), 0.1);
+}
+
+.attack-cell.is-potential {
+    border-left-color: var(--chimera-yellow-ink);
+    background-color: rgba(var(--chimera-yellow-rgb), 0.1);
+}
+
+.attack-cell.is-system {
+    border-left-color: var(--chimera-border-strong);
+}
+
+.attack-cell:hover {
+    border-color: var(--chimera-border-strong);
+}
+
+.attack-cell[aria-pressed="true"] {
+    outline: 2px solid var(--chimera-accent);
+    outline-offset: 1px;
+}
+
+.attack-id {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--chimera-font-mono);
+    font-size: 0.7rem;
+}
+
+.attack-count {
+    font-weight: 700;
+}
+
+.attack-name {
+    font-weight: 600;
+}
+
+.attack-sub {
+    font-size: 0.72rem;
+}
+
+.attack-detail {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid var(--chimera-border);
+    border-radius: var(--chimera-radius);
+    background-color: var(--chimera-surface-2);
+}
+
+/* ---------------------------------------------------------------------------
+   Simple view
+   ------------------------------------------------------------------------- */
+
+.simple-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    gap: 0.5rem;
+}
+
+.simple-stat {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--chimera-border);
+    border-radius: var(--chimera-radius);
+    background-color: var(--chimera-surface);
+}
+
+.simple-stat strong {
+    display: block;
+    color: var(--chimera-strong);
+    font-size: 1.35rem;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+}
+
+.simple-stat span {
+    color: var(--chimera-text-muted);
+    font-size: 0.78rem;
+}
+
+.claim-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.claim-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.45rem 0.65rem;
+    border: 1px solid var(--chimera-border);
+    border-radius: var(--chimera-radius-sm);
+    background-color: var(--chimera-surface);
+    font-size: 0.875rem;
+}
+
+.claim-kind {
+    flex: 0 0 auto;
+    min-width: 5.5rem;
+    padding: 0.05rem 0.45rem;
+    border-radius: 999px;
+    color: var(--chimera-text);
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.claim-kind.is-observed {
+    background-color: rgba(var(--chimera-blue-rgb), 0.16);
+}
+
+.claim-kind.is-inferred {
+    background-color: rgba(var(--chimera-violet-rgb), 0.16);
+}
+
+.ioc-groups {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+    gap: 0.75rem;
+}
+
+.ioc-group {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--chimera-border);
+    border-radius: var(--chimera-radius);
+    background-color: var(--chimera-surface);
+}
+
+.ioc-group h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.ioc-group ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ioc-group li {
+    padding: 0.2rem 0;
+    border-top: 1px solid var(--chimera-border);
+    font-family: var(--chimera-font-mono);
+    font-size: 0.78rem;
+    overflow-wrap: anywhere;
+}
+
+.ioc-group li:first-child {
+    border-top: 0;
 }

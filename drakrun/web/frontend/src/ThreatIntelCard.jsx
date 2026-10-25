@@ -1,8 +1,63 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import { getIntel, getIntelProviders, refreshIntel } from "./intelApi.js";
 
 export function ThreatIntelCard({ analysisId, stage, isOffline = false }) {
     const [loaded, setLoaded] = useState(null);
+    const [settings, setSettings] = useState(null);
+    const [running, setRunning] = useState(false);
+    const [lookupError, setLookupError] = useState("");
+    const [refreshStarted, setRefreshStarted] = useState(0);
+    useEffect(() => {
+        if (isOffline) return;
+        let active = true;
+        getIntelProviders()
+            .then(({ data }) => {
+                if (active) setSettings(data);
+            })
+            .catch(() => {});
+        return () => {
+            active = false;
+        };
+    }, [isOffline]);
+    useEffect(() => {
+        if (!running) return;
+        let active = true;
+        const controller = new AbortController();
+        const timer = setInterval(() => {
+            if (Date.now() - refreshStarted >= 180000) {
+                setRunning(false);
+                setLookupError("Lookup still pending; check again later.");
+                return;
+            }
+            getIntel(analysisId, { signal: controller.signal })
+                .then(({ data }) => {
+                    if (!active) return;
+                    setLoaded(data);
+                    const generated = data?.payload?.online?.generated_at;
+                    if (generated && Date.parse(generated) >= refreshStarted)
+                        setRunning(false);
+                })
+                .catch(() => {
+                    if (active) setLookupError("Could not load lookup status.");
+                });
+        }, 5000);
+        return () => {
+            active = false;
+            clearInterval(timer);
+            controller.abort();
+        };
+    }, [running, analysisId, refreshStarted]);
+    const startLookup = async () => {
+        setLookupError("");
+        setRefreshStarted(Date.now());
+        setRunning(true);
+        try {
+            await refreshIntel(analysisId);
+        } catch {
+            setRunning(false);
+            setLookupError("Could not queue online lookup.");
+        }
+    };
     useEffect(() => {
         setLoaded(null);
         if (stage || isOffline) return;
@@ -11,8 +66,7 @@ export function ThreatIntelCard({ analysisId, stage, isOffline = false }) {
         let timer;
         const deadline = Date.now() + 15 * 60 * 1000;
         const load = () =>
-            axios
-                .get(`/intel/${analysisId}`, { signal: controller.signal })
+            getIntel(analysisId, { signal: controller.signal })
                 .then(({ data }) => {
                     if (active) setLoaded(data);
                 })
@@ -32,8 +86,10 @@ export function ThreatIntelCard({ analysisId, stage, isOffline = false }) {
             controller.abort();
         };
     }, [analysisId, stage, isOffline]);
-    const current = stage || loaded;
+    const current = loaded || stage;
     const payload = current?.payload;
+    const online = payload?.online;
+    const assessment = current?.assessment;
     const feeds = payload?.feeds || [];
     const matches = payload?.matches || [];
     const dates = [...new Set(feeds.map((feed) => feed.fetched_at))].join(", ");
@@ -52,6 +108,130 @@ export function ThreatIntelCard({ analysisId, stage, isOffline = false }) {
         <section className="card mb-3" aria-label="Threat intel">
             <div className="card-body">
                 <h5>Threat intel</h5>
+                {assessment && (
+                    <div role="status">
+                        <strong>
+                            {assessment.label}: {assessment.basis}
+                        </strong>
+                        <ul>
+                            {assessment.reasons?.map((reason) => (
+                                <li key={reason}>{reason}</li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+                {!isOffline && settings?.online_enabled === false && (
+                    <p>
+                        Online disabled. Set online_enabled = true in the
+                        [intel] configuration and start drakrun intel-worker.
+                    </p>
+                )}
+                {!isOffline && (
+                    <button
+                        className="btn btn-outline-secondary mb-2"
+                        disabled={running || !settings?.online_enabled}
+                        onClick={startLookup}
+                    >
+                        {running
+                            ? "Online lookup running"
+                            : "Run online lookup"}
+                    </button>
+                )}
+                {lookupError && <p role="alert">{lookupError}</p>}
+                {online && (
+                    <>
+                        <p>Connectivity: {online.connectivity}</p>
+                        <div aria-label="Provider status">
+                            {online.providers?.map((provider) => (
+                                <span key={provider.id} className="me-3">
+                                    {provider.id}:{" "}
+                                    {provider.status === "ok"
+                                        ? "ran"
+                                        : provider.status.replaceAll(
+                                              "_",
+                                              " ",
+                                          )}{" "}
+                                    ({provider.queried})
+                                </span>
+                            ))}
+                        </div>
+                        <div className="chimera-table-scroll">
+                            <table className="table table-sm">
+                                <thead>
+                                    <tr>
+                                        {[
+                                            "Provider",
+                                            "Observable",
+                                            "Verdict",
+                                            "Detections",
+                                            "Family / tags",
+                                            "First / last seen",
+                                            "Reference",
+                                        ].map((label) => (
+                                            <th key={label} scope="col">
+                                                {label}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {online.results?.map((row, index) => (
+                                        <tr key={index}>
+                                            <td>{row.provider}</td>
+                                            <td>{row.observable}</td>
+                                            <td>
+                                                {row.status === "ok"
+                                                    ? row.verdict
+                                                    : row.status.replaceAll(
+                                                          "_",
+                                                          " ",
+                                                      )}
+                                            </td>
+                                            <td>
+                                                {row.detections
+                                                    ? `${row.detections.malicious || 0}/${row.detections.total || 0}`
+                                                    : "—"}
+                                            </td>
+                                            <td>
+                                                {[
+                                                    row.family,
+                                                    ...(row.tags || []),
+                                                ]
+                                                    .filter(Boolean)
+                                                    .join(", ")}
+                                            </td>
+                                            <td>
+                                                {row.first_seen || "unknown"} /{" "}
+                                                {row.last_seen || "unknown"}
+                                            </td>
+                                            <td>
+                                                {row.permalink &&
+                                                    /^https:\/\//.test(
+                                                        row.permalink,
+                                                    ) && (
+                                                        <a
+                                                            href={row.permalink}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                        >
+                                                            Open provider
+                                                        </a>
+                                                    )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </>
+                )}
+                {!feeds.length && (
+                    <p>
+                        No offline feed bundle is installed on the host. Import
+                        one with <code>drakrun intel import bundle.tar.gz</code>{" "}
+                        (needs <code>[intel] enabled = true</code>).
+                    </p>
+                )}
                 {!payload ? (
                     <span className="badge bg-secondary">
                         {!current && !isOffline

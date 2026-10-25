@@ -18,13 +18,30 @@ export function useAnalysisReport() {
     return useContext(AnalysisReportContext);
 }
 
+// A finished analysis' process tree does not change; the report shows it twice (top of the page and the peek
+// drawer), so it is fetched once per analysis.
+const treeCache = new Map();
+function cachedProcessTree({ analysisId }) {
+    if (!treeCache.has(analysisId)) {
+        if (treeCache.size > 20) treeCache.clear();
+        treeCache.set(
+            analysisId,
+            getAnalysisProcessTree({ analysisId }).catch((error) => {
+                treeCache.delete(analysisId);
+                throw error;
+            }),
+        );
+    }
+    return treeCache.get(analysisId);
+}
+
 export function OnlineAnalysisReportProvider({ analysisInfo, children }) {
     const contextValue = useMemo(
         () => ({
             analysisInfo,
             getAnalysisSummary,
             getProcessInfo,
-            getAnalysisProcessTree,
+            getAnalysisProcessTree: cachedProcessTree,
             getScreenshotURL: (analysis_id, screenshot_idx) =>
                 `${BASE_URL}/screenshot/${analysis_id}/${screenshot_idx}`,
             isOffline: false,

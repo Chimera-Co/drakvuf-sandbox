@@ -3,6 +3,8 @@ import { AnalysisStatusBadge } from "./AnalysisStatusBadge.jsx";
 import { AnalysisMetadataTable } from "./AnalysisMetadataTable.jsx";
 import { useState } from "react";
 import { Tab, TabSwitcher } from "./TabSwitcher.jsx";
+import { PipelineStatus } from "./PipelineStatus.jsx";
+import "./AnalysisWorkspace.css";
 
 export function AnalysisPendingStatusBox({ children }) {
     return (
@@ -75,6 +77,17 @@ export function AnalysisRemainingTimeBadge({ remainingTime }) {
 export function AnalysisPendingView({ analysis }) {
     return (
         <>
+            <header className="report-head">
+                <div className="min-width-0">
+                    <h1>
+                        {analysis.file?.name ||
+                            analysis.options?.sample_filename ||
+                            "Analysis"}
+                    </h1>
+                    <div className="report-sub">Analysis in progress</div>
+                </div>
+            </header>
+            <PipelineStatus analysisId={analysis.id} />
             <div className="row">
                 <div className="col">
                     <AnalysisPendingStatusBox>

@@ -8,7 +8,6 @@ from rq.exceptions import NoSuchJobError
 from rq.job import Job, JobStatus
 
 from drakrun.analyzer.analysis_metadata import AnalysisMetadata, FileMetadata
-from drakrun.analyzer.analysis_options import AnalysisOptions
 from drakrun.analyzer.postprocessing.indexer import (
     get_log_index_for_process,
     get_plugin_names_for_process,
@@ -28,6 +27,7 @@ from drakrun.analyzer.worker import (
 )
 from drakrun.analyzer.static.worker import enqueue_static_only, stage_and_enqueue
 from drakrun.lib.config import load_config
+from drakrun.lib.intel.online.options import OnlineAnalysisOptions
 from drakrun.lib.paths import STATIC_DIR, UPLOADS_DIR
 from drakrun.lib.s3_storage import get_s3_client, is_s3_enabled, upload_sample_to_s3
 from drakrun.web.schema import (
@@ -58,13 +58,21 @@ from drakrun.web.storage import (
 ANALYSES_LIST_MAX_LENGTH = 100
 api = APIBlueprint("api", __name__, url_prefix="/api")
 
+
+class OnlineUploadForm(UploadFileForm):
+    intel_online: bool | None = None
+
+
 config = load_config()
 redis = get_redis_connection(config.redis)
 logger = logging.getLogger(__name__)
 
 
 @api.post("/upload", responses={200: UploadAnalysisResponse})
-def upload_sample(form: UploadFileForm):
+def upload_sample(form: OnlineUploadForm):
+    intel_online = (
+        config.intel.online_default if form.intel_online is None else form.intel_online
+    )
     if form.mode == "static-only":
         if not config.static.enabled:
             return jsonify({"error": "static analysis is disabled on this server"}), 400
@@ -118,8 +126,17 @@ def upload_sample(form: UploadFileForm):
         except Exception:
             logger.exception("Static analysis could not be queued for %s", job_id)
 
+        from drakrun.analyzer.static.worker import _write_json, job_dir
+
+        if config.intel.online_enabled:
+            intel_directory = job_dir(job_id)
+            intel_directory.mkdir(parents=True, exist_ok=True)
+            _write_json(
+                intel_directory, "online-options.json", {"intel_online": intel_online}
+            )
         if form.mode == "static-only":
-            analysis_options = AnalysisOptions(
+            analysis_options = OnlineAnalysisOptions(
+                intel_online=intel_online,
                 mode=form.mode,
                 plugins=[],
                 net_enable=False,
@@ -142,7 +159,8 @@ def upload_sample(form: UploadFileForm):
         else:
             sample_path = tmp_upload_path.as_posix()
 
-        analysis_options = AnalysisOptions.with_config_defaults(
+        analysis_options = OnlineAnalysisOptions.with_config_defaults(
+            intel_online=intel_online,
             config=config,
             guest_os=form.guest_os,
             mode=form.mode,
@@ -477,6 +495,18 @@ def static_memdumps(path: AnalysisRequestPath):
     )
 
 
+@api.get("/static/<task_uid>/mobsf", responses={404: APIErrorResponse})
+def static_mobsf(path: AnalysisRequestPath):
+    """MobSF APK scan (chimera-mobsf/1); 404 until it has run, or for anything but an APK."""
+    return send_entity_file(
+        path.task_uid,
+        "mobsf.json",
+        "application/json",
+        None,  # static reports always stay on the host (not in S3)
+        base_dir=STATIC_DIR,
+    )
+
+
 @api.get("/features/<task_uid>", responses={404: APIErrorResponse})
 def features(path: AnalysisRequestPath):
     return send_analysis_file(
@@ -620,3 +650,31 @@ def chimera_report_iocs_csv(path: AnalysisRequestPath):
             "X-Content-Type-Options": "nosniff",
         },
     )
+
+
+@api.get("/intel/providers")
+def intel_providers():
+    from drakrun.lib.intel.online import inventory
+
+    return jsonify(
+        {
+            "providers": inventory(config.intel),
+            "online_enabled": config.intel.online_enabled,
+            "online_default": config.intel.online_default,
+        }
+    )
+
+
+@api.post("/intel/<task_uid>/refresh")
+def refresh_intel(path: AnalysisRequestPath):
+    if not config.intel.online_enabled:
+        return (
+            jsonify({"error": "Online intel disabled; set intel.online_enabled=true"}),
+            409,
+        )
+    if _report_or_404(path.task_uid) is None:
+        return jsonify({"error": "Data not found"}), 404
+    from drakrun.lib.intel.online.run import enqueue
+
+    enqueue(path.task_uid, redis, {"intel_online": True})
+    return jsonify({"status": "queued"}), 202

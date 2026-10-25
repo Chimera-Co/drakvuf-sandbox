@@ -13,6 +13,13 @@ import { uploadSample } from "./api.js";
 
 vi.mock("./AnalysisFiles.jsx", () => ({ AnalysisFilesViewer: () => null }));
 vi.mock("./api.js", () => ({ uploadSample: vi.fn() }));
+vi.mock("./intelApi.js", () => ({
+    getIntel: vi.fn().mockResolvedValue({ data: { status: "unavailable" } }),
+    refreshIntel: vi.fn().mockResolvedValue({ data: { status: "queued" } }),
+    getIntelProviders: vi
+        .fn()
+        .mockRejectedValue(new Error("settings unavailable")),
+}));
 vi.mock("./PluginPicker.jsx", () => ({
     PluginPicker: () => <input name="plugins" value="procmon" readOnly />,
 }));

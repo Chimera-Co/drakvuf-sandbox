@@ -11,12 +11,21 @@ import {
     YAxis,
 } from "recharts";
 import { getDeepStatic, getStaticReport } from "../api.js";
+import { MobsfView } from "./MobsfView.jsx";
 import {
     SEVERITY_CLASS,
     StaticOverview,
     useOptionalJson,
 } from "../AnalysisVerdict.jsx";
 import "./static.css";
+import {
+    ElfDetails,
+    FileLayout,
+    FlaggedStrings,
+    ImportsView,
+    Indicators,
+    PeDetails,
+} from "./Insight.jsx";
 
 const text = (value) =>
     value == null
@@ -74,8 +83,11 @@ function List({ values = [] }) {
 }
 function Table({ label, columns, rows = [] }) {
     return (
-        <div className="table-responsive">
-            <table aria-label={label} className="table table-sm static-table">
+        <div className="chimera-table-scroll mb-2">
+            <table
+                aria-label={label}
+                className="table table-sm chimera-data-table static-table"
+            >
                 <thead>
                     <tr>
                         {columns.map((c) => (
@@ -89,7 +101,10 @@ function Table({ label, columns, rows = [] }) {
                     {rows.map((row, i) => (
                         <tr key={i}>
                             {row.map((v, j) => (
-                                <td className="text-break" key={j}>
+                                <td
+                                    className={j ? "cell-long" : "cell-short"}
+                                    key={j}
+                                >
                                     {v}
                                 </td>
                             ))}
@@ -133,6 +148,8 @@ export function Structure({ data }) {
     const profile = data.universal?.entropy_profile;
     return (
         <section aria-label="Structure">
+            <FileLayout data={data} />
+            {pe ? <PeDetails pe={pe} /> : <ElfDetails elf={data.elf} />}
             <h6>Header facts</h6>
             <Facts
                 block={b}
@@ -172,6 +189,7 @@ export function Structure({ data }) {
                     "Raw size",
                     "Entropy",
                     "Permissions / type",
+                    "Flags",
                 ]}
                 rows={(b.sections || []).map((s) => [
                     <span className="font-monospace">
@@ -198,6 +216,15 @@ export function Structure({ data }) {
                         </span>
                     ) : (
                         s.type
+                    ),
+                    (s.flags || []).length ? (
+                        <span className="text-warning-emphasis">
+                            {s.flags
+                                .map((f) => f.replaceAll("_", " "))
+                                .join(", ")}
+                        </span>
+                    ) : (
+                        "–"
                     ),
                 ])}
             />
@@ -247,7 +274,7 @@ export function Structure({ data }) {
                     Entropy profile not reported by this analyzer.
                 </p>
             )}
-            {pe ? (
+            {pe && !pe.imports_annotated ? (
                 <>
                     <h6>Imports ({pe.import_count ?? 0})</h6>
                     {Object.entries(pe.import_categories || {}).map(
@@ -293,7 +320,7 @@ export function Structure({ data }) {
                     <h6>Signature</h6>
                     <Facts block={pe.signature} />
                 </>
-            ) : (
+            ) : pe ? null : (
                 <>
                     <h6>Symbols ({b.symbol_count ?? 0})</h6>
                     <Facts block={b.symbol_categories} />
@@ -337,6 +364,8 @@ export function Strings({ data, deep }) {
     const visible = samples.filter(filter);
     return (
         <section aria-label="Strings">
+            <FlaggedStrings data={data} />
+            <h6>All strings</h6>
             <div className="d-flex flex-wrap gap-3 mb-3">
                 <label>
                     Search strings
@@ -822,14 +851,24 @@ function Workspace({ data, analysisId }) {
             data[key] &&
             typeof data[key] === "object",
     );
+    const indicatorCount = data.indicators?.length || 0;
     const tabs = [
         "Overview",
+        ...(indicatorCount ? ["Indicators"] : []),
         "Structure",
+        ...(supported ? ["Imports"] : []),
+        ...(fmt === "apk" ? ["Android (MobSF)"] : []),
         "Strings",
         "Capabilities",
         "Code",
         ...(formatTab ? ["Format details"] : []),
     ];
+    const tabLabel = (t) =>
+        t === "Indicators"
+            ? `Indicators (${indicatorCount})`
+            : t === "Imports" && (data.pe || data.elf)?.imports_summary
+              ? `Imports (${(data.pe || data.elf).imports_summary.total_count ?? 0})`
+              : t;
     const hidden = ["stack", "tight", "decoded"].reduce(
         (n, k) => n + (deep?.floss?.[k]?.count || 0),
         0,
@@ -848,7 +887,7 @@ function Workspace({ data, analysisId }) {
                         aria-pressed={tab === t}
                         onClick={() => setTab(t)}
                     >
-                        {t}
+                        {tabLabel(t)}
                     </button>
                 ))}
             </nav>
@@ -877,6 +916,12 @@ function Workspace({ data, analysisId }) {
                                       : "Not reported",
                             ],
                             ["YARA hits", data.universal?.yara?.length ?? 0],
+                            [
+                                "Indicators",
+                                data.indicators_summary
+                                    ? `${data.indicators_summary.high} high · ${data.indicators_summary.medium} medium · ${data.indicators_summary.low} low`
+                                    : "–",
+                            ],
                             [
                                 "capa capabilities",
                                 deep?.capa?.rules_total ?? "–",
@@ -921,7 +966,10 @@ function Workspace({ data, analysisId }) {
                     />
                 </>
             )}
+            {tab === "Indicators" && <Indicators data={data} />}
             {tab === "Structure" && <Structure data={data} />}
+            {tab === "Imports" && <ImportsView data={data} />}
+            {tab === "Android (MobSF)" && <MobsfView analysisId={analysisId} />}
             {tab === "Strings" && <Strings data={data} deep={deep} />}
             {tab === "Capabilities" && <Capabilities data={data} deep={deep} />}
             {tab === "Code" && (

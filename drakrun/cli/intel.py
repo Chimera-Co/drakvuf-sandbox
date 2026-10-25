@@ -53,3 +53,26 @@ def status():
         )
         for failure in latest.get("failures", []):
             click.echo(f"{failure['name']}: missing; fetch or parse failed")
+
+
+@intel.command("providers")
+@click.option("--test", "test_lookup", is_flag=True)
+def providers_command(test_lookup):
+    """Show key presence and optionally query the EICAR hash."""
+    from drakrun.lib.intel.online import inventory, providers
+    from drakrun.lib.intel.online.cache import Cache
+    from drakrun.lib.intel.online.base import key_exists
+
+    config = load_config().intel
+    cache = Cache(config.cache_path) if test_lookup else None
+    for provider, info in zip(providers(), inventory(config)):
+        message = f"{provider.id}: key_file={'yes' if key_exists(provider, config) else 'no'} configured={'yes' if info['configured'] else 'no'} enabled={'yes' if info['enabled'] else 'no'}"
+        if test_lookup and info["configured"] and info["enabled"]:
+            result = provider.lookup(
+                "sha256",
+                "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f",
+                config,
+                cache,
+            )
+            message += f" status={result['status']}"
+        click.echo(message)

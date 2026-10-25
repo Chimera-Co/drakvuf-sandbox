@@ -736,6 +736,36 @@ def build_report(
             }
         )
 
+    from drakrun.lib.intel.online.run import assessment as intel_assessment
+
+    online_results = (intel_payload.get("online") or {}).get("results", [])
+    assessed = intel_assessment(label, online_results)
+    assessment.update(assessed)
+    if assessed["basis"] != "behaviour model":
+        assessment["text"] = f"{assessed['label']}: {assessed['basis']}. " + "; ".join(
+            assessed["reasons"]
+        )
+    intel_stage["assessment"] = assessed
+    for index, result in enumerate(online_results):
+        if result.get("status") != "ok":
+            continue
+        eids = result.get("evidence_ids", [])
+        claim(
+            f"intel-online-{index}",
+            f"{result['provider']}: {result['observable']} — {result['verdict']}",
+            "observed",
+            "unknown",
+            eids,
+        )
+        iocs.append(
+            {
+                "type": result["type"],
+                "value": result["observable"],
+                "source": "intel:" + result["provider"],
+                "evidence_ids": eids,
+            }
+        )
+
     stages = {
         "static": static_stage,
         "dynamic": dynamic_stage,

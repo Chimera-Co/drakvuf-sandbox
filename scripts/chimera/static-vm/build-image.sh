@@ -67,7 +67,17 @@ if [ "${1:-}" != "--images" ]; then
     cp -L "$MNT/initrd.img" "$OUT/initrd.img.new"
     for m in dev/pts dev proc sys; do umount "$MNT/$m"; done
 else
+    # A loop device left on root.img (a desktop automount of the image, or a crashed earlier run) makes
+    # mount reuse it read-only and the reload fails half way. The VM is down (checked above): release them.
+    for dev in $(losetup -j "$ROOT" | cut -d: -f1); do
+        for target in $(findmnt -rn -S "$dev" -o TARGET); do umount "$target"; done
+        losetup -d "$dev" 2>/dev/null || true
+    done
     mount -o loop "$ROOT" "$MNT"
+    if findmnt -rn -M "$MNT" -o OPTIONS | grep -qw ro; then
+        echo "root.img mounted read-only; a loop device on it is still in use (losetup -j $ROOT)" >&2
+        exit 1
+    fi
 fi
 
 # Analyzer images into the read-only additional store (same podman version and driver as the guest).

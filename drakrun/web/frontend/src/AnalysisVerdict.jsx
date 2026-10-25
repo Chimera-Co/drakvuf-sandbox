@@ -158,37 +158,41 @@ export function ScoreBar({
     );
 }
 
-function ComponentRow({ name, component }) {
+function ComponentCard({ name, component, compact }) {
     return (
-        <tr>
-            <th className="text-capitalize">{name}</th>
-            <td>
-                <LabelBadge label={component.label} />{" "}
-                <span className="ms-1">
-                    decision score {formatScore(component.score)}
-                </span>
-                <span className="small ms-2">
+        <div className="verdict-component">
+            <div className="d-flex flex-wrap align-items-center gap-2">
+                <strong className="text-capitalize">{name}</strong>
+                <LabelBadge label={component.label} />
+                <span>decision score {formatScore(component.score)}</span>
+                <span className="small text-muted ms-auto">
                     weight {component.weight ?? "–"}
                 </span>
-                <ScoreBar
-                    score={component.score}
-                    label={`${name} decision score (0-1)`}
-                    threshold={false}
-                />
-                {component.model ? (
-                    <span className="text-muted ms-2 small">
-                        {component.model} {component.model_version}
-                    </span>
-                ) : null}
-                {component.explanation?.length ? (
-                    <Explanation lines={component.explanation} />
-                ) : null}
-            </td>
-        </tr>
+            </div>
+            <ScoreBar
+                score={component.score}
+                label={`${name} decision score (0-1)`}
+                threshold={false}
+            />
+            {component.model ? (
+                <div className="text-muted small">
+                    {component.model} {component.model_version}
+                </div>
+            ) : null}
+            {!compact && component.explanation?.length ? (
+                <Explanation lines={component.explanation} />
+            ) : null}
+        </div>
     );
 }
 
-export function VerdictCard({ analysisId }) {
+const hasProbability = (data) =>
+    typeof data.calibrated_probability === "number" &&
+    data.calibrated_probability >= 0 &&
+    data.calibrated_probability <= 1;
+
+// The whole verdict is shown at once (no inner scroll). `compact` (simple view) leaves out the per-model detail.
+export function VerdictCard({ analysisId, compact = false }) {
     const { loading, data, missing, polling, error } = useOptionalJson(
         getClassification,
         analysisId,
@@ -214,36 +218,33 @@ export function VerdictCard({ analysisId }) {
         );
     else {
         const components = Object.entries(data.components || {});
+        // Only components that produced a verdict count: a static-only run has no dynamic side to agree with.
+        const ran = components.filter(
+            ([, c]) => c?.score != null && c.label && c.label !== "unknown",
+        );
+        const disagree = new Set(ran.map(([, c]) => c.label)).size > 1;
         body = (
             <>
-                <div className="d-flex align-items-center mb-2">
-                    <span className="fs-5 me-2">
+                <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <span className="fs-5">
                         <LabelBadge label={data.label} />
                     </span>
-                    {!(
-                        typeof data.calibrated_probability === "number" &&
-                        data.calibrated_probability >= 0 &&
-                        data.calibrated_probability <= 1
-                    ) && (
+                    {hasProbability(data) ? (
+                        <span>
+                            Calibrated probability:{" "}
+                            {(data.calibrated_probability * 100).toFixed(1)}%
+                        </span>
+                    ) : (
                         <span>
                             combined decision score {formatScore(data.score)}
                         </span>
                     )}
-                    {data.family ? (
-                        <span className="ms-3">family {data.family}</span>
-                    ) : null}
+                    {data.family ? <span>family {data.family}</span> : null}
                     <span className="text-muted ms-auto small">
                         {data.model} {data.model_version}
                     </span>
                 </div>
-                {typeof data.calibrated_probability === "number" &&
-                data.calibrated_probability >= 0 &&
-                data.calibrated_probability <= 1 ? (
-                    <div>
-                        Calibrated probability:{" "}
-                        {(data.calibrated_probability * 100).toFixed(1)}%
-                    </div>
-                ) : (
+                {!hasProbability(data) ? (
                     <>
                         <ScoreBar score={data.score} />
                         <div className="small text-muted mb-2">
@@ -251,38 +252,40 @@ export function VerdictCard({ analysisId }) {
                             calibrated; 0.50 is the malicious threshold.
                         </div>
                     </>
-                )}
-                {components.length > 1 && (
+                ) : null}
+                {ran.length > 1 && (
                     <div
-                        className={`alert py-2 small ${new Set(components.map(([, c]) => c.label)).size > 1 ? "alert-warning" : "alert-secondary"}`}
+                        className={`alert py-2 small ${disagree ? "alert-warning" : "alert-secondary"}`}
                     >
-                        {new Set(components.map(([, c]) => c.label)).size > 1
+                        {disagree
                             ? "Dynamic and static disagree"
                             : "Dynamic and static agree"}
                     </div>
                 )}
-                {components.length ? (
-                    <table className="datatable-table">
-                        <tbody>
-                            {components.map(([name, component]) => (
-                                <ComponentRow
-                                    key={name}
-                                    name={name}
-                                    component={component}
-                                />
-                            ))}
-                        </tbody>
-                    </table>
-                ) : (
+                {compact || !components.length ? (
                     <Explanation lines={data.explanation} />
-                )}
+                ) : null}
+                {components.length ? (
+                    <div
+                        className={`verdict-components ${compact ? "mt-2" : ""}`}
+                    >
+                        {components.map(([name, component]) => (
+                            <ComponentCard
+                                key={name}
+                                name={name}
+                                component={component}
+                                compact={compact}
+                            />
+                        ))}
+                    </div>
+                ) : null}
             </>
         );
     }
     return (
         <div className="card mb-2">
             <div className="card-body">
-                <h5 className="card-title h6">Classifier verdict</h5>
+                <h2 className="card-title h6">Classifier verdict</h2>
                 {body}
             </div>
         </div>

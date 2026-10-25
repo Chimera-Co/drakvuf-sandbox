@@ -42,11 +42,35 @@ static side never votes benign for them.
 
 DRAKVUF's memdump plugin saves memory regions on heuristics (remote thread creation, memory written and then
 executed, freed images). Packed malware often shows its real code only there. After each detonation the
-postprocessing step `queue_memdump_scan` puts a job on the deep queue: up to `memdump_scan_max` dumps (default 16,
-each at most `memdump_scan_max_mb` MiB) go through the same analyzer and sandbox as the upload. Dumps of the
-sample's own process tree come first, then dumps that start with an MZ header, then injection-type reasons, then
-size; identical contents are scanned once. Results go to `memdumps.json` (schema `chimera-memdumps/1`) and the
+postprocessing step `queue_memdump_scan` puts a job on the deep queue. Every distinct dump up to
+`memdump_scan_max_mb` MiB (default 64) goes through the same analyzer and sandbox as the upload (about 3-4 s per
+dump in the static VM). The scan stops at `memdump_scan_max` dumps (default 512) or after `memdump_scan_budget_s`
+seconds (default 1200), and `memdumps.json` records which (`stopped`), so a partial scan never looks complete.
+Order: dumps of the sample's own process tree, then dumps that start with an MZ header, then injection-type
+reasons, then size; identical contents are scanned once. Each dump keeps its YARA matches, analyzer findings,
+insight indicators of severity 2+ (for example injection imports in unpacked code), embedded executables and
+IOCs. Results go to `memdumps.json` (schema `chimera-memdumps/1`) and the
 "Memory dumps" tab. They are **not** classifier features: they never change the verdict.
+
+## Android APKs (MobSF)
+
+With `[static] mobsf_enabled = true`, an APK goes from the fast pass to MobSF on the deep queue
+(`drakrun/analyzer/static/mobsf.py`). Each APK gets a fresh MobSF container in dom0 with `--network none`,
+`--cap-drop ALL`, `no-new-privileges`, a memory and process cap, the sample mounted read-only and
+`noexec`, and a random API key; the container is removed afterwards. MobSF's online lookups therefore fail
+closed and nothing leaves the host. The summary (security score, findings, permissions with dangerous ones first,
+code and manifest findings with CWE/OWASP/MASVS, trackers, domains and URLs) goes to `mobsf.json`
+(schema `chimera-mobsf/1`) and the "Android (MobSF)" tab of the static analysis. It never feeds the classifier.
+Dynamic Android analysis (an emulator) is not part of this.
+
+Enable (the image is about 934 MiB from Docker Hub):
+
+```bash
+sudo podman pull docker.io/opensecurity/mobile-security-framework-mobsf:v4.5.3
+```
+
+then add `mobsf_enabled = true` under `[static]` in `/etc/drakrun/config.toml` and restart
+`drakrun-static-worker` and `drakrun-static-deep-worker`.
 
 ## Security
 
@@ -101,6 +125,35 @@ memdump_scan_enabled = true   # scan the run's memory dumps on the deep queue (d
 ```
 
 The analyzer needs no packages in the drakrun venv: they live in the image (`static_analyzer/requirements.txt`).
+
+## Analyst insight in `chimera-static/1`
+
+The fast pass adds structured metadata without changing existing fields or the scored `findings` subset.
+PE output includes decoded headers and directories, section permissions and hashes, annotated imports and
+exports, resource content types and hashes, manifests, version details, debug/PDB records, Rich toolchain
+entries, TLS callbacks, load configuration, certificate status, overlays, and file and memory layouts.
+Existing `imports`, `exports`, `resources`, `version_info`, and the boolean `rich_header` remain available;
+expanded records use `imports_annotated`, `exports_annotated`, `resources_annotated`, `version_fixed`,
+`version_flags`, and `rich_header_details`.
+
+ELF output adds decoded headers and program headers, annotated symbols, dynamic linker paths and flags,
+interpreter and build notes, Go/Rust hints, file and memory layouts, and PIE, NX, RELRO, canary, FORTIFY and
+stripping information. A shared library's position independence is distinguished from executable PIE.
+Absent GNU_STACK information leaves NX unknown.
+
+Top-level `indicators` contains observations sorted by numeric severity (3 high, 2 medium, 1 low),
+with categories, explanations, short evidence and technique IDs; `indicators_summary` counts each severity.
+These observations do not alter the score. `universal.strings_flagged` records matched text, byte offset,
+encoding, category and severity; `strings_summary` counts category matches. Existing strings and IOCs remain
+unchanged. API names in strings suggest possible dynamic resolution, not proof that a function executes.
+
+Bundled JSON tables under `chimera_static/knowledge/` supply Windows API, DLL, Linux symbol and string-rule
+annotations. They are loaded lazily and require no network access or additional dependencies.
+Function annotations are limited to 3,000, resource records to 500, and flagged strings to 600. Truncation and
+scan limits are recorded alongside the output. String inspection examines at most 32 MiB and 100,000 string
+candidates. Insight entropy samples at most the first MiB of each region; hashes cover the available bytes.
+File layouts partition the file in offset order, splitting overlaps and separating certificate bytes from
+overlays. Missing or malformed fields and unverified signatures must not be interpreted as benign evidence.
 
 ## Develop
 

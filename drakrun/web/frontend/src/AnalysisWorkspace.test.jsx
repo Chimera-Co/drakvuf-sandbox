@@ -4,6 +4,7 @@ import {
     fireEvent,
     render,
     screen,
+    within,
     waitFor,
 } from "@testing-library/react";
 import { StructuredTable } from "./StructuredLogs.jsx";
@@ -90,7 +91,7 @@ it("shows hostile event content as text and pages events", () => {
     );
     expect(container.querySelector("img")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Close details" }));
-    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
     expect(screen.getAllByRole("button", { name: "Inspect" })).toHaveLength(20);
 });
 it("builds virtual folders and nested directories", () => {
@@ -260,9 +261,39 @@ it("navigates call graph and disassembly", () => {
         },
     ];
     render(<CodeExplorer format="pe" deep={{ ghidra: { functions } }} />);
-    fireEvent.click(screen.getByRole("button", { name: "Navigate to worker" }));
-    fireEvent.click(screen.getByLabelText("Disassembly"));
+    // proximity graph: entry calls worker
+    fireEvent.click(screen.getByRole("button", { name: "Open worker" }));
+    fireEvent.click(screen.getByRole("button", { name: "Disassembly" }));
     expect(screen.getByText("RET")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Split" }));
+    expect(screen.getByText("RET")).toBeTruthy();
+    expect(screen.getByLabelText("Decompiled source").textContent).toContain(
+        "return 2;",
+    );
+});
+it("opens functions in tabs that can be closed", () => {
+    const functions = [
+        { address: "0x1", name: "entry", reasons: ["entry"], c: "return 1;" },
+        { address: "0x2", name: "worker", c: "return 2;" },
+        { address: "0x3", name: "helper", c: "return 3;" },
+    ];
+    render(<CodeExplorer format="pe" deep={{ ghidra: { functions } }} />);
+    const list = screen.getByRole("complementary", { name: "Functions" });
+    fireEvent.click(within(list).getByText("worker"));
+    fireEvent.click(within(list).getByText("helper"));
+    const tabs = () =>
+        screen.getAllByRole("tab").map((tab) => tab.textContent);
+    expect(tabs()).toEqual(["entry", "worker", "helper"]);
+    fireEvent.click(screen.getByRole("button", { name: "Close helper" }));
+    expect(tabs()).toEqual(["entry", "worker"]);
+    expect(screen.getByLabelText("Decompiled source").textContent).toContain(
+        "return 2;",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Close others" }));
+    expect(tabs()).toEqual(["worker"]);
+    fireEvent.click(screen.getByRole("button", { name: "Close worker" }));
+    expect(screen.queryAllByRole("tab")).toHaveLength(0);
+    expect(screen.getByText(/No function open/)).toBeTruthy();
 });
 it("renders unknown blocks and decoded source layers as text", () => {
     const { container } = render(
