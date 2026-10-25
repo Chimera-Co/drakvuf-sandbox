@@ -180,3 +180,46 @@ def test_plugin_writes_both_files_and_flags_metadata(tmp_path):
     page = (directory / "chimera-report.html").read_text()
     assert page.startswith("<!doctype html>")
     assert context.flags == {"chimera_report": True}
+
+
+def test_ioc_export_is_spreadsheet_safe_and_cites_evidence():
+    import csv
+    import io
+
+    from drakrun.analyzer.postprocessing.plugins.build_chimera_report import (
+        iocs_csv,
+        iocs_export,
+    )
+
+    report = {
+        "analysis_id": "a7",
+        "sample": {"sha256": "a" * 64},
+        "iocs": [
+            {
+                "type": "domain",
+                "value": '=HYPERLINK("x")',
+                "source": "dns",
+                "evidence_ids": ["e2"],
+            },
+            {"type": "url", "value": "@SUM(1)", "source": "-cmd", "evidence_ids": []},
+            {
+                "type": "endpoint",
+                "value": "10.0.0.1:80",
+                "protocol": "tcp",
+                "source": "conn",
+            },
+        ],
+        "evidence": [
+            {"id": "e1", "artifact": "report.json"},
+            {"id": "e2", "artifact": "report.json"},
+        ],
+    }
+    exported = iocs_export(report)
+    assert exported["schema"] == "chimera-iocs/1" and len(exported["iocs"]) == 3
+    assert [e["id"] for e in exported["evidence"]] == ["e2"]
+    rows = list(csv.reader(io.StringIO(iocs_csv(report))))
+    assert rows[0][:2] == ["type", "value"] and len(rows) == 4
+    assert rows[1][1] == '\'=HYPERLINK("x")' and rows[1][5] == "e2"
+    assert rows[2][1] == "'@SUM(1)" and rows[2][2] == "'-cmd"
+    assert rows[3][1] == "10.0.0.1:80" and rows[3][3] == "tcp"
+    assert all(not cell[:1] in "=+-@" for row in rows for cell in row if cell)

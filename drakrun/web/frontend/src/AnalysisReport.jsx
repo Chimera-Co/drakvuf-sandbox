@@ -438,6 +438,22 @@ export function AnalysisReport() {
                                 ) : (
                                     []
                                 )}
+                                {analysis["chimera_report"]
+                                    ? ["csv", "json"].map((format) => (
+                                          <a
+                                              key={format}
+                                              href={`${baseUrl}/chimera_report/${analysis.id}/iocs.${format}`}
+                                          >
+                                              <button className="btn btn-outline-primary m-1">
+                                                  <FontAwesomeIcon
+                                                      icon={faDownload}
+                                                      className="me-2"
+                                                  />
+                                                  IOCs ({format.toUpperCase()})
+                                              </button>
+                                          </a>
+                                      ))
+                                    : []}
                             </div>
                         </div>
                     ) : (

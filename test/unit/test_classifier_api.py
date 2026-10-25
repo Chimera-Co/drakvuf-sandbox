@@ -90,3 +90,24 @@ def test_chimera_report_is_served_with_a_locked_down_policy(api_client, tmp_path
     policy = response.headers["Content-Security-Policy"]
     assert "default-src 'none'" in policy and "script-src" not in policy
     assert response.headers["X-Content-Type-Options"] == "nosniff"
+
+
+def test_ioc_exports_download_from_the_report(api_client, tmp_path):
+    task_uid = str(uuid.uuid4())
+    assert api_client.get(f"/api/chimera_report/{task_uid}/iocs.csv").status_code == 404
+    directory = tmp_path / task_uid
+    directory.mkdir()
+    report = {
+        "analysis_id": task_uid,
+        "sample": {"sha256": "b" * 64},
+        "iocs": [{"type": "domain", "value": "+x.example", "source": "dns"}],
+        "evidence": [],
+    }
+    (directory / "chimera-report.json").write_text(json.dumps(report))
+    response = api_client.get(f"/api/chimera_report/{task_uid}/iocs.csv")
+    assert response.status_code == 200 and response.mimetype == "text/csv"
+    assert "attachment" in response.headers["Content-Disposition"]
+    assert '"\'+x.example"' in response.text
+    response = api_client.get(f"/api/chimera_report/{task_uid}/iocs.json")
+    assert response.json["iocs"][0]["value"] == "+x.example"
+    assert "attachment" in response.headers["Content-Disposition"]

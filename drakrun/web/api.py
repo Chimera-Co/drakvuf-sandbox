@@ -14,6 +14,10 @@ from drakrun.analyzer.postprocessing.indexer import (
     get_plugin_names_for_process,
     scattered_read_file,
 )
+from drakrun.analyzer.postprocessing.plugins.build_chimera_report import (
+    iocs_csv,
+    iocs_export,
+)
 from drakrun.analyzer.postprocessing.process_tree import tree_from_dict
 from drakrun.analyzer.worker import (
     analysis_job_to_metadata,
@@ -511,3 +515,37 @@ def chimera_report_html(path: AnalysisRequestPath):
         )
         response.headers["X-Content-Type-Options"] = "nosniff"
     return response
+
+
+def _report_or_404(task_uid: str):
+    try:
+        return read_analysis_json(task_uid, "chimera-report.json", config.s3)
+    except FileNotFoundError:
+        return None
+
+
+@api.get("/chimera_report/<task_uid>/iocs.json", responses={404: APIErrorResponse})
+def chimera_report_iocs_json(path: AnalysisRequestPath):
+    report = _report_or_404(path.task_uid)
+    if report is None:
+        return jsonify({"error": "Data not found"}), 404
+    response = jsonify(iocs_export(report))
+    response.headers["Content-Disposition"] = (
+        f"attachment; filename=iocs-{path.task_uid}.json"
+    )
+    return response
+
+
+@api.get("/chimera_report/<task_uid>/iocs.csv", responses={404: APIErrorResponse})
+def chimera_report_iocs_csv(path: AnalysisRequestPath):
+    report = _report_or_404(path.task_uid)
+    if report is None:
+        return jsonify({"error": "Data not found"}), 404
+    return Response(
+        iocs_csv(report),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=iocs-{path.task_uid}.csv",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )

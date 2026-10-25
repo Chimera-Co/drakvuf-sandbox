@@ -11,9 +11,11 @@ the rest of the guest's activity is counted but not listed. Every claim points a
 (artifact file + SHA-256 + a JSON-pointer selector), so a reader can check it against the raw data.
 """
 
+import csv
 import datetime
 import hashlib
 import html
+import io
 import json
 import logging
 import pathlib
@@ -848,6 +850,53 @@ def render_html(r: dict) -> str:
         "print this page to save it as PDF.</footer></main></body></html>"
     )
     return "".join(out)
+
+
+# ------------------------------------------------------------------ IOC export
+IOC_SCHEMA = "chimera-iocs/1"
+CSV_COLUMNS = (
+    "type",
+    "value",
+    "source",
+    "protocol",
+    "method",
+    "evidence",
+    "analysis_id",
+    "sample_sha256",
+)
+
+
+def iocs_export(r: dict) -> dict:
+    """The report's indicators with the evidence entries they cite, nothing else."""
+    cited = {i for ioc in r.get("iocs") or [] for i in ioc.get("evidence_ids") or []}
+    return {
+        "schema": IOC_SCHEMA,
+        "analysis_id": r.get("analysis_id"),
+        "sample_sha256": (r.get("sample") or {}).get("sha256"),
+        "report_generated_at": r.get("generated_at"),
+        "note": "Network indicators were seen under a simulated network (INetSim); "
+        "file strings were never observed in use.",
+        "iocs": r.get("iocs") or [],
+        "evidence": [e for e in r.get("evidence") or [] if e.get("id") in cited],
+    }
+
+
+def _cell(value) -> str:
+    # Values come from the sample. A leading = + - @ (or tab/CR) would make a spreadsheet run a formula.
+    text = "" if value is None else str(value)
+    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
+
+
+def iocs_csv(r: dict) -> str:
+    out = io.StringIO()
+    writer = csv.writer(out, quoting=csv.QUOTE_ALL, lineterminator="\r\n")
+    writer.writerow(CSV_COLUMNS)
+    sha = (r.get("sample") or {}).get("sha256")
+    for ioc in r.get("iocs") or []:
+        row = [ioc.get(k) for k in CSV_COLUMNS[:5]]
+        row += [";".join(ioc.get("evidence_ids") or []), r.get("analysis_id"), sha]
+        writer.writerow([_cell(v) for v in row])
+    return out.getvalue()
 
 
 def build_chimera_report(context: PostprocessContext) -> None:
