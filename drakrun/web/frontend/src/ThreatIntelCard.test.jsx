@@ -106,7 +106,31 @@ it("shows individual missing feeds beside successful feeds", () => {
     );
 });
 
-it("shows assessment, provider outcomes and bounded online results", () => {
+it("groups online results, hides providers without keys and opens VirusTotal detail", () => {
+    const vtDomain = {
+        provider: "virustotal",
+        observable: "evil.example",
+        type: "domain",
+        origin: "dynamic",
+        status: "ok",
+        verdict: "malicious",
+        detections: { malicious: 54, suspicious: 2, total: 72 },
+        family: "fixture",
+        tags: [],
+        permalink: "https://www.virustotal.com/gui/domain/evil.example",
+        details: {
+            engines: [
+                {
+                    engine: "EngineA",
+                    category: "malicious",
+                    result: "Trojan.X",
+                },
+            ],
+            engines_flagged: 1,
+            threat: { label: "trojan.fixture" },
+            network: { registrar: "Registrar Inc" },
+        },
+    };
     render(
         <ThreatIntelCard
             isOffline
@@ -118,33 +142,55 @@ it("shows assessment, provider outcomes and bounded online results", () => {
                 },
                 payload: {
                     online: {
-                        connectivity: "partial",
+                        connectivity: "online",
+                        generated_at: "2026-10-25T10:00:00+00:00",
                         providers: [
-                            { id: "virustotal", status: "ok", queried: 1 },
-                            { id: "otx", status: "not_configured", queried: 0 },
-                            { id: "urlhaus", status: "offline", queried: 0 },
                             {
-                                id: "abuseipdb",
-                                status: "rate_limited",
-                                queried: 0,
+                                id: "virustotal",
+                                configured: true,
+                                status: "ok",
+                                queried: 2,
                             },
                             {
-                                id: "hybridanalysis",
-                                status: "error",
+                                id: "otx",
+                                configured: false,
+                                status: "not_configured",
                                 queried: 0,
                             },
                         ],
                         results: [
                             {
-                                provider: "virustotal",
-                                observable: "example.org",
+                                provider: "malwarebazaar",
+                                observable: "a".repeat(64),
+                                type: "sha256",
+                                origin: "sample",
+                                status: "not_found",
+                                verdict: "unknown",
+                            },
+                            vtDomain,
+                            {
+                                provider: "urlhaus",
+                                observable: "evil.example",
+                                type: "domain",
+                                origin: "dynamic",
+                                status: "not_found",
+                                verdict: "unknown",
+                            },
+                            {
+                                provider: "otx",
+                                observable: "evil.example",
+                                type: "domain",
+                                status: "not_configured",
+                                verdict: "unknown",
+                            },
+                            {
+                                provider: "urlscan",
+                                observable: "quiet.example",
+                                type: "domain",
+                                origin: "static",
                                 status: "ok",
-                                verdict: "malicious",
-                                detections: { malicious: 54, total: 72 },
-                                family: "fixture",
-                                tags: [],
-                                permalink:
-                                    "https://www.virustotal.com/gui/domain/example.org",
+                                verdict: "unknown",
+                                details: { count: 12, malicious_count: 0 },
                             },
                         ],
                     },
@@ -153,15 +199,40 @@ it("shows assessment, provider outcomes and bounded online results", () => {
         />,
     );
     expect(screen.getByText("malicious: known malware")).toBeTruthy();
-    expect(screen.getByText("54/72")).toBeTruthy();
-    expect(screen.getByText(/otx: not configured/)).toBeTruthy();
-    expect(screen.getByText(/urlhaus: offline/)).toBeTruthy();
-    expect(screen.getByText(/abuseipdb: rate limited/)).toBeTruthy();
-    expect(screen.getByText(/hybridanalysis: error/)).toBeTruthy();
-    expect(screen.getByRole("link").rel).toBe("noopener noreferrer");
-    expect(screen.getByRole("table").parentElement.className).toBe(
-        "chimera-table-scroll",
+    expect(screen.getByText("1 flagged")).toBeTruthy();
+    expect(screen.getAllByText("Not listed")).toHaveLength(2);
+    const table = screen.getByRole("table", {
+        name: "Online lookups by indicator",
+    });
+    const rows = table.querySelectorAll("tbody tr");
+    expect(rows[0].textContent).toContain("evil.example"); // flagged first
+    expect(rows[0].textContent).toContain("Sample's processes");
+    expect(rows[0].textContent).not.toContain("AlienVault OTX"); // no key: not shown per indicator
+    expect(rows[1].textContent).toContain("Seen in 12 scans, 0 malicious");
+    const link = screen.getByText("Malicious 54/72 · fixture");
+    expect(link.tagName).toBe("A");
+    expect(link.rel).toBe("noopener noreferrer");
+    fireEvent.click(screen.getByText("VirusTotal detail"));
+    expect(screen.getByText("trojan.fixture")).toBeTruthy();
+    expect(screen.getByText("Trojan.X")).toBeTruthy();
+    expect(screen.getByText("Registrar Inc")).toBeTruthy();
+    expect(screen.getByLabelText("54 of 72 engines")).toBeTruthy();
+});
+
+it("queues an offline re-check", async () => {
+    axios.get.mockResolvedValue({ data: { online_enabled: true } });
+    axios.post.mockResolvedValue({ data: { status: "queued" } });
+    render(
+        <ThreatIntelCard
+            analysisId="fixture"
+            stage={{ status: "unavailable" }}
+        />,
     );
+    fireEvent.click(screen.getByText("Re-check offline feeds"));
+    await waitFor(() =>
+        expect(axios.post).toHaveBeenCalledWith("/intel/fixture/recheck"),
+    );
+    expect(screen.getByText("Re-checking offline feeds").disabled).toBe(true);
 });
 
 it("explains disabled online lookups", async () => {

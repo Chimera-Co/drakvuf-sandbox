@@ -63,6 +63,21 @@ read -rsp "VirusTotal key: " k && echo && printf '%s' "$k" | sudo tee /etc/chime
 The file name is the provider id (`virustotal`, `otx`, `abuseipdb`, `greynoise`, `hybridanalysis`, `urlscan`);
 abuse.ch providers use `/etc/chimera/abusech-auth-key`.
 
+What is looked up: the sample's hashes, then observables from the **sample's own process tree** (DNS, HTTP,
+TLS SNI, connections, files it dropped), then IOCs from memory dumps of that tree, then static strings. Activity
+of other guest processes (Windows services, updates, telemetry) is never sent. Names that are not public
+(`localhost`, `.local`, `.lan`, `.internal`, `.arpa`, ...), well-known background services (Microsoft/Windows
+update and telemetry hosts, certificate and OCSP hosts, the INetSim fake internet) and string artefacts that only
+look like hosts (version numbers such as `1.9.16.1`, one-letter domains, over-long label chains) are dropped
+before any request. Only configured providers are called; a result counts as a match only when the provider
+flags it malicious or suspicious.
+
+VirusTotal results keep a detailed view: engine detections (flagged engines first), the popular threat label and
+family names, crowdsourced YARA/Sigma/IDS hits, sandbox verdicts, first/last seen and file or network facts
+(registrar, ASN, country, categories). They are shown as evidence beside the verdict, not as classifier features:
+the models are trained from files and behaviour, and VirusTotal detections are kept for labelling and
+evaluation.
+
 Pacing: a lookup waits for its provider's interval (up to 20 s) instead of failing, and each provider gets a
 fixed number of lookups per analysis, the sample's hashes first, then dynamic observables, then static ones.
 The sample's SHA-1/MD5 are skipped when the SHA-256 is queried.

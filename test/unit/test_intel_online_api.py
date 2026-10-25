@@ -36,6 +36,18 @@ def test_refresh(api_client, base_config, tmp_path, monkeypatch):
     assert queue.call_args.args[2] == {"intel_online": True}
 
 
+def test_offline_recheck_queues_a_report_rebuild(api_client, tmp_path, monkeypatch):
+    uid = str(uuid.uuid4())
+    assert api_client.post(f"/api/intel/{uid}/recheck").status_code == 404
+    directory = tmp_path / uid
+    directory.mkdir()
+    (directory / "chimera-report.json").write_text(json.dumps({"stages": {}}))
+    queue = Mock()
+    monkeypatch.setattr("rq.Queue", queue)
+    assert api_client.post(f"/api/intel/{uid}/recheck").status_code == 202
+    assert queue.return_value.enqueue.call_args.kwargs["job_id"] == f"intel-recheck-{uid}"
+
+
 @pytest.mark.parametrize("mode", ["combined", "static-only"])
 @pytest.mark.parametrize("choice", [None, "true", "false"])
 def test_upload_online_option(upload, mode, choice):

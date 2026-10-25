@@ -163,7 +163,7 @@ export function ChimeraIntro() {
         >
             <div className="chimera-intro__splash">
                 <div className="chimera-intro__mark">
-                    {/* Dark Solarized backdrop -> white ("light") creature. */}
+                    {/* Every scheme's shell is dark -> white ("light") creature. */}
                     <ChimeraLogo size={168} variant="light" />
                 </div>
                 <div className="chimera-intro__wordmark">Chimera</div>
@@ -188,6 +188,9 @@ export function ChimeraIntro() {
                     onEnded={leave}
                     onError={leave}
                 />
+            )}
+            {!reducedMotion && phase === "video" && (
+                <div className="chimera-intro__tint" />
             )}
         </div>
     );

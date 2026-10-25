@@ -73,6 +73,8 @@ class Provider:
     # Observables looked up per analysis (sample hash first, then observed network indicators, then strings).
     max_lookups = 20
     header = None
+    # Larger details are dropped (only `truncated` kept) so one provider cannot bloat the report.
+    max_details_bytes = 8192
 
     def result(self, kind, value, status="ok", **fields):
         return dict(
@@ -134,7 +136,7 @@ class Provider:
             if len(raw) > 2 * 1024 * 1024:
                 raise ValueError("response too large")
             result.update(bounded(self.parse(json.loads(raw), kind, value)))
-            if len(json.dumps(result.get("details", {}))) > 8192:
+            if len(json.dumps(result.get("details", {}))) > self.max_details_bytes:
                 result["details"] = {"truncated": True}
             # Reject provider echoes before either the cache or report receives them.
             if key and key in json.dumps(result, ensure_ascii=False):
@@ -146,7 +148,11 @@ class Provider:
                 else "rate_limited" if error.code == 429 else "error"
             )
             result["details"] = {
-                "reason": "bad key" if error.code in (401, 403) else "HTTP failure",
+                "reason": (
+                    "bad key"
+                    if error.code in (401, 403)
+                    else "not in the provider's data" if error.code == 404 else "HTTP failure"
+                ),
                 "http_status": error.code,
             }
         except (TimeoutError, socket.timeout):

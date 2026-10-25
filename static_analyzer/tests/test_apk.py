@@ -160,3 +160,11 @@ def test_full_analyzer_routes_apk_and_never_reports_complete(tmp_path):
     assert r["type"]["format"] == "apk" and "apk" in r
     assert any(f["source"] == "apk" and f["severity"] == "high" for f in r["findings"])
     assert r["coverage"]["type_plugin"] == "apk" and r["coverage"]["complete"] is False
+
+
+def test_multidex_alone_is_low_and_native_libs_are_not_embedded_executables():
+    dex = dex_bytes(["ordinary"])
+    out, findings = analyze_apk(apk_bytes(members=[("classes.dex", dex), ("classes2.dex", dex),
+                                                  ("lib/arm64-v8a/a.so", b"\x7fELF" + b"\0" * 60)]))
+    severities = {f["id"]: f["severity"] for f in findings}
+    assert severities.get("apk_multidex") == "low" and "apk_packed" not in severities

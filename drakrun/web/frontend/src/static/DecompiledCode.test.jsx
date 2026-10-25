@@ -1,0 +1,77 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { DecompiledCodeTab } from "./DecompiledCode.jsx";
+import {
+    getDeepStatic,
+    getMobsf,
+    getMobsfSource,
+    getStaticReport,
+} from "../api.js";
+import pe from "../__fixtures__/static-pe.json";
+import ghidra from "../__fixtures__/deep-ghidra.json";
+vi.mock("../api.js");
+afterEach(() => {
+    cleanup();
+    vi.resetAllMocks();
+});
+describe("decompiled code tab", () => {
+    it("shows Ghidra's functions with highlighted C", async () => {
+        getStaticReport.mockResolvedValue(pe);
+        getDeepStatic.mockResolvedValue(ghidra);
+        const { container } = render(<DecompiledCodeTab analysisId="a1" />);
+        expect(await screen.findByText(/Ghidra 11/)).toBeInTheDocument();
+        expect(container.querySelector(".syntax-keyword")).not.toBeNull();
+        // decompiler output is shown as text, never as markup
+        expect(container.querySelector("script")).toBeNull();
+    });
+    it("explains when the file is not PE or ELF", async () => {
+        getStaticReport.mockResolvedValue({ type: { format: "pdf" } });
+        render(<DecompiledCodeTab analysisId="a1" />);
+        expect(
+            await screen.findByText(/available only for PE and ELF/),
+        ).toBeInTheDocument();
+    });
+    it("browses an APK's decompiled Java with the app's own code first", async () => {
+        getStaticReport.mockResolvedValue({ type: { format: "apk" } });
+        getMobsf.mockResolvedValue({
+            schema: "chimera-mobsf/1",
+            sources: {
+                package: "com.example.light",
+                found: 2,
+                files: [
+                    {
+                        path: "com/example/light/Main.java",
+                        size: 40,
+                        app: true,
+                    },
+                    { path: "okhttp3/Call.kt", size: 20, app: false },
+                ],
+            },
+        });
+        getMobsfSource.mockImplementation(({ path }) =>
+            Promise.resolve(
+                path.endsWith(".kt")
+                    ? "fun call() {}"
+                    : "@Override\npublic class Main { int x = 1; }",
+            ),
+        );
+        const { container } = render(<DecompiledCodeTab analysisId="a1" />);
+        expect(
+            await screen.findByLabelText(
+                "Decompiled com/example/light/Main.java",
+            ),
+        ).toBeInTheDocument();
+        expect(screen.queryByText("Call.kt")).toBeNull();
+        expect(container.querySelector(".syntax-keyword").textContent).toBe(
+            "public",
+        );
+        fireEvent.change(screen.getByLabelText("Show"), {
+            target: { value: "all" },
+        });
+        fireEvent.click(screen.getByText("Call.kt"));
+        expect(
+            await screen.findByLabelText("Decompiled okhttp3/Call.kt"),
+        ).toBeInTheDocument();
+        expect(screen.getByText("Kotlin")).toBeInTheDocument();
+    });
+});

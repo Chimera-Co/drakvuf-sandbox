@@ -488,3 +488,44 @@ def test_partial_failure_and_status(tmp_path, monkeypatch):
     assert "missing: missing" in result.output and "expired/stale" in result.output
     result = CliRunner().invoke(intel, ["import", str(path)])
     assert result.exit_code == 0 and "Imported 1 feeds" in result.output
+
+
+def test_fetch_puts_abusech_key_in_path_only_at_request_time(monkeypatch):
+    from drakrun.lib.intel.builder import fetch, parse_feed
+
+    seen = []
+
+    class Response:
+        headers = {}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def read(self, size):
+            return b"{}"
+
+    class Opener:
+        def open(self, request, timeout):
+            seen.append(request)
+            return Response()
+
+    monkeypatch.setattr("urllib.request.build_opener", lambda *a: Opener())
+    template = "https://mb-api.abuse.ch/v2/files/exports/{auth_key}/recent.csv"
+    spec = feed(url=template, auth_key=True)
+    fetch(spec, None, "SyntheticKey0123456789", 10)
+    assert seen[0].full_url == "https://mb-api.abuse.ch/v2/files/exports/SyntheticKey0123456789/recent.csv"
+    assert "auth-key" not in {k.lower() for k, _ in seen[0].header_items()}
+    assert spec["url"] == template  # the feed list keeps the placeholder
+    with pytest.raises(ValueError, match="authentication"):  # odd characters could rewrite the path
+        fetch(spec, None, "../../other?x=1", 10)
+    with pytest.raises(ValueError, match="authentication"):
+        fetch(feed(url="https://example.org/{auth_key}/x", auth_key=True), None, "SyntheticKey0123456789", 10)
+    # ThreatFox's 2026 JSON export names the indicator ioc_value
+    rows = parse_feed(
+        b'{"1": [{"ioc_value": "evil.example", "ioc_type": "domain", "malware_printable": "X"}]}',
+        feed(format="threatfox", indicator_types=["domain"]),
+    )
+    assert [(r["type"], r["value"]) for r in rows] == [("domain", "evil.example")]

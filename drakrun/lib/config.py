@@ -184,9 +184,12 @@ class StaticConfigSection(BaseModel):
     # Android APKs through MobSF (static scan only) in a fresh dom0 container per sample: no network,
     # no capabilities, no new privileges, removed afterwards. Off until the image has been pulled.
     mobsf_enabled: bool = False
-    mobsf_image: str = "docker.io/opensecurity/mobile-security-framework-mobsf:v4.5.3"
+    # Built by scripts/chimera/mobsf/Containerfile: upstream v4.5.3 with JADX installed (no network at run time).
+    mobsf_image: str = "localhost/chimera-mobsf:4.5.3"
     mobsf_timeout_s: float = Field(default=900, gt=0, le=3600, allow_inf_nan=False)
     mobsf_memory_mb: int = Field(default=4096, ge=1024)
+    # Cap for MobSF inside the static VM (3584 MB): JADX's heap plus MobSF; the VM serialises jobs.
+    mobsf_vm_memory_mb: int = Field(default=2816, ge=1024)
 
 
 class ScreenshotConfigSection(BaseModel):

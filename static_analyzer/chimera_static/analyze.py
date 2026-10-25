@@ -13,7 +13,7 @@ from .safety import read_sample, write_output
 
 SEVERITY_POINTS = {"info": 0, "low": 4, "medium": 12, "high": 25}
 ML_FORMATS = {"pe", "elf", "pdf"}
-TYPE_PLUGINS = {"pe", "elf", "pdf", "ole", "ooxml", "zip", "apk", "lnk", "rtf", "script"}
+TYPE_PLUGINS = {"pe", "elf", "pdf", "ole", "ooxml", "zip", "ipa", "apk", "lnk", "rtf", "script"}
 # Formats analyzed by rules only (no ML model, run-time behaviour unknown): never full coverage.
 RULE_ONLY = {"lnk", "rtf", "script"}
 EMBER_MAX_BYTES = 128 * 1024 * 1024
@@ -112,7 +112,10 @@ def analyze(path: str, out_dir: str | None = None, file_name: str = "", timeout_
 
     universal.update(stage("strings_insight", lambda: flagged_strings(data)) or {})
     result["universal"] = universal
-    embedded_exec = [e for e in universal["embedded"] if e["type"] in ("pe", "elf")]
+    # APKs carry native libraries (lib/<abi>/*.so) as stored ELF files by design; only a PE inside one is odd.
+    # ELF code in assets/ is the APK plugin's "packed" finding.
+    embedded_exec = [e for e in universal["embedded"]
+                     if e["type"] in (("pe",) if t["format"] == "apk" else ("pe", "elf"))]
     if embedded_exec and t["format"] not in ("pe", "elf"):
         result["findings"].append({"id": "embedded_executable", "title": "Executable embedded in a non-executable file",
                                    "severity": "high", "evidence": f"{len(embedded_exec)} at offset(s) "
@@ -194,11 +197,12 @@ def analyze(path: str, out_dir: str | None = None, file_name: str = "", timeout_
         if got:
             result["script"], result["source"], f = got
             result["findings"] += f
-    elif fmt == "zip":
+    elif fmt in ("zip", "ipa"):
+        # An iOS app is a ZIP (Payload/<name>.app/); MobSF reads the app itself on the deep queue.
         from .plugins.archive import analyze_zip
         got = stage("zip", lambda: analyze_zip(data), heavy=True)
         if got:
-            result["zip"], f = got
+            result[fmt], f = got
             result["findings"] += f
         # Members are listed, never unpacked: nothing inside was analyzed, so this is never full coverage.
         result["errors"].append({"stage": "archive-contents",

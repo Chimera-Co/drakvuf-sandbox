@@ -126,6 +126,26 @@ export const tokenizePython = (text) =>
         ),
         types: /^(?:str|int|float|bool|list|dict|bytes|set|tuple)$/,
     });
+// Annotations (@Override) read as types; JADX's "/* renamed from: */" notes are ordinary comments.
+const annotation = /^@[A-Za-z_][\w.]*/;
+export const tokenizeJava = (text) =>
+    scan(text, {
+        comments: cComments,
+        words: words(
+            "abstract assert break case catch class continue default do else enum extends final finally for if implements import instanceof interface native new package private protected public return static strictfp super switch synchronized this throw throws transient try volatile while var record yield null true false",
+        ),
+        types: /^(?:void|boolean|byte|char|short|int|long|float|double|String|Object|Integer|Long|Boolean|Class|[A-Z][A-Za-z0-9_]*(?:Exception|Error))$/,
+        variables: annotation,
+    });
+export const tokenizeKotlin = (text) =>
+    scan(text, {
+        comments: cComments,
+        words: words(
+            "package import class interface object fun val var if else when for while do return break continue throw try catch finally is in as by companion data sealed enum open override abstract private protected public internal lateinit suspend inline null true false this super",
+        ),
+        types: /^(?:Unit|Int|Long|Short|Byte|Boolean|Char|Float|Double|String|Any|Nothing|List|Map|Set|Array)$/,
+        variables: annotation,
+    });
 export const tokenizeHTML = (text) =>
     scan(text, {
         comments: [/^<!--[\s\S]*?(?:-->|$)/],
@@ -143,6 +163,9 @@ export const tokenizers = {
     python: tokenizePython,
     html: tokenizeHTML,
     hta: tokenizeHTML,
+    java: tokenizeJava,
+    kotlin: tokenizeKotlin,
+    xml: tokenizeHTML,
 };
 export function tokenize(text, language = "c") {
     return (tokenizers[language] || tokenizeC)(text);

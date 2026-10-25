@@ -62,3 +62,46 @@ it("disables online checkbox with configuration explanation", async () => {
     expect(checkbox.disabled).toBe(true);
     expect(checkbox.checked).toBe(false);
 });
+
+it("sends an Android APK as a static-only analysis", async () => {
+    getIntelProviders.mockResolvedValue({
+        data: { online_enabled: false, online_default: false },
+    });
+    uploadSample.mockResolvedValue({ task_uid: "fixture" });
+    render(
+        <MemoryRouter>
+            <UploadView />
+        </MemoryRouter>,
+    );
+    fireEvent.change(screen.getByLabelText("Platform"), {
+        target: { value: "android" },
+    });
+    expect(screen.getByText(/The app is not run/)).toBeTruthy();
+    expect(screen.getByLabelText("Mode").disabled).toBe(true);
+    expect(screen.queryByText(/Analysis time/)).toBeNull();
+    const file = document.querySelector('input[type="file"]');
+    expect(file.accept).toContain(".apk");
+    fireEvent.change(file, {
+        target: { files: [new File(["PK"], "app.apk")] },
+    });
+    fireEvent.submit(document.querySelector("form"));
+    await waitFor(() => expect(uploadSample).toHaveBeenCalledOnce());
+    expect(uploadSample.mock.calls[0][0].mode).toBe("static-only");
+});
+
+it("refuses a non-APK file for Android", async () => {
+    getIntelProviders.mockResolvedValue({ data: { online_enabled: false } });
+    render(
+        <MemoryRouter>
+            <UploadView />
+        </MemoryRouter>,
+    );
+    fireEvent.change(screen.getByLabelText("Platform"), {
+        target: { value: "android" },
+    });
+    fireEvent.change(document.querySelector('input[type="file"]'), {
+        target: { files: [new File(["MZ"], "tool.exe")] },
+    });
+    expect(await screen.findByText(/takes an APK file/)).toBeTruthy();
+    expect(screen.getByText("Analyze").disabled).toBe(true);
+});

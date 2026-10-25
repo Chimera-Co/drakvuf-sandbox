@@ -31,7 +31,7 @@ EXPECTED_EXTS = {
     "elf": {"", ".so", ".elf", ".bin", ".o", ".ko", ".out", ".sample"}, "pdf": {".pdf"},
     "ole": {".doc", ".xls", ".ppt", ".msi", ".msg", ".dot", ".xlt", ".pub", ".vsd"},
     "ooxml": {".docx", ".docm", ".xlsx", ".xlsm", ".pptx", ".pptm", ".dotx", ".dotm", ".xlsb"},
-    "rtf": {".rtf", ".doc"}, "zip": {".zip", ".jar"}, "apk": {".apk"}, "jar": {".jar"},
+    "rtf": {".rtf", ".doc"}, "zip": {".zip", ".jar"}, "apk": {".apk"}, "jar": {".jar"}, "ipa": {".ipa"},
 }
 SCRIPT_HINTS = [
     ("powershell", re.compile(rb"(?i)(\$[a-z_]+\s*=|invoke-|new-object\s|write-host|param\s*\(|\[system\.)")),
@@ -110,6 +110,8 @@ def _zip_kind(data: bytes) -> str:
         return "zip"
     if "AndroidManifest.xml" in names or "classes.dex" in names:
         return "apk"
+    if any(n.startswith("Payload/") and ".app/" in n for n in names):
+        return "ipa"
     if "[Content_Types].xml" in names:
         return "ooxml"
     if "META-INF/MANIFEST.MF" in names:
@@ -184,6 +186,8 @@ def identify(data: bytes, file_name: str = "") -> dict:
                     info["platform"] = "linux"
     if info["format"] == "apk":
         info["platform"] = "android"
+    elif info["format"] == "ipa":
+        info["platform"] = "ios"
 
     if magic is not None:
         try:

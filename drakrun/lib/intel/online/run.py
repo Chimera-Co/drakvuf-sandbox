@@ -8,10 +8,11 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from drakrun.lib.intel import normalize
-from drakrun.lib.intel.report import observations
+from drakrun.lib.intel.report import observations, sample_scope
 
 from . import inventory, providers
 from .cache import Cache
+from .noise import background, non_public, string_artifact
 
 
 def read_json(path):
@@ -23,18 +24,30 @@ def read_json(path):
 
 
 def collect(directory, static_directory, config, network=None):
+    """(kind, value, origin) to look up: the sample's hash, then what its own processes contacted, then what
+    nobody can attribute, then strings in the file. Other guest processes' traffic is not looked up."""
     metadata = read_json(directory / "metadata.json")
     static = read_json(static_directory / "static.json")
+    report = read_json(directory / "report.json")
+    scope = sample_scope(report)
     candidates = observations(
         metadata,
-        read_json(directory / "report.json"),
+        report,
         static,
         read_json(directory / "tls_sessions.json"),
+        scope=scope or None,
     )
+    # Strings from memory dumps of the sample's own processes (unpacked code); other processes' dumps are
+    # Windows talking to its own services.
     for row in read_json(static_directory / "memdumps.json").get("scanned", []):
-        candidates += observations(
-            {}, {}, {"universal": {"iocs": row.get("iocs") or {}}}, {}
-        )
+        if not row.get("sample_tree"):
+            continue
+        candidates += [
+            (kind, value, "memory")
+            for kind, value, _ in observations(
+                {}, {}, {"universal": {"iocs": row.get("iocs") or {}}}, {}
+            )
+        ]
     excluded = []
     if network is not None:
         values = (
@@ -46,7 +59,7 @@ def collect(directory, static_directory, config, network=None):
             except ValueError:
                 pass
     # Most telling first: the sample's own hash, then indicators seen at run time, then strings in the file.
-    origin_rank = {"sample": 0, "dynamic": 1, "static": 2}
+    origin_rank = {"sample": 0, "dynamic": 1, "memory": 2, "unattributed": 3, "static": 4}
     kind_rank = {"sha256": 0, "sha1": 1, "md5": 2, "domain": 3, "url": 4, "ip": 5}
     candidates = sorted(
         candidates, key=lambda c: (origin_rank.get(c[2], 3), kind_rank.get(c[0], 9))
@@ -55,7 +68,7 @@ def collect(directory, static_directory, config, network=None):
     sample_sha256 = any(k == "sha256" and o == "sample" for k, _, o in candidates)
     selected, seen, counts = [], set(), Counter()
     for kind, value, origin in candidates:
-        if kind not in kind_rank:
+        if kind not in kind_rank or origin not in origin_rank:
             continue
         if origin == "sample" and kind in ("sha1", "md5") and sample_sha256:
             continue
@@ -63,6 +76,15 @@ def collect(directory, static_directory, config, network=None):
             value = normalize(kind, value)
             host = urlsplit(value).hostname if kind == "url" else value
             if kind in {"ip", "url", "domain"}:
+                try:
+                    ipaddress.ip_address(host)
+                    host_kind = "ip"
+                except ValueError:
+                    host_kind = "domain"
+                if origin in ("static", "memory") and string_artifact(
+                    host_kind, host or ""
+                ):
+                    continue
                 try:
                     address = ipaddress.ip_address(host)
                     if (
@@ -73,13 +95,17 @@ def collect(directory, static_directory, config, network=None):
                     ):
                         continue
                 except ValueError:
-                    if kind == "ip":
+                    if kind == "ip" or non_public(host):
+                        continue
+                    # Domain verdicts for Windows' own services say nothing; a URL the sample itself
+                    # fetched from one (payload hosting) still does.
+                    if background(host) and (kind == "domain" or origin != "dynamic"):
                         continue
             if (kind, value) in seen or counts[kind] >= config.max_observables:
                 continue
         except (ValueError, TypeError, UnicodeError):
             continue
-        selected.append((kind, value))
+        selected.append((kind, value, origin))
         counts[kind] += 1
         seen.add((kind, value))
     return selected
@@ -91,10 +117,11 @@ def run(directory, static_directory, config, network=None):
     cache = Cache(config.cache_path)
     for provider, info in zip(providers(), inventory(config)):
         rows = []
-        if info["enabled"]:
-            wanted = [(k, v) for k, v in items if k in provider.types]
-            for kind, value in wanted[: provider.max_lookups]:
-                rows.append(provider.lookup(kind, value, config, cache))
+        # A provider without its key is reported once in `providers`, not once per observable.
+        if info["enabled"] and info["configured"]:
+            wanted = [item for item in items if item[0] in provider.types]
+            for kind, value, origin in wanted[: provider.max_lookups]:
+                rows.append({**provider.lookup(kind, value, config, cache), "origin": origin})
         statuses = Counter(row["status"] for row in rows)
         status = (
             "disabled"
@@ -148,7 +175,14 @@ def run(directory, static_directory, config, network=None):
         providers=states,
         results=results,
         summary=dict(
-            observables=len(items), matches=sum(r["status"] == "ok" for r in results)
+            observables=len(items),
+            # A match is a provider calling it malicious or suspicious; "seen" only means the provider
+            # knows the value (a urlscan search hit, a known-good file).
+            matches=sum(r.get("verdict") in ("malicious", "suspicious") for r in results),
+            malicious=sum(r.get("verdict") == "malicious" for r in results),
+            known_good=sum(r.get("verdict") == "harmless" for r in results),
+            seen=sum(r["status"] == "ok" for r in results),
+            lookups=sum(r["status"] in ("ok", "not_found") for r in results),
         ),
     )
 
@@ -253,3 +287,10 @@ def assessment(label, results):
     return dict(
         label=label, basis="behaviour model", reasons=["Classifier verdict retained"]
     )
+
+
+def run_offline_recheck_job(analysis_id):
+    """Match an existing analysis against the offline feeds now installed (rebuilds its report)."""
+    from drakrun.analyzer.static.worker import _refresh_report
+
+    _refresh_report(analysis_id)

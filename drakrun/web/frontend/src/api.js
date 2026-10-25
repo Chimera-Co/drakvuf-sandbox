@@ -174,6 +174,17 @@ export async function getDeepStatic({ analysisId }) {
     return request.data;
 }
 
+// One JADX-decompiled file of an APK, as text; only the paths mobsf.json lists
+export async function getMobsfSource({ analysisId, path, signal }) {
+    const request = await axios.get(`/static/${analysisId}/mobsf/source`, {
+        params: { path },
+        responseType: "text",
+        transformResponse: (data) => data,
+        signal,
+    });
+    return request.data;
+}
+
 // MobSF APK scan (chimera-mobsf/1); 404 until it has run, or for anything but an APK
 export async function getMobsf({ analysisId }) {
     const request = await axios.get(`/static/${analysisId}/mobsf`);

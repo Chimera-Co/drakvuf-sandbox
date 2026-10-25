@@ -109,7 +109,7 @@ def parse_feed(raw, feed):
                     "sha1_hash": "sha1",
                 }.get(row.get("ioc_type"), row.get("ioc_type"))
                 if kind in feed["indicator_types"]:
-                    add(kind, row.get("ioc"), row)
+                    add(kind, row.get("ioc") or row.get("ioc_value"), row)
     else:
         lines = []
         for line in text.splitlines():
@@ -192,6 +192,9 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         raise ValueError("feed redirect refused")
 
 
+AUTH_PLACEHOLDER = "{auth_key}"
+
+
 def fetch(feed, previous, key, size_cap):
     if size_cap <= 0:
         raise ValueError("size cap must be positive")
@@ -210,7 +213,16 @@ def fetch(feed, previous, key, size_cap):
     if feed.get("auth_key"):
         if not u.hostname or not u.hostname.endswith(".abuse.ch") or not key:
             raise ValueError("feed authentication unavailable")
-        headers["Auth-Key"] = key
+        if AUTH_PLACEHOLDER in u.path:
+            # abuse.ch exports (2026) take the key as a path segment. It is put in only here, at request time;
+            # the feed list, manifest and errors keep the placeholder.
+            if not re.fullmatch(r"[A-Za-z0-9_-]{16,128}", key):
+                raise ValueError("feed authentication unavailable")
+            url = url.replace(AUTH_PLACEHOLDER, key)
+        else:
+            headers["Auth-Key"] = key
+    elif AUTH_PLACEHOLDER in u.path:
+        raise ValueError("feed authentication unavailable")
     opener = urllib.request.build_opener(
         NoRedirect(), urllib.request.HTTPSHandler(context=ssl.create_default_context())
     )

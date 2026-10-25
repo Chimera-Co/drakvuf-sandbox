@@ -18,7 +18,11 @@ before attributing a connection to the sample.
 1. On a separate connected update host with the package installed, review the
    provider terms and `scripts/chimera/intel/feeds.toml`. Store the operator's
    abuse.ch Auth-Key in a restricted file outside the repository. Do not put a key
-   in a URL, shell argument, environment variable, feed list or unit file.
+   in a shell argument, environment variable, feed list or unit file. Since 2026
+   abuse.ch serves its exports only at `https://<service>-api.abuse.ch/v2/files/exports/<key>/...`,
+   so `feeds.toml` holds the placeholder `{auth_key}`: the builder substitutes the
+   key (which must match `[A-Za-z0-9_-]{16,128}`) only for the request itself, only
+   on `*.abuse.ch`, and never writes the resulting URL to a manifest or log.
 2. Build a daily snapshot (weekly is possible with longer reviewed expiry limits):
 
    ```sh
@@ -79,6 +83,18 @@ restricted key file and output directory separately. Adapt `ExecStart` to includ
 The timer uses `OnCalendar=daily`, `RandomizedDelaySec=1h` and `Persistent=true`.
 For weekly updates use `OnCalendar=weekly` and explicitly review `max_age_days`;
 the two-day Feodo expiry will otherwise correctly show stale between updates.
+
+## On the CHIMERA host (25 Oct 2026)
+
+The host has internet and builds its own bundle every day: `chimera-intel-update.timer` (02:30 plus up to 30
+minutes' random delay, `Persistent`) runs `scripts/chimera/intel/update-host.sh`, which builds a bundle from
+`/opt/chimera/src` with the previous one as `--previous`, imports the newest and deletes bundles older than 14
+days. The service is hardened like the other CHIMERA units. The `chimera-intel-build.*` units remain for a
+separate air-gapped update host.
+
+A finished analysis can be matched again against the current bundle with **Re-check offline feeds** on the
+report (`POST /api/intel/<id>/recheck`, queued on the intel worker); it rebuilds the report and the Threat intel
+card.
 
 ## Feed catalog and supported formats
 

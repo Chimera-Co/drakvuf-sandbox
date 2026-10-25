@@ -8,12 +8,44 @@ from urllib.parse import urlsplit
 from . import digest, match
 
 
-def observations(metadata, report, static, tls):
+def sample_scope(report):
+    """Seqids of the started sample and everything it spawned (report.json processes + startup.process)."""
+    root = (report.get("startup") or {}).get("process")
+    if root is None:
+        return set()
+    children = {}
+    for proc in report.get("processes") or []:
+        if isinstance(proc, dict) and proc.get("parent_seqid") is not None:
+            children.setdefault(proc["parent_seqid"], []).append(proc.get("seqid"))
+    scope, stack = set(), [root]
+    while stack:
+        seqid = stack.pop()
+        if seqid in scope:
+            continue
+        scope.add(seqid)
+        stack.extend(children.get(seqid, []))
+    return scope
+
+
+def observations(metadata, report, static, tls, scope=None):
+    """(kind, value, origin) triples. With `scope` (sample seqids), run-time rows are split by who made them:
+    "dynamic" (the sample's process tree), "system" (only other guest processes) or "unattributed"."""
     out = []
+    row_origin = "dynamic"
 
     def add(kind, value, origin):
         if value is not None:
-            out.append((kind, value, origin))
+            out.append((kind, value, row_origin if origin == "dynamic" else origin))
+
+    def attribute(row):
+        nonlocal row_origin
+        if scope is None:
+            row_origin = "dynamic"
+            return
+        seqids = set(row.get("process_seqids") or [])
+        if row.get("process_seqid") is not None:
+            seqids.add(row["process_seqid"])
+        row_origin = "unattributed" if not seqids else "dynamic" if seqids & scope else "system"
 
     for source in (
         metadata.get("file") or {},
@@ -38,13 +70,16 @@ def observations(metadata, report, static, tls):
                     "static",
                 )
     for row in report.get("dns_queries") or []:
+        attribute(row)
         add("domain", row.get("domain") or row.get("query"), "dynamic")
     for row in report.get("connections") or []:
+        attribute(row)
         add("ip", row.get("remote_ip"), "dynamic")
         if row.get("remote_ip") and row.get("remote_port"):
             add("ip_port", f"{row['remote_ip']}:{row['remote_port']}", "dynamic")
     for key in ("http_requests", "tls_requests", "tls_handshakes"):
         for row in report.get(key) or []:
+            attribute(row)
             host = row.get("server_name") or row.get("host") or row.get("sni")
             if host:
                 try:
@@ -67,6 +102,7 @@ def observations(metadata, report, static, tls):
             add("ja3", row.get("ja3_md5") or row.get("ja3"), "dynamic")
             add("sslcert_sha1", row.get("sslcert_sha1"), "dynamic")
     if isinstance(tls, dict):
+        attribute({})
         for row in tls.get("tls_handshakes") or []:
             add("domain", row.get("sni"), "dynamic")
             add("ja3", row.get("ja3_md5") or row.get("ja3"), "dynamic")
@@ -132,7 +168,7 @@ def _offline_stage(directory, config, metadata, report, static, ev, static_path=
     if not feeds:
         return {**base, "reason": "offline intel database has no feeds"}
     status = "stale" if feeds and all(f["stale"] for f in feeds) else "ok"
-    dates = ", ".join(sorted({f["fetched_at"] for f in feeds}))
+    dates = ", ".join(sorted({str(f["fetched_at"])[:10] for f in feeds}))
     summary = (
         f"{len(payload['matches'])} offline matches"
         if payload["matches"]

@@ -93,3 +93,19 @@ def test_dotnet_user_string_heap():
         return bytes([len(raw)]) + raw
     heap = b"\x00" + entry("http://c2.example/gate.php") + entry("ab") + entry("cmd.exe /c whoami")
     assert _user_strings(heap) == ["http://c2.example/gate.php", "cmd.exe /c whoami"]
+
+
+def test_ipa_is_identified_as_an_ios_app_and_listed_like_a_zip(tmp_path):
+    import io
+    import zipfile
+
+    from chimera_static.identify import identify
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("Payload/Notes.app/Info.plist", b"<plist/>")
+        z.writestr("Payload/Notes.app/Notes", b"\xcf\xfa\xed\xfe" + b"\0" * 60)
+    info = identify(buf.getvalue(), "Notes.ipa")
+    assert info["format"] == "ipa" and info["platform"] == "ios"
+    result = run(tmp_path, "Notes.ipa", buf.getvalue())
+    assert result["type"]["format"] == "ipa" and result["ipa"]["members"] == 2

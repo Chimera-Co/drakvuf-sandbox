@@ -964,7 +964,13 @@ li.selected {
     position: fixed;
     inset: 0;
     z-index: 20000;
-    background-color: #002b36;
+    /* The scheme the analyst picked (themes.js sets it before the first render). */
+    background-color: var(--chimera-shell);
+    background-image: radial-gradient(
+        circle at 50% 46%,
+        color-mix(in srgb, var(--chimera-accent) 22%, transparent) 0,
+        transparent 55%
+    );
     cursor: pointer;
     opacity: 1;
     transition: opacity 420ms ease;
@@ -1006,12 +1012,62 @@ li.selected {
     height: 100%;
     object-fit: cover;
     object-position: center center;
-    background-color: #002b36;
+    background-color: var(--chimera-shell);
     opacity: 0;
     transition: opacity 380ms ease;
 }
 
 .chimera-intro--video .chimera-intro__video {
+    opacity: 1;
+}
+
+/* Over the clip: the theme's accent washes through it and the frame fades to the
+   theme's shell at the edges, so the clip sits in the same colours as the console. */
+.chimera-intro__tint {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 380ms ease;
+    background:
+        radial-gradient(
+            ellipse at 50% 50%,
+            transparent 48%,
+            color-mix(in srgb, var(--chimera-shell) 88%, transparent) 100%
+        ),
+        linear-gradient(
+            to top,
+            color-mix(in srgb, var(--chimera-shell) 80%, transparent) 0,
+            transparent 22%
+        );
+}
+
+.chimera-intro__tint::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--chimera-accent);
+    mix-blend-mode: color;
+    opacity: 0.28;
+}
+
+.chimera-intro__tint::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 7vh;
+    width: 180px;
+    height: 2px;
+    transform: translateX(-50%);
+    background: linear-gradient(
+        90deg,
+        transparent,
+        var(--chimera-accent),
+        transparent
+    );
+}
+
+.chimera-intro--video .chimera-intro__tint {
     opacity: 1;
 }
 
@@ -1022,7 +1078,7 @@ li.selected {
 }
 
 .chimera-intro__wordmark {
-    color: #eee8d5;
+    color: var(--chimera-shell-strong);
     font-family: var(--chimera-font-sans);
     font-size: 1.05rem;
     font-weight: 600;
@@ -1038,7 +1094,7 @@ li.selected {
     background: linear-gradient(
         90deg,
         transparent,
-        var(--chimera-blue),
+        var(--chimera-accent),
         transparent
     );
     animation: chimera-intro-rule 900ms ease-out 300ms forwards;

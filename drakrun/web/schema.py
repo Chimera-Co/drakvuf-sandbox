@@ -14,7 +14,10 @@ class APIErrorResponse(BaseModel):
 class UploadFileForm(BaseModel):
     mode: Literal["combined", "dynamic-only", "static-only"] = "combined"
     file: FileStorage
-    guest_os: GuestOS = Field(default="windows", description="Guest operating system")
+    # android and ios are static-only: MobSF reads the app, nothing runs it.
+    guest_os: GuestOS | Literal["android", "ios"] = Field(
+        default="windows", description="Guest operating system, or a mobile platform"
+    )
     timeout: Optional[int] = Field(default=None, description="Analysis timeout")
     file_name: Optional[str] = Field(default=None, description="Target file name")
     file_path: Optional[str] = Field(default=None, description="Target file path")

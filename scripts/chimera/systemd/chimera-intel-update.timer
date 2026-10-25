@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily CHIMERA offline threat-intel refresh
+
+[Timer]
+# Once a day (abuse.ch regenerates exports every 5 minutes and asks for no heavier polling than that).
+OnCalendar=*-*-* 02:30
+RandomizedDelaySec=30m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -148,7 +148,9 @@ def pipeline(analysis_id: str) -> Optional[dict]:
             add("postprocess", "Postprocessing", post)
 
     classification = _read_json(analysis_dir / "classification.json")
-    if classification is not None:
+    if classification is not None and classification.get("not_applicable"):
+        add("classifier", "Classifier", "skipped", "mobile app: see the MobSF report")
+    elif classification is not None:
         add("classifier", "Classifier", "done", str(classification.get("label") or ""))
     else:
         add("classifier", "Classifier", "failed" if status == "failed" else "pending")
@@ -156,7 +158,7 @@ def pipeline(analysis_id: str) -> Optional[dict]:
     fmt = ((static or {}).get("type") or {}).get("format")
     deep = _read_json(static_dir / "deep.json")
     mobsf = _read_json(static_dir / "mobsf.json")
-    if fmt == "apk" and (mobsf is not None or _job_state(f"static-mobsf-{analysis_id}")):
+    if fmt in ("apk", "ipa") and (mobsf is not None or _job_state(f"static-mobsf-{analysis_id}")):
         # APKs take MobSF on the deep queue instead of capa/FLOSS/Ghidra.
         if mobsf is not None:
             score = mobsf.get("security_score")

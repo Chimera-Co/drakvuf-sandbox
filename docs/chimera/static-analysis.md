@@ -52,25 +52,50 @@ insight indicators of severity 2+ (for example injection imports in unpacked cod
 IOCs. Results go to `memdumps.json` (schema `chimera-memdumps/1`) and the
 "Memory dumps" tab. They are **not** classifier features: they never change the verdict.
 
-## Android APKs (MobSF)
+## Mobile apps: Android APK and iOS IPA (MobSF)
 
-With `[static] mobsf_enabled = true`, an APK goes from the fast pass to MobSF on the deep queue
-(`drakrun/analyzer/static/mobsf.py`). Each APK gets a fresh MobSF container in dom0 with `--network none`,
-`--cap-drop ALL`, `no-new-privileges`, a memory and process cap, the sample mounted read-only and
-`noexec`, and a random API key; the container is removed afterwards. MobSF's online lookups therefore fail
-closed and nothing leaves the host. The summary (security score, findings, permissions with dangerous ones first,
-code and manifest findings with CWE/OWASP/MASVS, trackers, domains and URLs) goes to `mobsf.json`
-(schema `chimera-mobsf/1`) and the "Android (MobSF)" tab of the static analysis. It never feeds the classifier.
-Dynamic Android analysis (an emulator) is not part of this.
+Choose **Android APK** or **iOS IPA** as the platform on the upload page (or send `guest_os=android|ios` with
+`mode=static-only`; any other mode is refused). Mobile apps are never run. The fast pass identifies the file (an
+IPA is a ZIP with `Payload/<name>.app/`) and, with `[static] mobsf_enabled = true`, the app goes to MobSF on the
+deep queue (`drakrun/analyzer/static/mobsf.py`).
 
-Enable (the image is about 934 MiB from Docker Hub):
+**Isolation.** With `[static] backend = "vm"` (the deployed setting) MobSF runs **inside the static-analysis Xen
+VM**, not on the host: one podman step in the domU (`vm_backend.mobsf_in_vm`) starts MobSF and its driver in a
+container with `--network none`, `--cap-drop ALL`, `no-new-privileges`, a 2816 MB / 1024-PID cap, a `noexec`
+`/tmp`, the sample mounted read-only and `noexec`, and a random API key. The VM itself has no network device and
+receives the sample on a read-only raw disk. If the VM is unavailable the scan **fails closed**: MobSF is never
+started on the host, whatever `vm_fallback_container` says. (With `backend = "container"` the same hardened
+container runs in dom0.)
+
+**Report.** `mobsf.json` (schema `chimera-mobsf/1`) holds the security score, findings, permissions, code and
+manifest findings with CWE/OWASP/MASVS, behaviour, Android API use, network security config, signing certificate,
+APKiD, secrets, trackers, domains and URLs; for iOS also the Mach-O binary findings, binary hardening flags and
+App Transport Security. It is shown on the "Android (MobSF)" / "iOS (MobSF)" tab of the static analysis.
+
+**Decompiled code.** For APKs the driver also returns JADX's Java/Kotlin output: the app's own package first,
+libraries last, at most 3000 files, 1 MiB each and 48 MiB in total. The host re-packs it into
+`mobsf-sources.zip`, keeping only plain relative `.java`/`.kt` paths (never extracted), and lists the files in
+`mobsf.json`. `GET /api/static/<id>/mobsf/source?path=...` serves one listed file as `text/plain`; the
+**Decompiled code** tab of the analysis browses them with Java/Kotlin highlighting. iOS apps are native code and
+MobSF does not decompile them on Linux. For PE and ELF files the same tab shows Ghidra's decompiled functions.
+
+**No classifier.** The models are trained on Windows and Linux files, so mobile apps get
+`classification.json` with `not_applicable: true` and the verdict card reads "Not classified"; the MobSF report
+is the result.
+
+**Not covered.** Dynamic Android or iOS analysis. Android would need an Android-x86 HVM guest under Xen (dom0
+has no `/dev/kvm` for the usual emulator) with its own instrumentation; iOS needs Corellium-style virtual
+devices or jailbroken hardware. Both are planned as separate work after the capstone.
+
+The MobSF image is built locally from upstream v4.5.3 with JADX baked in (no download at scan time):
 
 ```bash
-sudo podman pull docker.io/opensecurity/mobile-security-framework-mobsf:v4.5.3
+sudo podman build --network=host -t localhost/chimera-mobsf:4.5.3 scripts/chimera/mobsf
 ```
 
-then add `mobsf_enabled = true` under `[static]` in `/etc/drakrun/config.toml` and restart
-`drakrun-static-worker` and `drakrun-static-deep-worker`.
+`scripts/chimera/static-vm/build-image.sh --images` copies it into the VM's read-only image store; then set
+`mobsf_enabled = true` under `[static]` in `/etc/drakrun/config.toml` and restart `drakrun-static-worker` and
+`drakrun-static-deep-worker`.
 
 ## Security
 

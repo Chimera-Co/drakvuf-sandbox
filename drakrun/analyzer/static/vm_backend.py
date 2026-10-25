@@ -165,7 +165,7 @@ def _attached(settings) -> set[str]:
     return {names[line.split()[0]] for line in out.splitlines()[1:] if line.split() and line.split()[0] in names}
 
 
-def run_job(settings, steps: list[dict], sample: Path) -> dict:
+def run_job(settings, steps: list[dict], sample: Path, uid: Optional[int] = None) -> dict:
     """Send one job (a list of podman steps) to the VM; return the guest's envelope. Raises VmUnavailable when
     the VM is not there; any other failure is returned as {"error": ...}."""
     job_id = uuid.uuid4().hex
@@ -174,7 +174,7 @@ def run_job(settings, steps: list[dict], sample: Path) -> dict:
         while chunk := fh.read(1 << 20):
             digest.update(chunk)
     spec = {"job": job_id, "sample_size": sample.stat().st_size, "sample_sha256": digest.hexdigest(),
-            "uid": settings.container_uid, "gid": settings.container_gid, "steps": steps}
+            "uid": settings.container_uid if uid is None else uid, "gid": settings.container_gid, "steps": steps}
     wall = sum(float(step["timeout_s"]) for step in steps) + JOB_SLACK_S
     with _vm_lock():
         dom = ready(settings)
@@ -292,3 +292,41 @@ def ghidra_in_vm(settings, analysis_id: str, job_dir: Path, targets: list[dict])
     except ValueError:
         return {"error": "ghidra.json is not valid JSON"}
     return doc if isinstance(doc, dict) else {"error": "ghidra.json is not an object"}
+
+
+def mobsf_in_vm(settings, analysis_id: str, job_dir: Path, fmt: str, driver: str, driver_args: list[str],
+                api_key: str) -> dict:
+    """MobSF inside the static VM: one podman step starts its server and runs the driver, which writes the
+    report envelope to mobsf-out/mobsf.json. The container runs as MobSF's own user (the image's), reads the
+    root:gid 0440 sample through --group-add and writes into a directory the agent hands to that user."""
+    from .mobsf import MOBSF_UID, container_name
+
+    memory = f"{settings.mobsf_vm_memory_mb}m"
+    upload = f"sample.{fmt}"  # MobSF picks its analyzer by the extension
+    argv = [
+        "podman", "run", "--rm", "--name", container_name(analysis_id),
+        "--network", "none", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+        "--pids-limit", "1024", "--memory", memory, "--memory-swap", memory, "--cpus", "2",
+        "--ulimit", "core=0", "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=512m",
+        "--user", f"{MOBSF_UID}:{MOBSF_UID}", "--group-add", str(settings.container_gid),
+        "--volume", f"{GUEST_WORK / 'in'}:/input:ro,noexec,nosuid,nodev",
+        "--volume", f"{GUEST_WORK / 'mobsf-out'}:/out:rw,noexec,nosuid,nodev",
+        "--env", f"MOBSF_API_KEY={api_key}", "--env", f"CHIMERA_DRIVER={driver}",
+        "--entrypoint", "/bin/sh", settings.mobsf_image, "-c",
+        'scripts/entrypoint.sh >/dev/null 2>&1 & python3 -c "$CHIMERA_DRIVER" "$@" > /out/mobsf.json',
+        "chimera-mobsf", "/input/sample", *driver_args, upload,
+    ]
+    step = {"name": "mobsf", "argv": argv, "timeout_s": settings.mobsf_timeout_s + 60,
+            "container": container_name(analysis_id), "prepare": {"dirs": ["mobsf-out"]},
+            "outputs": ["mobsf-out/mobsf.json"]}
+    envelope = run_job(settings, [step], job_dir / "in" / "sample", uid=MOBSF_UID)
+    if "steps" not in envelope:
+        return {"error": envelope.get("error", "static VM returned nothing")}
+    status, text, error = _step_status(envelope, "mobsf-out/mobsf.json")
+    if error:
+        return {"error": error}
+    if status.get("exit_code") != 0:
+        return {"error": f"MobSF exited with {status.get('exit_code')}: {status.get('stderr', '')[-500:]}"}
+    if not text:
+        return {"error": "MobSF wrote no report (or it was over the VM's output limit)"}
+    return {"text": text}

@@ -90,6 +90,11 @@ def upload_sample(form: OnlineUploadForm):
                     400,
                 )
 
+    if form.guest_os in ("android", "ios") and form.mode != "static-only":
+        return (
+            jsonify({"error": "mobile apps are analysed statically only (mode static-only)"}),
+            400,
+        )
     request_file = form.file
     job_id = str(uuid.uuid4())
 
@@ -507,6 +512,20 @@ def static_mobsf(path: AnalysisRequestPath):
     )
 
 
+@api.get("/static/<task_uid>/mobsf/source", responses={404: APIErrorResponse})
+def static_mobsf_source(path: AnalysisRequestPath):
+    """One JADX-decompiled source file of an APK (?path=...), as plain text; only paths mobsf.json lists."""
+    from drakrun.analyzer.static.mobsf import read_source
+
+    text = read_source(path.task_uid, request.args.get("path", ""))
+    if text is None:
+        return jsonify({"error": "Source not found"}), 404
+    response = Response(text, mimetype="text/plain")
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Content-Disposition"] = "inline"
+    return response
+
+
 @api.get("/features/<task_uid>", responses={404: APIErrorResponse})
 def features(path: AnalysisRequestPath):
     return send_analysis_file(
@@ -663,6 +682,26 @@ def intel_providers():
             "online_default": config.intel.online_default,
         }
     )
+
+
+@api.post("/intel/<task_uid>/recheck")
+def recheck_offline_intel(path: AnalysisRequestPath):
+    """Re-match the analysis against the offline feeds installed now (after a new bundle was imported)."""
+    if _report_or_404(path.task_uid) is None:
+        return jsonify({"error": "Data not found"}), 404
+    from rq import Queue
+
+    from drakrun.analyzer.static.worker import INTEL_QUEUE_NAME
+    from drakrun.lib.intel.online.run import run_offline_recheck_job
+
+    Queue(name=INTEL_QUEUE_NAME, connection=redis).enqueue(
+        run_offline_recheck_job,
+        str(path.task_uid),
+        job_id=f"intel-recheck-{path.task_uid}",
+        job_timeout=600,
+        result_ttl=600,
+    )
+    return jsonify({"status": "queued"}), 202
 
 
 @api.post("/intel/<task_uid>/refresh")

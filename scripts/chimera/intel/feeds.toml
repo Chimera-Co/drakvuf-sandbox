@@ -1,7 +1,7 @@
 # Review provider access and redistribution terms before enabling scheduled updates.
 [[feeds]]
 name = "malwarebazaar"
-url = "https://bazaar.abuse.ch/export/csv/recent/"
+url = "https://mb-api.abuse.ch/v2/files/exports/{auth_key}/recent.csv"
 format = "malwarebazaar"
 indicator_types = ["sha256", "sha1", "md5"]
 license = "abuse.ch terms: not-for-profit; no high-volume harvesting; no model training without written permission; redistribution requires review"
@@ -10,7 +10,7 @@ auth_key = true
 
 [[feeds]]
 name = "urlhaus"
-url = "https://urlhaus.abuse.ch/downloads/csv_recent/"
+url = "https://urlhaus-api.abuse.ch/v2/files/exports/{auth_key}/recent.csv"
 format = "urlhaus"
 indicator_types = ["url"]
 license = "abuse.ch terms: not-for-profit; no high-volume harvesting; no model training without written permission; redistribution requires review"
@@ -19,7 +19,7 @@ auth_key = true
 
 [[feeds]]
 name = "threatfox"
-url = "https://threatfox.abuse.ch/export/json/recent/"
+url = "https://threatfox-api.abuse.ch/v2/files/exports/{auth_key}/recent.json"
 format = "threatfox"
 indicator_types = ["sha256", "sha1", "md5", "domain", "url", "ip_port", "ip"]
 license = "abuse.ch terms: not-for-profit; no high-volume harvesting; no model training without written permission; redistribution requires review"

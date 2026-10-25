@@ -235,3 +235,44 @@ def test_unrequested_stage_does_not_make_report_partial(tmp_path, mode):
     for name, data in files.items():
         (tmp_path / name).write_text(json.dumps(data))
     assert build_report(tmp_path)["status"] == "complete"
+
+
+@pytest.mark.parametrize("platform", ["android", "ios"])
+def test_mobile_uploads_are_static_only(upload, platform):
+    client, api, dynamic, static, queue = upload
+    ok = client.post(
+        "/api/upload",
+        data={"file": (io.BytesIO(b"PK"), "app.bin"), "mode": "static-only",
+              "guest_os": platform},
+    )
+    assert ok.status_code == 200, ok.json
+    refused = client.post(
+        "/api/upload",
+        data={"file": (io.BytesIO(b"PK"), "app.bin"), "mode": "combined",
+              "guest_os": platform},
+    )
+    assert refused.status_code == 400 and dynamic.call_count == 0
+
+
+def test_mobile_apps_are_not_classified(tmp_path, monkeypatch, base_config):
+    from drakrun.analyzer.classifier import runner
+
+    aid = str(uuid.uuid4())
+    monkeypatch.setattr(worker, "ANALYSES_DIR", tmp_path / "analyses")
+    monkeypatch.setattr(worker, "STATIC_DIR", tmp_path / "static")
+    monkeypatch.setattr(worker, "load_config", lambda: base_config)
+    base_config.classifier.enabled = True
+    worker.job_dir(aid).mkdir(parents=True)
+    result = {"schema": "chimera-static/1", "type": {"format": "apk"}, "error": None}
+    monkeypatch.setattr(worker, "run_in_container", Mock(return_value=result))
+    monkeypatch.setattr(worker, "load_static", lambda _aid: result)
+    classifier = Mock()
+    monkeypatch.setattr(runner, "run_classifier", classifier)
+    options = AnalysisOptions(mode="static-only", plugins=[], net_enable=False).to_dict()
+    file = {"name": "app.apk", "sha256": "a" * 64, "size_bytes": 7, "type": "zip"}
+    worker.run_static_only_analysis(aid, file, options)
+    verdict = json.loads((tmp_path / "analyses" / aid / "classification.json").read_text())
+    assert verdict["not_applicable"] and verdict["label"] == "unknown"
+    classifier.assert_not_called()
+    report = json.loads((tmp_path / "analyses" / aid / "chimera-report.json").read_text())
+    assert "Mobile apps are not classified" in json.dumps(report)

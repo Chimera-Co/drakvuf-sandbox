@@ -618,7 +618,11 @@ def build_report(
         label = verdict.get("label") or "unknown"
         components = verdict.get("components") or {}
         classifier_stage = {
-            "status": "ok" if label != "unknown" else "partial",
+            "status": (
+                "skipped"
+                if verdict.get("not_applicable")
+                else "ok" if label != "unknown" else "partial"
+            ),
             "reason": (
                 None
                 if label != "unknown"

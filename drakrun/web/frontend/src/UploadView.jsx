@@ -94,12 +94,18 @@ function UploadForm() {
     }, []);
     const isStatic = mode === "static-only";
     const isLinux = guestOs === "linux";
+    // Mobile apps are not run: an APK or IPA goes through the static analyzer and MobSF (no network).
+    const isAndroid = guestOs === "android";
+    const isIos = guestOs === "ios";
+    const isMobile = isAndroid || isIos;
     const [extraOptionsCollapsed, setExtraOptionsCollapsed] = useState(true);
     const navigate = useNavigate();
 
     const validateForm = useCallback(() => {
         const form = new FormData(formRef.current);
-        const filename = form.get("file").name;
+        const filename =
+            form.get("file")?.name ||
+            formRef.current?.elements?.file?.files?.[0]?.name;
         const archiveEntryPath = form.get("archive_entry_path");
         const targetStartCommand = form.get("start_command");
         const extractArchive = form.get("extract_archive");
@@ -112,6 +118,24 @@ function UploadForm() {
             form.getAll("plugins").length === 0
         ) {
             formErrors["plugins"] = "You need to pick at least one plugin";
+            isValid = false;
+        }
+
+        if (
+            form.get("guest_os") === "android" &&
+            filename &&
+            !/\.apk$/i.test(filename)
+        ) {
+            formErrors["form-file"] =
+                "Android analysis takes an APK file (.apk).";
+            isValid = false;
+        }
+        if (
+            form.get("guest_os") === "ios" &&
+            filename &&
+            !/\.ipa$/i.test(filename)
+        ) {
+            formErrors["form-file"] = "iOS analysis takes an IPA file (.ipa).";
             isValid = false;
         }
 
@@ -184,38 +208,52 @@ function UploadForm() {
     );
     return (
         <form onSubmit={submitForm} ref={formRef}>
-            {!isStatic && (
-                <>
-                    <div className="mb-3">
-                        <label htmlFor="guest-os" className="form-label">
-                            Guest OS
-                        </label>
-                        <select
-                            className="form-select"
-                            id="guest-os"
-                            name="guest_os"
-                            value={guestOs}
-                            onChange={(ev) => {
-                                setGuestOs(ev.target.value);
-                                setExtractArchive(false);
-                                setFormErrors({});
-                                setValid(true);
-                            }}
-                        >
-                            <option value="windows">Windows 10</option>
-                            <option value="linux">
-                                Linux (Debian 12 desktop)
-                            </option>
-                        </select>
+            <div className="mb-3">
+                <label htmlFor="guest-os" className="form-label">
+                    Platform
+                </label>
+                <select
+                    className="form-select"
+                    id="guest-os"
+                    name="guest_os"
+                    value={guestOs}
+                    onChange={(ev) => {
+                        const next = ev.target.value;
+                        setGuestOs(next);
+                        const mobile = next === "android" || next === "ios";
+                        if (mobile) setMode("static-only");
+                        else if (isMobile) setMode("combined");
+                        setExtractArchive(false);
+                        setFormErrors({});
+                        setValid(true);
+                    }}
+                >
+                    <option value="windows">Windows 10</option>
+                    <option value="linux">Linux (Debian 12 desktop)</option>
+                    <option value="android">
+                        Android APK (static analysis and MobSF)
+                    </option>
+                    <option value="ios">
+                        iOS IPA (static analysis and MobSF)
+                    </option>
+                </select>
+                {isMobile ? (
+                    <div className="form-text">
+                        The app is not run: CHIMERA's static analyzer and MobSF
+                        (in a container with no network) examine it, and the
+                        classifier is not used for mobile apps. Dynamic{" "}
+                        {isIos ? "iOS" : "Android"} analysis is not available
+                        yet.
                     </div>
-                </>
-            )}
+                ) : null}
+            </div>
             <div className="mb-3">
                 <input
                     className="form-control"
                     type="file"
                     id="form-file"
                     name="file"
+                    accept={isAndroid ? ".apk" : isIos ? ".ipa" : undefined}
                     onChange={validateForm}
                     required
                 />
@@ -541,11 +579,15 @@ function UploadForm() {
                 <label htmlFor="analysis-mode" className="me-2">
                     Mode
                 </label>
+                {isMobile ? (
+                    <input type="hidden" name="mode" value="static-only" />
+                ) : null}
                 <select
                     id="analysis-mode"
-                    name="mode"
+                    name={isMobile ? undefined : "mode"}
                     className="form-select w-auto me-3"
                     value={mode}
+                    disabled={isMobile}
                     onChange={(ev) => {
                         setMode(ev.target.value);
                         setFormErrors({});

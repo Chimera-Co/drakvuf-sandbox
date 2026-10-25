@@ -583,3 +583,234 @@
 .ioc-group li:first-child {
     border-top: 0;
 }
+
+/* Threat intel card */
+.intel-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.9rem;
+}
+
+.intel-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.intel-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.7rem 0.85rem;
+    border: 1px solid var(--chimera-border);
+    border-radius: var(--chimera-radius-sm);
+    background-color: var(--chimera-surface-2);
+}
+
+.intel-tile-label,
+.intel-subhead {
+    color: var(--chimera-text-muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.intel-subhead {
+    margin: 0.85rem 0 0.4rem;
+}
+
+.intel-section {
+    padding-top: 0.9rem;
+    margin-top: 0.9rem;
+    border-top: 1px solid var(--chimera-border);
+}
+
+.intel-heading {
+    margin-bottom: 0.6rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.intel-list {
+    padding-left: 1.1rem;
+    margin-bottom: 0;
+    font-size: 0.8125rem;
+}
+
+.intel-outcomes {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.intel-outcome {
+    display: inline-flex;
+    overflow: hidden;
+    border: 1px solid var(--chimera-border);
+    border-radius: var(--chimera-radius-sm);
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.intel-outcome > * {
+    padding: 0.1rem 0.45rem;
+}
+
+.intel-outcome .intel-provider {
+    background-color: var(--chimera-surface-3);
+    color: var(--chimera-text-muted);
+    font-weight: 600;
+}
+
+.intel-outcome a {
+    color: inherit;
+}
+
+.intel-outcome.is-bad {
+    border-color: rgba(var(--chimera-red-rgb), 0.55);
+    background-color: rgba(var(--chimera-red-rgb), 0.14);
+}
+
+.intel-outcome.is-warn {
+    border-color: rgba(var(--chimera-yellow-rgb), 0.55);
+    background-color: rgba(var(--chimera-yellow-rgb), 0.12);
+}
+
+.intel-outcome.is-good {
+    border-color: rgba(var(--chimera-green-rgb), 0.5);
+    background-color: rgba(var(--chimera-green-rgb), 0.12);
+}
+
+.intel-pill {
+    display: inline-block;
+    padding: 0.05rem 0.5rem;
+    border-radius: 999px;
+    background-color: var(--chimera-surface-3);
+    color: var(--chimera-text);
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.intel-pill.is-malicious {
+    background-color: rgba(var(--chimera-red-rgb), 0.22);
+}
+
+.intel-pill.is-suspicious {
+    background-color: rgba(var(--chimera-yellow-rgb), 0.22);
+}
+
+.intel-pill.is-harmless {
+    background-color: rgba(var(--chimera-green-rgb), 0.2);
+}
+
+.intel-vt {
+    padding: 0.85rem;
+    margin-top: 0.6rem;
+    border: 1px solid var(--chimera-border);
+    border-radius: var(--chimera-radius-sm);
+    background-color: var(--chimera-surface-2);
+}
+
+.intel-vt-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.6rem;
+}
+
+.intel-meter {
+    min-width: 11rem;
+}
+
+.intel-meter-figure strong {
+    margin-right: 0.3rem;
+    font-size: 1.6rem;
+    line-height: 1;
+}
+
+.intel-meter-figure span {
+    color: var(--chimera-text-muted);
+    font-size: 0.8rem;
+}
+
+.intel-meter-bar {
+    display: flex;
+    height: 0.4rem;
+    margin-top: 0.3rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background-color: var(--chimera-surface-3);
+}
+
+.intel-meter-bar .is-bad {
+    background-color: var(--chimera-red-ink);
+}
+
+.intel-meter-bar .is-warn {
+    background-color: var(--chimera-yellow-ink);
+}
+
+.intel-facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+    gap: 0.4rem 1rem;
+    margin: 0;
+    font-size: 0.8125rem;
+}
+
+.intel-facts dt {
+    color: var(--chimera-text-muted);
+    font-weight: 500;
+}
+
+.intel-facts dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.intel-engines {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+    gap: 0.25rem 0.75rem;
+    font-size: 0.78rem;
+}
+
+.intel-engines > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.15rem 0.4rem;
+    border-left: 3px solid var(--chimera-border-strong);
+}
+
+.intel-engines > .is-malicious {
+    border-left-color: var(--chimera-red-ink);
+}
+
+.intel-engines > .is-suspicious {
+    border-left-color: var(--chimera-yellow-ink);
+}
+
+.intel-engines code {
+    overflow: hidden;
+    color: var(--chimera-text);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.intel-providers {
+    margin-top: 0.9rem;
+    font-size: 0.85rem;
+}
+
+.intel-providers > summary {
+    cursor: pointer;
+    font-weight: 600;
+}

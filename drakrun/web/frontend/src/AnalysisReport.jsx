@@ -24,6 +24,7 @@ import { ProcessBadge } from "./ProcessBadge.jsx";
 import { AnalysisFilesViewer } from "./AnalysisFiles.jsx";
 import { useAnalysisReport } from "./AnalysisReportContext.jsx";
 import { StaticAnalysisTab, VerdictCard } from "./AnalysisVerdict.jsx";
+import { DecompiledCodeTab } from "./static/DecompiledCode.jsx";
 import { EdgeDrawer, useOutOfView } from "./EdgeDrawer.jsx";
 import { PipelineStatus } from "./PipelineStatus.jsx";
 import { SimpleReport } from "./SimpleReport.jsx";
@@ -262,9 +263,19 @@ function AnalysisReportTabs({
         return (
             <div className="card">
                 <div className="card-body">
-                    <TabSwitcher activeTab="Static analysis">
+                    <TabSwitcher
+                        activeTab={
+                            activeReportTab === "Decompiled code"
+                                ? "Decompiled code"
+                                : "Static analysis"
+                        }
+                        onTabSwitch={setActiveReportTab}
+                    >
                         <PaddedTab tab="Static analysis">
                             <StaticAnalysisTab analysisId={analysis.id} />
+                        </PaddedTab>
+                        <PaddedTab tab="Decompiled code">
+                            <DecompiledCodeTab analysisId={analysis.id} />
                         </PaddedTab>
                     </TabSwitcher>
                 </div>
@@ -329,6 +340,13 @@ function AnalysisReportTabs({
                     {!isOffline ? (
                         <PaddedTab tab="Static analysis">
                             <StaticAnalysisTab analysisId={analysis.id} />
+                        </PaddedTab>
+                    ) : (
+                        []
+                    )}
+                    {!isOffline ? (
+                        <PaddedTab tab="Decompiled code">
+                            <DecompiledCodeTab analysisId={analysis.id} />
                         </PaddedTab>
                     ) : (
                         []

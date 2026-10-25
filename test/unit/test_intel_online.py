@@ -177,11 +177,11 @@ def test_selection_never_reads_sample(setup, tmp_path, monkeypatch):
                             "10.99.0.1",
                             "192.168.1.1",
                             "224.0.0.1",
-                            "8.8.8.8",
-                            "1.1.1.1",
-                            "9.9.9.9",
+                            "93.184.216.34",
+                            "45.33.32.156",
+                            "198.51.200.7",
                         ],
-                        "domains": ["a.example", "b.example", "c.example"],
+                        "domains": ["alpha.example", "beta.example", "gamma.example"],
                         "urls": ["http://127.0.0.1/private"],
                     }
                 }
@@ -198,10 +198,10 @@ def test_selection_never_reads_sample(setup, tmp_path, monkeypatch):
 
     monkeypatch.setattr(Path, "open", guarded)
     result = collect(directory, directory, config)
-    assert result[0] == ("sha256", HASH)
-    assert [v for k, v in result if k == "ip"] == ["8.8.8.8", "1.1.1.1"]
-    assert len([v for k, v in result if k == "domain"]) == 2
-    assert not any(k == "url" for k, v in result)
+    assert result[0] == ("sha256", HASH, "sample")
+    assert [v for k, v, _ in result if k == "ip"] == ["93.184.216.34", "45.33.32.156"]
+    assert len([v for k, v, _ in result if k == "domain"]) == 2
+    assert not any(k == "url" for k, v, _ in result)
 
 
 @pytest.mark.parametrize(
@@ -365,19 +365,22 @@ def test_memory_iocs_and_guest_address_excluded(setup, tmp_path):
             {
                 "scanned": [
                     {
+                        "sample_tree": True,
                         "iocs": {
                             "domains": ["memory.example"],
-                            "ips": ["8.8.8.8", "1.1.1.1"],
-                        }
-                    }
+                            "ips": ["93.184.216.34", "45.33.32.156"],
+                        },
+                    },
+                    {"sample_tree": False, "iocs": {"domains": ["windows-only.example"]}},
                 ]
             }
         )
     )
-    result = collect(tmp_path, tmp_path, config, SimpleNamespace(dns_server="8.8.8.8"))
-    assert ("domain", "memory.example") in result
-    assert ("ip", "8.8.8.8") not in result
-    assert ("ip", "1.1.1.1") in result
+    result = collect(tmp_path, tmp_path, config, SimpleNamespace(dns_server="93.184.216.34"))
+    assert ("domain", "memory.example", "memory") in result
+    assert not any(v == "93.184.216.34" for _, v, _ in result)
+    assert ("ip", "45.33.32.156", "memory") in result
+    assert not any(v == "windows-only.example" for _, v, _ in result)
 
 
 def test_hashlookup_malicious_marker_cannot_make_benign():
@@ -437,9 +440,9 @@ def test_one_hash_per_sample_and_observed_first(setup, tmp_path):
         json.dumps({"universal": {"iocs": {"domains": ["string.example"]}}})
     )
     selected = collect(directory, directory, config)
-    assert selected[0] == ("sha256", HASH)
-    assert ("sha1", "c" * 40) not in selected and ("md5", "d" * 32) not in selected
-    domains = [v for k, v in selected if k == "domain"]
+    assert selected[0] == ("sha256", HASH, "sample")
+    assert not any(k in ("sha1", "md5") for k, _, _ in selected)
+    domains = [v for k, v, _ in selected if k == "domain"]
     assert domains == ["observed.example", "string.example"]
 
 
@@ -478,3 +481,64 @@ def test_enqueue_uses_the_pipeline_job_id(setup, monkeypatch):
     assert queue.return_value.enqueue.call_args.kwargs["job_id"] == (
         "intel-online-fixture"
     )
+
+
+def test_only_the_sample_tree_and_public_names_are_looked_up(setup, tmp_path, monkeypatch):
+    config, _, _ = setup
+    directory = tmp_path / "scoped"
+    directory.mkdir()
+    (directory / "report.json").write_text(json.dumps({
+        "startup": {"process": 7},
+        "processes": [{"seqid": 1, "parent_seqid": None}, {"seqid": 7, "parent_seqid": 1},
+                      {"seqid": 8, "parent_seqid": 7}],
+        "dns_queries": [
+            {"domain": "c2.evil.example", "process_seqids": [8]},          # child of the sample
+            {"domain": "telemetry.other.example", "process_seqids": [1]},  # another guest process
+            {"domain": "localhost", "process_seqids": [7]},                # never public
+            {"domain": "ctldl.windowsupdate.com", "process_seqids": [7]},  # Windows background service
+            {"domain": "orphan.example", "process_seqids": []},
+        ],
+        "http_requests": [{"server_name": "g.live.com", "path": "/payload.bin", "server_port": 443,
+                           "process_seqid": 8}],
+    }))
+    selected = collect(directory, directory, config)
+    assert ("domain", "c2.evil.example", "dynamic") in selected
+    assert ("domain", "orphan.example", "unattributed") in selected
+    assert ("url", "https://g.live.com/payload.bin", "dynamic") in selected  # the sample fetched it
+    values = [v for _, v, _ in selected]
+    assert "telemetry.other.example" not in values and "localhost" not in values
+    assert "ctldl.windowsupdate.com" not in values and "g.live.com" not in values
+
+
+def test_unconfigured_providers_are_not_called_and_matches_need_a_flag(setup, tmp_path, monkeypatch):
+    config, _, _ = setup
+    (config.keys_dir / "virustotal").unlink()
+    looked = []
+    monkeypatch.setattr(
+        base.Provider,
+        "lookup",
+        lambda self, kind, value, cfg, cache: looked.append(self.id)
+        or self.result(kind, value),
+    )
+    directory = tmp_path / "unconfigured"
+    directory.mkdir()
+    (directory / "report.json").write_text(json.dumps({"dns_queries": [{"domain": "a.example"}]}))
+    doc = run(directory, directory, config)
+    assert "virustotal" not in looked
+    vt = next(p for p in doc["providers"] if p["id"] == "virustotal")
+    assert vt["status"] == "not_configured" and not any(r["provider"] == "virustotal" for r in doc["results"])
+    assert doc["summary"]["matches"] == 0 and doc["summary"]["seen"] == len(doc["results"])
+    assert all(r["origin"] == "dynamic" for r in doc["results"])
+
+
+def test_string_artifacts_are_not_looked_up(setup, tmp_path):
+    config, _, _ = setup
+    directory = tmp_path / "strings"
+    directory.mkdir()
+    (directory / "static.json").write_text(json.dumps({"universal": {"iocs": {
+        "ips": ["1.9.16.1", "185.220.101.4"],
+        "domains": ["cuassistant.reboot.force.time.interval.in", "e.com", "evil-c2.example"],
+        "urls": ["http://185.220.101.4/gate.php"],
+    }}}))
+    values = [v for _, v, _ in collect(directory, directory, config)]
+    assert values == ["evil-c2.example", "http://185.220.101.4/gate.php", "185.220.101.4"]

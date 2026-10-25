@@ -354,7 +354,6 @@
     right: 0;
     border-right: 0;
     border-radius: var(--chimera-radius) 0 0 var(--chimera-radius);
-    transform: rotate(180deg);
 }
 
 .chimera-edge-drawer {

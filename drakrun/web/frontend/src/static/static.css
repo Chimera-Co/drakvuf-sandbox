@@ -297,6 +297,9 @@
     gap: 0.5rem;
     height: min(78vh, 50rem);
 }
+.code-ide.is-sources {
+    grid-template-columns: minmax(14rem, 20rem) minmax(0, 1fr);
+}
 .code-pane {
     display: flex;
     flex-direction: column;

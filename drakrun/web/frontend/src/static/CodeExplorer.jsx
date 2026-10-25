@@ -5,14 +5,21 @@ export function SourceCode({
     code = "",
     language = "c",
     label = "Decompiled source",
+    maxBytes = 131072,
+    maxLines = 2000,
 }) {
-    const limited = code.slice(0, 131072).split("\n").slice(0, 2000).join("\n");
+    const limited = code
+        .slice(0, maxBytes)
+        .split("\n")
+        .slice(0, maxLines)
+        .join("\n");
     let line = 1;
     return (
         <pre className="static-code text-break" aria-label={label}>
             {limited.length < code.length && (
                 <span className="text-warning-emphasis">
-                    Source display truncated to 2000 lines / 128 KiB.{"\n"}
+                    Source display truncated to {maxLines} lines /{" "}
+                    {Math.round(maxBytes / 1024)} KiB.{"\n"}
                 </span>
             )}
             <code>

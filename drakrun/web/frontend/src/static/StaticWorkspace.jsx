@@ -596,8 +596,10 @@ export function Code(props) {
     return <CodeExplorer {...props} />;
 }
 export function FormatDetails({ data }) {
-    const fmt = data.type?.format;
-    const b = data[fmt];
+    const format = data.type?.format;
+    const b = data[format];
+    // An IPA is a ZIP and is listed the same way.
+    const fmt = format === "ipa" ? "zip" : format;
     if (!b) return <p>Format details not reported.</p>;
     if (!["zip", "apk", "pdf", "ole", "ooxml"].includes(fmt))
         return (
@@ -858,6 +860,7 @@ function Workspace({ data, analysisId }) {
         "Structure",
         ...(supported ? ["Imports"] : []),
         ...(fmt === "apk" ? ["Android (MobSF)"] : []),
+        ...(fmt === "ipa" ? ["iOS (MobSF)"] : []),
         "Strings",
         "Capabilities",
         "Code",
@@ -969,7 +972,9 @@ function Workspace({ data, analysisId }) {
             {tab === "Indicators" && <Indicators data={data} />}
             {tab === "Structure" && <Structure data={data} />}
             {tab === "Imports" && <ImportsView data={data} />}
-            {tab === "Android (MobSF)" && <MobsfView analysisId={analysisId} />}
+            {(tab === "Android (MobSF)" || tab === "iOS (MobSF)") && (
+                <MobsfView analysisId={analysisId} />
+            )}
             {tab === "Strings" && <Strings data={data} deep={deep} />}
             {tab === "Capabilities" && <Capabilities data={data} deep={deep} />}
             {tab === "Code" && (
@@ -977,9 +982,9 @@ function Workspace({ data, analysisId }) {
             )}
             {tab === "Format details" && (
                 <>
-                    {["pdf", "ole", "ooxml", "zip", "apk"].includes(fmt) && (
-                        <FormatDetails data={data} />
-                    )}
+                    {["pdf", "ole", "ooxml", "zip", "ipa", "apk"].includes(
+                        fmt,
+                    ) && <FormatDetails data={data} />}
                     {Object.entries(data)
                         .filter(
                             ([key, value]) =>
@@ -1002,6 +1007,7 @@ function Workspace({ data, analysisId }) {
                                         "ole",
                                         "ooxml",
                                         "zip",
+                                        "ipa",
                                         "apk",
                                     ].includes(fmt)
                                         ? [fmt]

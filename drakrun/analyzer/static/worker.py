@@ -34,6 +34,7 @@ STATIC_ONLY_QUEUE_NAME = "chimera-static-only"
 INTEL_QUEUE_NAME = "chimera-intel"
 DEEP_QUEUE_NAME = "chimera-static-deep"
 DEEP_FORMATS = {"pe", "elf"}  # what capa (and FLOSS, PE only) can disassemble
+MOBILE_FORMATS = {"apk", "ipa"}  # MobSF's report instead of the deep pass and the classifier
 
 
 class StaticAnalysisFailed(RuntimeError):
@@ -113,7 +114,7 @@ def _enqueue_deep(
     if result.get("error"):
         return False
     file_format = (result.get("type") or {}).get("format")
-    if file_format == "apk" and settings.mobsf_enabled:
+    if file_format in MOBILE_FORMATS and settings.mobsf_enabled:
         return _enqueue_mobsf(settings, analysis_id, base)
     if not settings.deep_enabled or file_format not in DEEP_FORMATS:
         return False
@@ -328,6 +329,18 @@ def enqueue_static_only(
     )
 
 
+def not_applicable_verdict() -> dict:
+    return {
+        "schema": "chimera-verdict/1",
+        "label": "unknown",
+        "not_applicable": True,
+        "explanation": [
+            "Mobile apps are not classified: the models are trained on Windows and Linux files. "
+            "Read the MobSF report for this app."
+        ],
+    }
+
+
 def run_static_only_analysis(analysis_id: str, file_metadata: dict, options: dict):
     from rq import get_current_job
 
@@ -373,7 +386,13 @@ def run_static_only_analysis(analysis_id: str, file_metadata: dict, options: dic
         "static": static,
     }
     write("features.json", features)
-    if config.classifier.enabled:
+    mobile = ((static or {}).get("type") or {}).get("format") in MOBILE_FORMATS
+    if mobile:
+        # The models are trained on Windows and Linux files; a score for an app would mean nothing.
+        verdict = not_applicable_verdict()
+        write("classification.json", verdict)
+        metadata["classification"] = verdict
+    elif config.classifier.enabled:
         try:
             verdict = run_classifier(
                 features,

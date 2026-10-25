@@ -209,6 +209,15 @@ export function VerdictCard({ analysisId, compact = false }) {
         );
     else if (error)
         body = <div className="text-danger">Error: {error.toString()}</div>;
+    else if (data.not_applicable)
+        body = (
+            <div>
+                <span className="badge bg-secondary">Not classified</span>
+                <span className="ms-2 text-muted">
+                    {(data.explanation || []).join(" ")}
+                </span>
+            </div>
+        );
     else if (data.error)
         body = (
             <div>

@@ -129,9 +129,13 @@ def analyze_apk(data: bytes) -> tuple[dict, list[dict]]:
                 if magic in (b"dex\n", b"\x7fELF") and len(payloads) < 100:
                     payloads.append(member.filename[:300])
         out["asset_payloads"] = payloads
-        if len(dex) > 1 or payloads:
-            add("packed", "Multiple DEX files or executable assets", "medium",
-                f"{len(dex)} DEX files; executable assets: {', '.join(payloads[:5])}; may be legitimate multidex")
+        # DEX or ELF code hidden in assets/ is how Android packers and droppers carry a second stage; several
+        # classesN.dex alone is ordinary multidex in any large app.
+        if payloads:
+            add("packed", "Executable code hidden in assets", "medium",
+                f"{len(payloads)} DEX/ELF file(s) in assets/: {', '.join(payloads[:5])}")
+        elif len(dex) > 1:
+            add("multidex", "Multiple DEX files (multidex)", "low", f"{len(dex)} DEX files; usual for large apps")
         urls, domains, ips, samples, markers, skipped = set(), set(), set(), [], set(), []
         runtime, exec_method = False, False
         for member in dex:

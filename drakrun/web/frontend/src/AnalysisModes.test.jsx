@@ -55,11 +55,10 @@ it("defaults to combined and sends only static inputs in static-only mode", asyn
         </MemoryRouter>,
     );
     expect(screen.getByLabelText("Mode").value).toBe("combined");
-    expect(screen.getByLabelText("Guest OS")).toBeTruthy();
+    expect(screen.getByLabelText("Platform")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Mode"), {
         target: { value: "static-only" },
     });
-    expect(screen.queryByLabelText("Guest OS")).toBeNull();
     expect(document.querySelector('[name="timeout"]')).toBeNull();
     expect(document.querySelector('[name="plugins"]')).toBeNull();
     expect(document.querySelector('[name="start_command"]')).toBeNull();

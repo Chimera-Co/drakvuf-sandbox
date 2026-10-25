@@ -8,7 +8,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 OUT=/var/lib/chimera-static-vm
 ROOT=$OUT/root.img
 MNT=$(mktemp -d /tmp/chimera-static-root.XXXX)
-IMAGES=("localhost/chimera-static:0.1.0" "localhost/chimera-ghidra:11.1.2")
+IMAGES=("localhost/chimera-static:0.1.0" "localhost/chimera-ghidra:11.1.2" "localhost/chimera-mobsf:4.5.3")
 MIRROR=${MIRROR:-http://deb.debian.org/debian}
 mkdir -p "$OUT"
 chmod 700 "$OUT"
