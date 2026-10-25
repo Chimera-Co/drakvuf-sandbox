@@ -1,4 +1,4 @@
-# CHIMERA current state (verified 25 Oct 2026)
+# CHIMERA current state (verified 25 Oct 2026, updated after the P0/P1 work the same day)
 
 Everything below was checked on the CHIMERA host on 25 Oct 2026 with the command or file named. Historical results
 from earlier documents are marked as such and were not re-run.
@@ -7,11 +7,11 @@ from earlier documents are marked as such and were not re-run.
 
 | Item | State | How verified |
 |---|---|---|
-| Working branch | `sprint/final` at `4696288` (one commit ahead of `origin/sprint/final`) | `git log` |
-| Deployed source | `/opt/chimera/src` at `b1ee4d3`, installed into `/opt/chimera/venv` | `git -C /opt/chimera/src log -1` |
-| Deployed classifier | `/etc/drakrun/classifier/`; `model.py` replaced with the `4696288` version (sha256 `be411b68…`), backup `classifier.bak-20261025-035159` | `sha256sum` |
-| Deployed web bundle | Rebuilt 25 Oct with the "no verdict" label; previous bundle kept as `dist.prev-20261025` | bundle grep |
-| Classifier and static analysis | Merged from `classifierUndStatico`; static image `localhost/chimera-static:0.1.0`; `drakrun-static-worker` running | services, image |
+| Working branch | `sprint/final` at `16ccf04` (18 commits ahead of `origin/sprint/final`, not pushed) | `git log` |
+| Deployed source | `/opt/chimera/src` (files copied per change, then installed into `/opt/chimera/venv`); every change up to `16ccf04` is deployed, backups under `/var/backups/chimera-*` | file compare, services |
+| Deployed classifier | `/etc/drakrun/classifier/`, `model.py` sha256 `74dba488…` (`f09beb4`: partial static never votes benign; static-only runs say the sample was not executed) | `sha256sum` |
+| Deployed web bundle | Rebuilt 25 Oct with R4, R6, R7, R8, R10 | browser check |
+| Classifier and static analysis | Merged from `classifierUndStatico`; static image `localhost/chimera-static:0.1.0` (id `7d3d92a26f94`, ReversingLabs YARA, libfuzzy ssdeep, oletools; previous images tagged `pre-r2`, `pre-r3`, `pre-ssdeep`, `pre-r12`); `drakrun-static-worker` running | services, image |
 | Upstream DRAKVUF fixes | tklengyel/drakvuf#1886 (use-after-free in `refresh_shadow_copy`) and #1887 (libvmi bump) **merged 24 Oct** | `gh pr view` |
 
 ## 2. Host
@@ -29,10 +29,21 @@ from earlier documents are marked as such and were not re-run.
 
 | Suite | Result | Note |
 |---|---|---|
-| `test/unit` (drakrun) | **613 passed** | `.venv/bin/python -m pytest -q test/unit --confcutdir=test/unit` |
-| `classifier/tests` | **19 passed, 1 skipped** | includes the new gate test; the skip is the optional thrember parity test |
-| Frontend (vitest) | **23 passed** | |
-| `static_analyzer/tests` | **9 failed, 11 passed** in the dev venv | Not regressions: they need the container's packages (scikit-learn etc.). There is no documented way to run them outside the image yet (see `testing-strategy.md` §3) |
+| `test/unit` (drakrun) | **646 passed** | `.venv/bin/python -m pytest -q test/unit --confcutdir=test/unit -p no:cacheprovider` |
+| `classifier/tests` | **21 passed, 1 skipped** | the skip is the optional thrember parity test |
+| Frontend (vitest) | **47 passed** | Node 22 |
+| `static_analyzer/tests` | **33 passed** | inside the image: `podman build --network=host --target test -f static_analyzer/Containerfile static_analyzer` (R5) |
+
+## 3a. Roadmap progress (25 Oct)
+
+| Item | State |
+|---|---|
+| P0 R1–R5 | Done and deployed |
+| P1 R6 combined report, R7 analysis modes, R8 hashes and list filters, R9 classifier freeze | Done and deployed; R7 checked live with a static-only run (VM workers never saw the job) |
+| P2 R10 IOC export, R12 Office macros and ZIP listing | Done and deployed |
+| P2 R11 offline intelligence | Not started: needs a dated feed snapshot (download needs the owner's OK; abuse.ch rate limits) |
+| P2 R13 one dynamic analysis at a time | Not started: changes VM scheduling close to the freeze |
+| Static analysis isolation | Per-sample rootful podman container in dom0 (no network, read-only, no capabilities, uid 65534, limits). Stronger options for later: gVisor runtime, rootless podman, or a static-analysis domU |
 
 ## 4. Data and experiments
 
