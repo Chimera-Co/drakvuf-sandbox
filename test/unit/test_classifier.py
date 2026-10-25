@@ -672,3 +672,16 @@ def test_static_missing_is_none_not_error(analysis, config_factory, tmp_path, mo
 def test_static_disabled_leaves_features_unchanged(analysis, config_factory):
     classify_sample(context_for(analysis, config_factory("[classifier]\nenabled = true\n")))
     assert "static" not in json.loads((analysis / "features.json").read_text())
+
+
+def test_runner_keeps_a_calibrated_probability(analysis):
+    model = analysis / "model.py"
+    model.write_text(GOOD_MODEL.replace(
+        '"explanation": ["test"]}',
+        '"explanation": ["test"], "calibrated_probability": 0.12, "calibration": "platt, grouped 5-fold"}',
+    ))
+    verdict = run_classifier(extract_features(analysis), analysis, model)
+    assert verdict["calibrated_probability"] == 0.12 and verdict["calibration"] == "platt, grouped 5-fold"
+    model.write_text(GOOD_MODEL.replace('"explanation": ["test"]}', '"explanation": ["test"], '
+                                        '"calibrated_probability": 1.5}'))
+    assert run_classifier(extract_features(analysis), analysis, model)["label"] == "unknown"

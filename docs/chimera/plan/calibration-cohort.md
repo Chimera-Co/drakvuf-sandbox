@@ -1,6 +1,6 @@
 # Classifier retraining and calibration cohort
 
-Owner of the model: classifier owner (Monty). Sandbox runs: Shreyas. Status 25 Oct 2026.
+Owner of the model: classifier owner (Monty). Sandbox runs: Shreyas. Status 25 Oct 2026. Checklist and what changed on the sandbox: [`../classifier-handoff.md`](../classifier-handoff.md).
 
 ## Order
 

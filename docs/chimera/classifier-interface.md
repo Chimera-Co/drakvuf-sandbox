@@ -75,6 +75,13 @@ lowercase `[a-z][a-z0-9_]*`, at most 32 characters, at most 8 components. An inv
 result invalid (→ `unknown` with the error), like any other invalid field. Without `components` the verdict is
 exactly as before.
 
+### Optional `calibrated_probability`
+
+Only a model calibrated on held-out CHIMERA runs (`docs/chimera/plan/calibration-cohort.md`) may add
+`"calibrated_probability": 0.12` (0..1) and a short `"calibration": "platt, grouped 5-fold, cohort 2026-10"`.
+The verdict card then shows the probability instead of the decision score. A value outside 0..1 makes the result
+invalid; without it the card keeps saying the score is not a probability.
+
 `stub_model.py` (`model: "chimera-stub"`) is a placeholder heuristic, not a trained model, and says so in its
 explanation.
 
