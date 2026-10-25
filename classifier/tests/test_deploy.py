@@ -146,3 +146,16 @@ def test_garbage_static_block_does_not_crash():
                  {"type": "x"}, [], "nope", None):
         v = run(with_static(junk))
         assert "error" not in v, (junk, v)
+
+
+@has_static
+def test_static_only_run_never_judges_behaviour():
+    # A static-only analysis never executed the sample: the dynamic part must say so, not "too little behaviour",
+    # and the verdict rests on static alone.
+    empty = copy.deepcopy(FIXTURE)
+    empty["api_calls"], empty["api_sequence"] = {}, []
+    empty["run"] = {**(empty.get("run") or {}), "mode": "static-only", "guest_os": None}
+    v = run(with_static(STATIC["pe"], base=empty))
+    dyn = v["components"]["dynamic"]
+    assert dyn["label"] == "unknown" and "static-only" in dyn["explanation"][0]
+    assert v["components"]["static"]["label"] in LABELS

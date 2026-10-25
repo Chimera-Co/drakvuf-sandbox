@@ -82,6 +82,8 @@ def _dynamic(features: dict, s: dict) -> dict:
     meta, np = s["meta"], s["np"]
     model, version = meta.get("model", "chimera-lgbm"), meta.get("model_version", "0")
     run = features.get("run") or {}
+    if run.get("mode") == "static-only":
+        return _component("unknown", None, model, version, ["Not run: static-only analysis (the sample was never executed)."])
     if run.get("guest_os") == "linux":
         return _component("unknown", None, model, version, ["Linux run: the dynamic model knows Windows behaviour only."])
     names, allowed = meta["feature_names"], meta.get("api_vocabulary")
