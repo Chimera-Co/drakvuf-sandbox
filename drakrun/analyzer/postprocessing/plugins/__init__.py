@@ -1,5 +1,6 @@
 from drakrun.lib.paths import DUMPS_DIR, DUMPS_ZIP, IPT_DIR, IPT_ZIP
 
+from .build_chimera_report import build_chimera_report
 from .build_process_tree import build_process_tree
 from .capa_plugin.capa_processor import capa_analysis
 from .classify_sample import classify_sample
@@ -110,6 +111,12 @@ POSTPROCESS_PLUGINS = [
         function=generate_html_report,
         requires=["report.json"],
         generates=["report.html"],
+    ),
+    # After classification and report.html: one evidence-linked report (always rebuilt, it is cheap)
+    PostprocessPlugin(
+        function=build_chimera_report,
+        requires=["report.json"],
+        generates=[],
     ),
     PostprocessPlugin(
         function=index_logs, requires=["process_tree.json"], generates=["log_index"]

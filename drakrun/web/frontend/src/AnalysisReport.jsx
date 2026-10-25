@@ -8,7 +8,7 @@ import { ProcessTreeView } from "./ProcessTreeView.jsx";
 import { MethodFilterPicker } from "./MethodFilterPicker.jsx";
 import { ProcessInfoTable } from "./ProcessInfoTable.jsx";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faDownload } from "@fortawesome/free-solid-svg-icons";
+import { faDownload, faFileLines } from "@fortawesome/free-solid-svg-icons";
 import axios, { CanceledError } from "axios";
 import { AnalysisSummary } from "./AnalysisSummary.jsx";
 import { ProcessBadge } from "./ProcessBadge.jsx";
@@ -400,6 +400,23 @@ export function AnalysisReport() {
                                                 className="me-2"
                                             />
                                             HTML report
+                                        </button>
+                                    </a>
+                                ) : (
+                                    []
+                                )}
+                                {analysis["chimera_report"] ? (
+                                    <a
+                                        href={`${baseUrl}/chimera_report/${analysis.id}/html`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        <button className="btn btn-primary m-1">
+                                            <FontAwesomeIcon
+                                                icon={faFileLines}
+                                                className="me-2"
+                                            />
+                                            Printable report
                                         </button>
                                     </a>
                                 ) : (

@@ -72,3 +72,21 @@ def test_status_preserves_classification(api_client, tmp_path):
 @pytest.mark.parametrize("artifact", ["classification", "features"])
 def test_classifier_routes_reject_invalid_uid(api_client, artifact):
     assert api_client.get(f"/api/{artifact}/not-a-uuid").status_code == 422
+
+
+def test_chimera_report_is_served_with_a_locked_down_policy(api_client, tmp_path):
+    task_uid = str(uuid.uuid4())
+    assert api_client.get(f"/api/chimera_report/{task_uid}").status_code == 404
+    assert api_client.get(f"/api/chimera_report/{task_uid}/html").status_code == 404
+    directory = tmp_path / task_uid
+    directory.mkdir()
+    (directory / "chimera-report.json").write_text('{"schema": "chimera-report/1"}')
+    (directory / "chimera-report.html").write_text("<!doctype html><p>x</p>")
+    response = api_client.get(f"/api/chimera_report/{task_uid}")
+    assert response.json == {"schema": "chimera-report/1"}
+    response = api_client.get(f"/api/chimera_report/{task_uid}/html")
+    assert response.status_code == 200 and response.mimetype == "text/html"
+    assert "attachment" not in response.headers.get("Content-Disposition", "")
+    policy = response.headers["Content-Security-Policy"]
+    assert "default-src 'none'" in policy and "script-src" not in policy
+    assert response.headers["X-Content-Type-Options"] == "nosniff"

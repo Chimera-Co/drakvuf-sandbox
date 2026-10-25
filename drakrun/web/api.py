@@ -449,3 +449,32 @@ def get_html_report(path: AnalysisRequestPath):
         s3_config=config.s3,
         download_name=f"report-{task_uid}.html",
     )
+
+
+@api.get("/chimera_report/<task_uid>", responses={404: APIErrorResponse})
+def chimera_report(path: AnalysisRequestPath):
+    """Evidence-linked report (chimera-report/1); 404 until postprocessing has written it."""
+    return send_analysis_file(
+        path.task_uid,
+        "chimera-report.json",
+        mimetype="application/json",
+        s3_config=config.s3,
+    )
+
+
+@api.get("/chimera_report/<task_uid>/html", responses={404: APIErrorResponse})
+def chimera_report_html(path: AnalysisRequestPath):
+    """Printable page of the same report, shown inline. It carries guest-controlled strings, so
+    the page may load nothing and run nothing, whatever its own meta tag says."""
+    response = send_analysis_file(
+        path.task_uid,
+        "chimera-report.html",
+        mimetype="text/html",
+        s3_config=config.s3,
+    )
+    if isinstance(response, Response):
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'"
+        )
+        response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
