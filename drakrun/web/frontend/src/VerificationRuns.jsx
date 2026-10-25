@@ -6,6 +6,7 @@ import { AnalysisStatusBadge } from "./AnalysisStatusBadge.jsx";
 import { formatDate } from "./formatUtils.js";
 import { scoreStateLabel } from "./evasionStatus.js";
 import { ScoreTrend } from "./EvasionCharts.jsx";
+import { Pagination, usePagination } from "./Pagination.jsx";
 
 const SCORE_BADGE_CLASS = {
     pass: "bg-success",
@@ -69,6 +70,7 @@ function VerificationRunRow({ run }) {
 }
 
 function VerificationRunsTable({ runs }) {
+    const pager = usePagination(runs.length);
     return (
         <div className="datatable-container">
             <table className="datatable-table">
@@ -84,11 +86,16 @@ function VerificationRunsTable({ runs }) {
                     </tr>
                 </thead>
                 <tbody>
-                    {runs.map((run) => (
+                    {pager.slice(runs).map((run) => (
                         <VerificationRunRow run={run} key={run.id} />
                     ))}
                 </tbody>
             </table>
+            <Pagination
+                pager={pager}
+                label="Verification run pages"
+                noun="runs"
+            />
         </div>
     );
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import Select from "react-select";
+import { selectStyles } from "./themes.js";
 import { getLogLoader, LogViewer } from "./LogViewer.jsx";
 import {
     BarChart,
@@ -13,6 +14,8 @@ import {
     Line,
     Legend,
 } from "recharts";
+
+const themedSelect = selectStyles();
 
 export const displayValue = (value) =>
     value == null
@@ -157,6 +160,7 @@ export function StructuredTable({
                     <Select
                         aria-label="Methods"
                         isMulti
+                        styles={themedSelect}
                         options={options}
                         value={methods}
                         onChange={(value) => {
@@ -338,7 +342,7 @@ export function Timeline({ stats, label = "Activity timeline" }) {
             keys.map((key) => [key, series?.[key]?.[index] ?? value]),
         ),
     }));
-    const colors = ["#446baf", "#b74c53", "#19856c", "#9e72ba", "#bd842c"];
+    const colors = [1, 2, 3, 4, 5].map((i) => `var(--chimera-chart-${i})`);
     return (
         <section aria-label={label}>
             <h6>{label}</h6>
@@ -390,7 +394,7 @@ export function CountChart({ values = [], label = "Methods" }) {
                         <Tooltip />
                         <Bar
                             dataKey="count"
-                            fill="#446baf"
+                            fill="var(--chimera-chart-1)"
                             isAnimationActive={false}
                         />
                     </BarChart>

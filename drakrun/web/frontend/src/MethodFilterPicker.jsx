@@ -1,14 +1,17 @@
 import { useCallback, useMemo } from "react";
 import CreatableSelect from "react-select/creatable";
+import { selectStyles } from "./themes.js";
 
-const methodPickerStyles = {
-    multiValue: (styles, { data }) => {
-        return { ...styles, backgroundColor: "rgba(255, 86, 48, 0.1)" };
-    },
-    multiValueLabel: (styles, { data }) => {
-        return { ...styles, color: "rgb(255, 86, 48)" };
-    },
-};
+const methodPickerStyles = selectStyles({
+    multiValue: (styles) => ({
+        ...styles,
+        backgroundColor: "rgba(var(--chimera-orange-rgb), 0.14)",
+    }),
+    multiValueLabel: (styles) => ({
+        ...styles,
+        color: "var(--chimera-orange-ink)",
+    }),
+});
 
 export function MethodFilterPicker({ onFilterChange, methods, currentFilter }) {
     const onSelectChange = useCallback(

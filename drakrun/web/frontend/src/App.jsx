@@ -6,6 +6,8 @@ import "startbootstrap-sb-admin/dist/css/styles.css";
 // CHIMERA cosmetic theme. Imported last so it wins the cascade over Bootstrap
 // and the sb-admin template at equal specificity.
 import "./chimera-theme.css";
+import "./themes.css";
+import { ThemePicker } from "./ThemePicker.jsx";
 import AnalysisList from "./AnalysisList.jsx";
 import UploadView from "./UploadView.jsx";
 import AnalysisView from "./AnalysisView.jsx";
@@ -35,6 +37,7 @@ export function AppHeader() {
                 />
                 CHIMERA
             </Link>
+            <ThemePicker />
         </nav>
     );
 }

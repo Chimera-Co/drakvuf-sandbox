@@ -50,14 +50,14 @@
     width: min(680px, 94vw);
     z-index: 1055;
     overflow: auto;
-    box-shadow: 0 1rem 3rem #0004;
+    box-shadow: 0 1rem 3rem rgba(var(--chimera-shadow-rgb), 0.3);
 }
 .analysis-screenshot-stage {
     height: min(55vh, 550px);
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--chimera-base02);
+    background: var(--chimera-shell-raised);
 }
 .analysis-screenshot-stage img {
     max-height: 100%;
@@ -86,8 +86,8 @@
     bottom: -4px;
     width: 4px;
     transform: translateX(-2px);
-    background: var(--chimera-base03);
-    border: 1px solid var(--chimera-base3);
+    background: var(--chimera-strong);
+    border: 1px solid var(--chimera-surface);
 }
 .syntax-function,
 .syntax-label {
@@ -95,7 +95,7 @@
 }
 .syntax-variable,
 .syntax-preprocessor {
-    color: var(--chimera-violet);
+    color: var(--chimera-violet-ink);
 }
 .syntax-char {
     color: var(--chimera-cyan-ink);
@@ -121,7 +121,7 @@
 }
 
 .decision-component {
-    background: var(--chimera-base1);
+    background: var(--chimera-border-strong);
 }
 .analysis-event-table th:nth-child(1) {
     width: 5.75rem;

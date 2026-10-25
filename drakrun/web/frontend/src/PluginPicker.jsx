@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import CreatableSelect from "react-select/creatable";
+import { selectStyles } from "./themes.js";
 
 const createOption = (option) => ({ label: option, value: option });
 
@@ -48,17 +49,20 @@ const linuxPlugins = [
     ...["cpuidmon", "rebootmon", "debugmon", "procdump2"].map(createOption),
 ];
 
-const pluginPickerStyles = {
-    multiValue: (styles, { data }) => {
-        if (!data.__isNew__)
-            return { ...styles, backgroundColor: "rgba(0, 82, 204, 0.1)" };
-        else return { ...styles, backgroundColor: "rgba(255, 86, 48, 0.1)" };
-    },
-    multiValueLabel: (styles, { data }) => {
-        if (!data.__isNew__) return { ...styles, color: "rgb(0, 82, 204)" };
-        else return { ...styles, color: "rgb(255, 86, 48)" };
-    },
-};
+// Plugins typed in by hand (not in the list) are shown in orange.
+const pluginPickerStyles = selectStyles({
+    multiValue: (styles, { data }) =>
+        data.__isNew__
+            ? {
+                  ...styles,
+                  backgroundColor: "rgba(var(--chimera-orange-rgb), 0.14)",
+              }
+            : styles,
+    multiValueLabel: (styles, { data }) =>
+        data.__isNew__
+            ? { ...styles, color: "var(--chimera-orange-ink)" }
+            : styles,
+});
 
 export function PluginList({ plugins }) {
     return (
@@ -67,8 +71,9 @@ export function PluginList({ plugins }) {
                 <div
                     className="plugin-badge"
                     style={{
-                        backgroundColor: "rgba(0, 82, 204, 0.1)",
-                        color: "rgb(0, 82, 204)",
+                        backgroundColor:
+                            "rgba(var(--chimera-accent-rgb), 0.14)",
+                        color: "var(--chimera-accent-ink)",
                     }}
                     key={plugin}
                 >

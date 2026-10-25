@@ -4,6 +4,7 @@ import { getAnalysisList } from "./api";
 import { CanceledError } from "axios";
 import { AnalysisStatusBadge } from "./AnalysisStatusBadge.jsx";
 import { formatDate, formatSandbox } from "./formatUtils.js";
+import { Pagination, usePagination } from "./Pagination.jsx";
 
 function AnalysisListRow({ analysis }) {
     return (
@@ -39,6 +40,7 @@ function AnalysisListTable() {
         const next = new URLSearchParams(params);
         if (value) next.set(key, value);
         else next.delete(key);
+        next.delete("page"); // a new filter starts at its first page
         setParams(next, { replace: true });
     }
     const [error, setError] = useState();
@@ -61,21 +63,7 @@ function AnalysisListTable() {
         };
     }, []);
 
-    if (typeof error !== "undefined") {
-        return <div>Error: {error.toString()}</div>;
-    }
-
-    if (typeof analysisList === "undefined") {
-        return <div>Loading...</div>;
-    }
-
-    if (analysisList.length === 0) {
-        return (
-            <div>There are no analyses. Upload sample to create a new one.</div>
-        );
-    }
-
-    const filtered = analysisList.filter((analysis) => {
+    const filtered = (analysisList || []).filter((analysis) => {
         const verdict = analysis.classification
             ? ["malicious", "suspicious", "benign"].includes(
                   analysis.classification.label,
@@ -96,6 +84,22 @@ function AnalysisListTable() {
             )
         );
     });
+    const pager = usePagination(filtered.length);
+
+    if (typeof error !== "undefined") {
+        return <div>Error: {error.toString()}</div>;
+    }
+
+    if (typeof analysisList === "undefined") {
+        return <div>Loading...</div>;
+    }
+
+    if (analysisList.length === 0) {
+        return (
+            <div>There are no analyses. Upload sample to create a new one.</div>
+        );
+    }
+
     return (
         <div className="datatable-container">
             <div className="d-flex flex-wrap gap-2 mb-3">
@@ -169,7 +173,7 @@ function AnalysisListTable() {
                     </tr>
                 </thead>
                 <tbody>
-                    {filtered.map((analysis) => (
+                    {pager.slice(filtered).map((analysis) => (
                         <AnalysisListRow
                             analysis={analysis}
                             key={analysis.id}
@@ -177,6 +181,7 @@ function AnalysisListTable() {
                     ))}
                 </tbody>
             </table>
+            <Pagination pager={pager} label="Analyses pages" noun="analyses" />
         </div>
     );
 }

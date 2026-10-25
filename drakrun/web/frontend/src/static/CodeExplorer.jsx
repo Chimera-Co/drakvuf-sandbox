@@ -175,8 +175,8 @@ export function CallGraph({ functions, current, onSelect }) {
                                 rx={4}
                                 fill={
                                     current?.address === f.address
-                                        ? "#446baf"
-                                        : "#45505c"
+                                        ? "var(--chimera-accent-ink)"
+                                        : "var(--chimera-text-muted)"
                                 }
                             />
                             <text

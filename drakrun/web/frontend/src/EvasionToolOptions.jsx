@@ -1,4 +1,7 @@
 import Select from "react-select";
+import { selectStyles } from "./themes.js";
+
+const themedSelect = selectStyles();
 
 /**
  * Renders one tool's Custom-profile configuration panel entirely from the
@@ -31,6 +34,7 @@ function MultiselectOption({ field, value, onChange }) {
                     onChange((picked || []).map((o) => o.value))
                 }
                 classNamePrefix="evasion-select"
+                styles={themedSelect}
             />
             {field.note ? <div className="form-text">{field.note}</div> : []}
         </div>

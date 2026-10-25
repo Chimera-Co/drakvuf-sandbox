@@ -27,10 +27,10 @@ import { formatDate } from "./formatUtils.js";
  */
 
 const SCORE_COLORS = {
-    pass: "#5c6a00", // --chimera-green-ink
-    warn: "#7d5f00", // --chimera-yellow-ink
-    fail: "#c32b28", // --chimera-red-ink
-    incomplete: "#586e75", // --chimera-base01 (muted)
+    pass: "var(--chimera-green-ink)",
+    warn: "var(--chimera-yellow-ink)",
+    fail: "var(--chimera-red-ink)",
+    incomplete: "var(--chimera-text-muted)",
 };
 
 export function ScoreGauge({ score, state }) {
@@ -112,8 +112,8 @@ export function CategoryRadar({ perCategory }) {
                 <Radar
                     name="CHIMERA score"
                     dataKey="score"
-                    stroke="#1e6fa8"
-                    fill="#1e6fa8"
+                    stroke="var(--chimera-chart-1)"
+                    fill="var(--chimera-chart-1)"
                     fillOpacity={0.35}
                 />
                 <Tooltip />
@@ -123,8 +123,16 @@ export function CategoryRadar({ perCategory }) {
 }
 
 // One line per sandbox: Windows blue, Linux orange, others from the palette
-const PLATFORM_COLORS = { windows: "#1e6fa8", linux: "#e07b1a" };
-const EXTRA_COLORS = ["#2a9d5c", "#8e44ad", "#c0392b", "#7f8c8d"];
+const PLATFORM_COLORS = {
+    windows: "var(--chimera-chart-1)",
+    linux: "var(--chimera-chart-5)",
+};
+const EXTRA_COLORS = [
+    "var(--chimera-chart-3)",
+    "var(--chimera-chart-4)",
+    "var(--chimera-chart-2)",
+    "var(--chimera-chart-6)",
+];
 
 function sandboxSeries(runs) {
     const series = new Map();
@@ -132,7 +140,8 @@ function sandboxSeries(runs) {
         const sandbox = r.sandbox || {};
         const key = sandbox.id || sandbox.platform || "unknown";
         if (!series.has(key)) {
-            const name = sandbox.display_name || sandbox.id || "Unknown sandbox";
+            const name =
+                sandbox.display_name || sandbox.id || "Unknown sandbox";
             series.set(key, {
                 key,
                 name: sandbox.platform ? `${name} (${sandbox.platform})` : name,

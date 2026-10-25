@@ -10,7 +10,7 @@ from earlier documents are marked as such and were not re-run.
 | Working branch | `sprint/final` at `2476dc2` (37 commits ahead of `origin/sprint/final`, not pushed) | `git log` |
 | Deployed source | `/opt/chimera/src` (files copied per change, then installed into `/opt/chimera/venv`); every change up to `2476dc2` is deployed, backups under `/var/backups/chimera-*` | file compare, services |
 | Deployed classifier | `/etc/drakrun/classifier/`, `model.py` sha256 `74dba488…` (`f09beb4`: partial static never votes benign; static-only runs say the sample was not executed) | `sha256sum` |
-| Deployed web bundle | Rebuilt 25 Oct: analysis dashboard (process tree top left, log statistics, structured log tables, file explorer), static sub-tabs with the code viewer, Memory dumps tab, Threat intel card | browser check |
+| Deployed web bundle | Rebuilt 25 Oct: analysis dashboard (process tree top left, log statistics, structured log tables, file explorer), static sub-tabs with the code viewer, Memory dumps tab, Threat intel card; seven colour schemes in light and dark (`ui-themes.md`), pagination on the analyses and verification-run lists | browser check, contrast audit of every page in all 14 themes |
 | Classifier and static analysis | Merged from `classifierUndStatico`; static image `localhost/chimera-static:0.1.0` (id `7d3d92a26f94`, ReversingLabs YARA, libfuzzy ssdeep, oletools; previous images tagged `pre-r2`, `pre-r3`, `pre-ssdeep`, `pre-r12`); `drakrun-static-worker` running | services, image |
 | Upstream DRAKVUF fixes | tklengyel/drakvuf#1886 (use-after-free in `refresh_shadow_copy`) and #1887 (libvmi bump) **merged 24 Oct** | `gh pr view` |
 
@@ -29,9 +29,9 @@ from earlier documents are marked as such and were not re-run.
 
 | Suite | Result | Note |
 |---|---|---|
-| `test/unit` (drakrun) | **718 passed** | `.venv/bin/python -m pytest -q test/unit --confcutdir=test/unit -p no:cacheprovider` |
+| `test/unit` (drakrun) | **721 passed** | `.venv/bin/python -m pytest -q test/unit --confcutdir=test/unit -p no:cacheprovider` |
 | `classifier/tests` | **22 passed, 1 skipped** | the skip is the optional thrember parity test |
-| Frontend (vitest) | **102 passed** | Node 22 |
+| Frontend (vitest) | **108 passed** | Node 22 |
 | `static_analyzer/tests` | **53 passed** | inside the image: `podman build --network=host --target test -f static_analyzer/Containerfile static_analyzer` (R5) |
 
 ## 3a. Roadmap progress (25 Oct)

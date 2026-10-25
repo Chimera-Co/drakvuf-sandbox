@@ -103,16 +103,16 @@
     user-select: none;
 }
 .syntax-keyword {
-    color: var(--chimera-violet);
+    color: var(--chimera-violet-ink);
 }
 .syntax-type {
-    color: var(--chimera-blue);
+    color: var(--chimera-blue-ink);
 }
 .syntax-number {
-    color: var(--chimera-cyan);
+    color: var(--chimera-cyan-ink);
 }
 .syntax-string {
-    color: var(--chimera-green);
+    color: var(--chimera-green-ink);
 }
 .syntax-comment {
     color: var(--bs-secondary-color);
