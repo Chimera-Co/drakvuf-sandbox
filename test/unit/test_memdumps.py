@@ -73,3 +73,28 @@ def test_scan_reports_unreadable_archive(tmp_path):
     doc = memdumps.scan(AID, analyses_dir=tmp_path / "analyses", static_dir=tmp_path / "static",
                         settings=StaticConfigSection())
     assert "cannot read dumps.zip" in doc["error"] and doc["scanned"] == []
+
+
+def test_report_includes_memdump_yara_hits_without_changing_completeness(tmp_path):
+    from drakrun.analyzer.postprocessing.plugins.build_chimera_report import build_report
+
+    aid = "3f2b1c4d-0000-4000-8000-000000000001"
+    analysis = tmp_path / "analyses" / aid
+    analysis.mkdir(parents=True)
+    (analysis / "metadata.json").write_text(json.dumps({"id": aid, "status": "finished"}))
+    static_dir = tmp_path / "static"
+    (static_dir / aid).mkdir(parents=True)
+    baseline = build_report(analysis, static_dir=static_dir)
+    assert baseline["stages"]["memdumps"]["status"] == "unavailable"
+    doc = {"schema": "chimera-memdumps/1", "dumps_total": 3, "duplicates": 0, "skipped": 1, "scanned": [
+        {"member": "a", "pid": 4, "process": "s.exe", "reason": "Remote thread", "sample_tree": True,
+         "yara": ["Beacon"], "iocs": {"domains": ["evil.test"]}},
+        {"member": "b", "pid": 5, "process": "x.exe", "yara": [], "iocs": {}}]}
+    (static_dir / aid / "memdumps.json").write_text(json.dumps(doc))
+    r = build_report(analysis, static_dir=static_dir)
+    stage = r["stages"]["memdumps"]
+    assert stage["status"] == "ok" and stage["payload"]["yara_hits"] == 1
+    hit = next(c for c in r["claims"] if c["id"] == "memdump-yara-0")
+    assert "Beacon" in hit["text"] and hit["confidence"] == "high"
+    assert any(i["value"] == "evil.test" and i["type"] == "domain" for i in r["iocs"])
+    assert r["status"] == baseline["status"]

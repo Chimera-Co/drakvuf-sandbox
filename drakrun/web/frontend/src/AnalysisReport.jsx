@@ -1,3 +1,5 @@
+import { ThreatIntelCard } from "./ThreatIntelCard.jsx";
+import MemoryDumps from "./MemoryDumps.jsx";
 import { AnalysisDashboard, ProcessWorkspace } from "./AnalysisDashboard.jsx";
 import { LogWorkspace } from "./StructuredLogs.jsx";
 import "./AnalysisWorkspace.css";
@@ -323,6 +325,13 @@ function AnalysisReportTabs({
                         []
                     )}
                     {!isOffline ? (
+                        <PaddedTab tab="Memory dumps">
+                            <MemoryDumps analysisId={analysis.id} />
+                        </PaddedTab>
+                    ) : (
+                        []
+                    )}
+                    {!isOffline ? (
                         <PaddedTab tab="Analysis files">
                             <AnalysisFilesViewer analysisId={analysis.id} />
                         </PaddedTab>
@@ -395,6 +404,10 @@ export function AnalysisReport() {
                     {!isOffline ? (
                         <VerdictCard analysisId={analysis.id} />
                     ) : null}
+                    <ThreatIntelCard
+                        analysisId={analysis.id}
+                        isOffline={isOffline}
+                    />
                     <details className="mb-2">
                         <summary>Analysis metadata</summary>
                         <AnalysisMetadataTable analysis={analysis} />

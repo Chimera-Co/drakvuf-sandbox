@@ -250,8 +250,68 @@ def _stage_deep(deep, ev: "_Evidence", claim, attack: list) -> dict:
     }
 
 
+def _stage_memdumps(doc, ev: "_Evidence", claim, iocs: list) -> dict:
+    """Memory dumps through the static analyzer (memdumps.json). Informational: never changes completeness."""
+    if not isinstance(doc, dict):
+        return {
+            "status": "unavailable",
+            "reason": "no memory-dump scan (off, no dumps, or still running)",
+            "producer": {},
+            "payload": None,
+            "evidence_ids": [],
+        }
+    producer = {"name": "chimera-static (memory dumps)", "schema": doc.get("schema")}
+    eid = ev.add("memdumps.json", "", "chimera-static:memdumps")
+    if doc.get("error"):
+        return {
+            "status": "failed",
+            "reason": str(doc["error"])[:300],
+            "producer": producer,
+            "payload": None,
+            "evidence_ids": [eid],
+        }
+    scanned = doc.get("scanned") or []
+    for i, dump in enumerate(scanned):
+        d_eid = ev.add("memdumps.json", f"/scanned/{i}", "chimera-static:memdumps")
+        if dump.get("yara"):
+            claim(
+                f"memdump-yara-{i}",
+                f"YARA matched in memory dumped from {dump.get('process') or '?'} "
+                f"(PID {dump.get('pid')}): " + ", ".join(dump["yara"][:6]),
+                "observed",
+                "high" if dump.get("sample_tree") else "medium",
+                [d_eid],
+                rationale=f"Region dumped by DRAKVUF ({dump.get('reason') or 'unknown reason'}) and "
+                "scanned with the static analyzer's YARA rules.",
+            )
+        for kind, values in (dump.get("iocs") or {}).items():
+            for value in values:
+                iocs.append(
+                    {
+                        "type": kind.rstrip("s"),
+                        "value": value,
+                        "source": "string in a memory dump (not observed in use)",
+                        "evidence_ids": [d_eid],
+                    }
+                )
+    return {
+        "status": "ok",
+        "reason": None,
+        "producer": producer,
+        "payload": {
+            "dumps_total": doc.get("dumps_total"),
+            "scanned": len(scanned),
+            "yara_hits": sum(1 for d in scanned if d.get("yara")),
+            "duplicates": doc.get("duplicates"),
+        },
+        "evidence_ids": [eid],
+    }
+
+
 def build_report(
-    analysis_dir: pathlib.Path, static_dir: Optional[pathlib.Path] = None
+    analysis_dir: pathlib.Path,
+    static_dir: Optional[pathlib.Path] = None,
+    intel_config=None,
 ) -> dict:
     analysis_dir = pathlib.Path(analysis_dir)
     loaded = {
@@ -266,11 +326,10 @@ def build_report(
     meta = loaded["metadata.json"][0] or {}
     if static_dir is None:
         from drakrun.lib.paths import STATIC_DIR as static_dir
-    loaded["deep.json"] = _read(
-        pathlib.Path(static_dir)
-        / str(meta.get("id") or analysis_dir.name)
-        / "deep.json"
-    )
+    for name in ("deep.json", "memdumps.json"):
+        loaded[name] = _read(
+            pathlib.Path(static_dir) / str(meta.get("id") or analysis_dir.name) / name
+        )
     hashes = {name: digest for name, (_, digest) in loaded.items() if digest}
     report = loaded["report.json"][0] or {}
     features = loaded["features.json"][0] or {}
@@ -551,6 +610,7 @@ def build_report(
             )
 
     deep_stage = _stage_deep(loaded["deep.json"][0], ev, claim, attack)
+    memdumps_stage = _stage_memdumps(loaded["memdumps.json"][0], ev, claim, iocs)
 
     # ---- classifier
     if isinstance(verdict, dict):
@@ -644,18 +704,45 @@ def build_report(
     elif mode == "dynamic-only":
         static_stage = not_requested("dynamic-only analysis")
 
+    from drakrun.lib.config import IntelConfigSection, load_config
+    from drakrun.lib.intel.report import stage as intel_report_stage
+
+    if intel_config is None:
+        try:
+            intel_config = load_config().intel
+        except (OSError, ValueError):
+            intel_config = IntelConfigSection()
+    intel_stage = intel_report_stage(
+        analysis_dir,
+        intel_config,
+        meta,
+        report,
+        static,
+        ev,
+        static_path=pathlib.Path(static_dir)
+        / str(meta.get("id") or analysis_dir.name)
+        / "static.json",
+    )
+    intel_payload = intel_stage.get("payload") or {}
+    intel_feeds = {feed["name"]: feed for feed in intel_payload.get("feeds", [])}
+    for match in intel_payload.get("matches", []):
+        iocs.append(
+            {
+                "type": match["type"],
+                "value": match["indicator"],
+                "source": "intel:" + match["feed"],
+                "feed_provenance": intel_feeds[match["feed"]],
+                "evidence_ids": match["evidence_ids"],
+            }
+        )
+
     stages = {
         "static": static_stage,
         "dynamic": dynamic_stage,
         "classifier": classifier_stage,
         "deep": deep_stage,
-        "intel": {
-            "status": "unavailable",
-            "reason": "no threat-intelligence lookup in this version",
-            "producer": {},
-            "payload": None,
-            "evidence_ids": [],
-        },
+        "memdumps": memdumps_stage,
+        "intel": intel_stage,
     }
 
     # ---- limitations that always apply, then the ones this run triggered
@@ -701,7 +788,7 @@ def build_report(
             if all(
                 s["status"] in ("ok", "not_requested")
                 for k, s in stages.items()
-                if k not in ("intel", "deep")
+                if k not in ("intel", "deep", "memdumps")
             )
             else "partial"
         )
@@ -998,7 +1085,10 @@ def iocs_csv(r: dict) -> str:
 
 
 def build_chimera_report(context: PostprocessContext) -> None:
-    report = build_report(context.analysis_dir)
+    report = build_report(
+        context.analysis_dir,
+        intel_config=getattr(getattr(context, "config", None), "intel", None),
+    )
     (context.analysis_dir / "chimera-report.json").write_text(
         json.dumps(report, indent=1, allow_nan=False), encoding="utf-8"
     )

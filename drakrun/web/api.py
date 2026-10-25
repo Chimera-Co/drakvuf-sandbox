@@ -465,6 +465,18 @@ def static_deep(path: AnalysisRequestPath):
     )
 
 
+@api.get("/static/<task_uid>/memdumps", responses={404: APIErrorResponse})
+def static_memdumps(path: AnalysisRequestPath):
+    """Memory-dump scan (chimera-memdumps/1); 404 until the deep worker has scanned the run's dumps."""
+    return send_entity_file(
+        path.task_uid,
+        "memdumps.json",
+        "application/json",
+        None,  # static reports always stay on the host (not in S3)
+        base_dir=STATIC_DIR,
+    )
+
+
 @api.get("/features/<task_uid>", responses={404: APIErrorResponse})
 def features(path: AnalysisRequestPath):
     return send_analysis_file(
@@ -564,6 +576,23 @@ def _report_or_404(task_uid: str):
         return read_analysis_json(task_uid, "chimera-report.json", config.s3)
     except FileNotFoundError:
         return None
+
+
+@api.get("/intel/<task_uid>", responses={404: APIErrorResponse})
+def intel_report(path: AnalysisRequestPath):
+    report = _report_or_404(path.task_uid)
+    if report is None:
+        return jsonify({"error": "Data not found"}), 404
+    return jsonify(
+        report.get("stages", {}).get(
+            "intel",
+            {
+                "status": "unavailable",
+                "payload": None,
+                "reason": "No offline intel snapshot",
+            },
+        )
+    )
 
 
 @api.get("/chimera_report/<task_uid>/iocs.json", responses={404: APIErrorResponse})

@@ -1,0 +1,15 @@
+[Unit]
+Description=Build offline CHIMERA indicator bundle on connected update host
+
+[Service]
+Type=oneshot
+User=chimera-intel
+Group=chimera-intel
+WorkingDirectory=/srv/chimera
+ExecStart=/srv/chimera/.venv/bin/python scripts/chimera/intel/build_bundle.py --feeds scripts/chimera/intel/feeds.toml --output /srv/chimera-intel/bundles --abusech-key-file /srv/chimera-intel/auth-key
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/srv/chimera-intel/bundles
+UMask=0077

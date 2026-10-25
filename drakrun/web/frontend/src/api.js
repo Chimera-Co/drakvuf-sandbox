@@ -172,3 +172,9 @@ export async function getDeepStatic({ analysisId }) {
     const request = await axios.get(`/static/${analysisId}/deep`);
     return request.data;
 }
+
+// Memory-dump scan (chimera-memdumps/1); 404 until the deep worker has scanned the run's dumps
+export async function getMemdumps({ analysisId }) {
+    const request = await axios.get(`/static/${analysisId}/memdumps`);
+    return request.data;
+}
