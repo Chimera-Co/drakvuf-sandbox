@@ -227,7 +227,8 @@ def analyze_linux_file(
                                         daemon=True, name="drakvuf-watchdog")
             watchdog.start()
             with run_tcpdump(vm.get_network_info(), output_dir / "dump.pcap"), \
-                    run_screenshotter(vm_id, install_info, output_dir, enabled=not options.no_screenshotter), \
+                    run_screenshotter(vm_id, install_info, output_dir, enabled=not options.no_screenshotter,
+                                      settings=config.screenshots), \
                     drakmon_file.open("wb") as out, drakvuf_err_file.open("wb") as err:
                 drakvuf = subprocess.Popen(cmdline, stdout=out, stderr=err, cwd=output_dir)
                 stall_monitor.on_stall = drakvuf.terminate

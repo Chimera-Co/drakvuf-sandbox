@@ -22,6 +22,7 @@ class Screenshotter:
         loop_interval=5,
         max_screenshots=30,
         diff_threshold=0.05,
+        heartbeat_interval=0,
     ):
         self._aioloop = None
         self._thread = None
@@ -34,10 +35,12 @@ class Screenshotter:
         self.loop_interval = loop_interval
         self.max_screenshots = max_screenshots
         self.diff_threshold = diff_threshold
+        self.heartbeat_interval = heartbeat_interval
 
     async def perform(self):
         hasher = hashers.PHash()
         prev_image_hash = None
+        prev_timestamp = 0.0
         screenshot_no = 0
         screenshot_log_path = self.output_dir / "screenshots.json"
         screenshot_dir = self.output_dir / "screenshots"
@@ -53,12 +56,19 @@ class Screenshotter:
                         timestamp = time.time()
                         image = Image.fromarray(pixels)
                         image_hash = hasher.compute(image)
-                        if (
+                        changed = (
                             not prev_image_hash
                             or hasher.compute_distance(image_hash, prev_image_hash)
                             > self.diff_threshold
-                        ):
+                        )
+                        heartbeat = (
+                            not changed
+                            and self.heartbeat_interval > 0
+                            and timestamp - prev_timestamp >= self.heartbeat_interval
+                        )
+                        if changed or heartbeat:
                             prev_image_hash = image_hash
+                            prev_timestamp = timestamp
                             screenshot_no += 1
                             screenshot_name = (
                                 screenshot_dir / f"screenshot_{screenshot_no}.png"
@@ -70,6 +80,7 @@ class Screenshotter:
                                         "timestamp": timestamp,
                                         "image_hash": image_hash,
                                         "index": screenshot_no,
+                                        **({"heartbeat": True} if heartbeat else {}),
                                     }
                                 )
                                 + "\n"

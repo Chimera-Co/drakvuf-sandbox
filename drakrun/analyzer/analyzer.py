@@ -392,6 +392,7 @@ def analyze_file(
                     install_info,
                     output_dir,
                     enabled=(not options.no_screenshotter),
+                    settings=config.screenshots,
                 ),
                 run_drakvuf(
                     vm_name=vm.vm_name,

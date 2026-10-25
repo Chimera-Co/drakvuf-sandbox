@@ -133,6 +133,16 @@ class StaticConfigSection(BaseModel):
     ghidra_max_functions: int = Field(default=40, ge=1, le=200)
 
 
+class ScreenshotConfigSection(BaseModel):
+    # VNC capture from dom0; nothing runs in the guest. A frame is kept when its
+    # perceptual hash differs from the last kept one by more than diff_threshold
+    # (0-1, fraction of hash bits), or when heartbeat_s passed without a kept frame.
+    interval_s: float = Field(default=2, gt=0)
+    diff_threshold: float = Field(default=0.02, ge=0, le=1)
+    max_screenshots: int = Field(default=90, ge=1)
+    heartbeat_s: float = Field(default=30, ge=0)
+
+
 class MemdumpConfigSection(BaseModel):
     # Maximum total size of collected, uncompressed dumps
     max_total_dumps_size: int = 500 * 1024 * 1024
@@ -231,6 +241,7 @@ class DrakrunConfig(BaseSettings):
     classifier: ClassifierConfigSection = Field(default_factory=ClassifierConfigSection)
     static: StaticConfigSection = Field(default_factory=StaticConfigSection)
     memdump: MemdumpConfigSection = MemdumpConfigSection()
+    screenshots: ScreenshotConfigSection = Field(default_factory=ScreenshotConfigSection)
     karton: KartonConfigSection = KartonConfigSection()
     s3: Optional[S3StorageConfigSection] = None
     preset: Dict[str, DrakrunDefaultsPresetSection] = Field(default_factory=dict)

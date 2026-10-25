@@ -11,7 +11,7 @@ from rq import get_current_job
 
 from drakrun.analyzer.screenshotter import Screenshotter
 from drakrun.analyzer.startup_command import ExecParameters
-from drakrun.lib.config import NetworkConfigSection, load_config
+from drakrun.lib.config import NetworkConfigSection, ScreenshotConfigSection, load_config
 from drakrun.lib.drakvuf_cmdline import get_base_drakvuf_cmdline
 from drakrun.lib.install_info import InstallInfo
 from drakrun.lib.libvmi import VmiInfo
@@ -268,15 +268,21 @@ def run_screenshotter(
     install_info: InstallInfo,
     output_dir: pathlib.Path,
     enabled: bool = True,
+    settings: Optional[ScreenshotConfigSection] = None,
 ):
     if not enabled:
         yield
         return
+    settings = settings or ScreenshotConfigSection()
     screenshotter = Screenshotter(
         output_dir=output_dir,
         vnc_host="localhost",
         vnc_port=5900 + vm_id,
         vnc_password=install_info.vnc_passwd,
+        loop_interval=settings.interval_s,
+        max_screenshots=settings.max_screenshots,
+        diff_threshold=settings.diff_threshold,
+        heartbeat_interval=settings.heartbeat_s,
     )
     try:
         screenshotter.start()
