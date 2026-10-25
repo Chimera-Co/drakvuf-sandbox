@@ -34,7 +34,9 @@ def analyze_elf(data: bytes) -> tuple[dict, list[dict]]:
     out = {"class": elf.elfclass, "endian": "little" if elf.little_endian else "big", "type": h["e_type"],
            "machine": h["e_machine"], "osabi": h["e_ident"]["EI_OSABI"], "entry": hex(h["e_entry"])}
     interp, needed, exec_stack, segs = None, [], None, []
-    for seg in elf.iter_segments():
+    for seg_index, seg in enumerate(elf.iter_segments()):
+        if seg_index >= 256:
+            break
         segs.append({"type": seg["p_type"], "flags": seg["p_flags"], "filesz": seg["p_filesz"], "memsz": seg["p_memsz"]})
         if seg["p_type"] == "PT_INTERP":
             interp = seg.get_interp_name()
@@ -47,7 +49,9 @@ def analyze_elf(data: bytes) -> tuple[dict, list[dict]]:
     out["static"] = interp is None and h["e_type"] == "ET_EXEC"
     out["exec_stack"] = exec_stack
     sections, has_symtab, symbols = [], False, set()
-    for sec in elf.iter_sections():
+    for sec_index, sec in enumerate(elf.iter_sections()):
+        if sec_index >= 512:
+            break
         if sec.name == ".symtab":
             has_symtab = True
         if isinstance(sec, DynamicSection):
@@ -60,7 +64,7 @@ def analyze_elf(data: bytes) -> tuple[dict, list[dict]]:
                     break
                 if sym.name:
                     symbols.add(sym.name)
-        body = sec.data() if sec["sh_type"] != "SHT_NOBITS" and sec["sh_size"] < 64 * 1024 * 1024 else b""
+        body = data[sec["sh_offset"]:sec["sh_offset"] + min(sec["sh_size"], 1 << 20)] if sec["sh_type"] != "SHT_NOBITS" else b""
         sections.append({"name": sec.name, "type": sec["sh_type"], "size": sec["sh_size"],
                          "entropy": round(entropy(body), 3) if body else 0.0})
     out["sections"] = sections[:128]
@@ -84,4 +88,12 @@ def analyze_elf(data: bytes) -> tuple[dict, list[dict]]:
         add("elf_exec_stack", "Executable stack", "low", "", [])
     if out["static"] and out["stripped"]:
         add("elf_static_stripped", "Statically linked and stripped (common for Linux malware/IoT bots)", "low", "", [])
+    from .elf_insight import enrich
+
+    try:
+        enrich(elf, data, out)
+    except MemoryError:
+        raise
+    except Exception as exc:
+        out["insight_error"] = f"{type(exc).__name__}: {str(exc)[:300]}"
     return out, findings

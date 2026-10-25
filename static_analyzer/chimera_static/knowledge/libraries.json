@@ -1,0 +1,552 @@
+{
+  "actxprxy.dll": {
+    "category": "com",
+    "description": "ActiveX interface marshaling.",
+    "severity": 0
+  },
+  "advapi32.dll": {
+    "category": "system_info",
+    "description": "Registry, services, security and legacy cryptography.",
+    "severity": 0
+  },
+  "api-ms-win-core-file-l1-1-0.dll": {
+    "category": "misc",
+    "description": "Core file services contract.",
+    "severity": 0
+  },
+  "api-ms-win-core-synch-l1-2-0.dll": {
+    "category": "misc",
+    "description": "Core synchronization contract.",
+    "severity": 0
+  },
+  "api-ms-win-crt-filesystem-l1-1-0.dll": {
+    "category": "misc",
+    "description": "C runtime filesystem contract.",
+    "severity": 0
+  },
+  "api-ms-win-crt-heap-l1-1-0.dll": {
+    "category": "misc",
+    "description": "C runtime heap contract.",
+    "severity": 0
+  },
+  "api-ms-win-crt-math-l1-1-0.dll": {
+    "category": "misc",
+    "description": "C runtime mathematics contract.",
+    "severity": 0
+  },
+  "api-ms-win-crt-runtime-l1-1-0.dll": {
+    "category": "misc",
+    "description": "Universal C runtime contract.",
+    "severity": 0
+  },
+  "api-ms-win-crt-stdio-l1-1-0.dll": {
+    "category": "misc",
+    "description": "C runtime standard I/O contract.",
+    "severity": 0
+  },
+  "api-ms-win-crt-string-l1-1-0.dll": {
+    "category": "misc",
+    "description": "C runtime string contract.",
+    "severity": 0
+  },
+  "atl.dll": {
+    "category": "com",
+    "description": "Active Template Library support.",
+    "severity": 0
+  },
+  "avifil32.dll": {
+    "category": "ui",
+    "description": "AVI file services.",
+    "severity": 0
+  },
+  "bcrypt.dll": {
+    "category": "crypto",
+    "description": "Cryptographic primitives.",
+    "severity": 0
+  },
+  "bcryptprimitives.dll": {
+    "category": "crypto",
+    "description": "Cryptographic primitive implementation.",
+    "severity": 0
+  },
+  "cfgmgr32.dll": {
+    "category": "system_info",
+    "description": "Device configuration management.",
+    "severity": 0
+  },
+  "clr.dll": {
+    "category": "misc",
+    "description": "Common language runtime.",
+    "severity": 0
+  },
+  "combase.dll": {
+    "category": "com",
+    "description": "COM runtime implementation.",
+    "severity": 0
+  },
+  "comctl32.dll": {
+    "category": "ui",
+    "description": "Common window controls.",
+    "severity": 0
+  },
+  "comdlg32.dll": {
+    "category": "ui",
+    "description": "Common user interface dialogs.",
+    "severity": 0
+  },
+  "credui.dll": {
+    "category": "crypto",
+    "description": "Credential user interface.",
+    "severity": 0
+  },
+  "crypt32.dll": {
+    "category": "crypto",
+    "description": "Certificate and data protection services.",
+    "severity": 0
+  },
+  "cryptbase.dll": {
+    "category": "crypto",
+    "description": "Base cryptographic services.",
+    "severity": 0
+  },
+  "cryptsp.dll": {
+    "category": "crypto",
+    "description": "Cryptographic service provider support.",
+    "severity": 0
+  },
+  "d2d1.dll": {
+    "category": "ui",
+    "description": "Two dimensional graphics.",
+    "severity": 0
+  },
+  "d3d11.dll": {
+    "category": "ui",
+    "description": "Direct3D 11 graphics.",
+    "severity": 0
+  },
+  "d3d9.dll": {
+    "category": "ui",
+    "description": "Direct3D 9 graphics.",
+    "severity": 0
+  },
+  "dbgcore.dll": {
+    "category": "credential",
+    "description": "Core process minidump services.",
+    "severity": 2
+  },
+  "dbghelp.dll": {
+    "category": "credential",
+    "description": "Debugging and symbol services including process minidumps.",
+    "severity": 2
+  },
+  "dnsapi.dll": {
+    "category": "network",
+    "description": "DNS client services.",
+    "severity": 1
+  },
+  "dssenh.dll": {
+    "category": "crypto",
+    "description": "DSS cryptographic provider.",
+    "severity": 0
+  },
+  "dwmapi.dll": {
+    "category": "ui",
+    "description": "Desktop window composition.",
+    "severity": 0
+  },
+  "dwrite.dll": {
+    "category": "ui",
+    "description": "Text rendering.",
+    "severity": 0
+  },
+  "dxgi.dll": {
+    "category": "ui",
+    "description": "Graphics infrastructure.",
+    "severity": 0
+  },
+  "fastprox.dll": {
+    "category": "wmi",
+    "description": "WMI marshaling support.",
+    "severity": 1
+  },
+  "fltmgr.sys": {
+    "category": "system_info",
+    "description": "File system minifilter support.",
+    "severity": 0
+  },
+  "gdi32.dll": {
+    "category": "ui",
+    "description": "Graphics device interface.",
+    "severity": 0
+  },
+  "gdi32full.dll": {
+    "category": "ui",
+    "description": "Graphics implementation support.",
+    "severity": 0
+  },
+  "hal.dll": {
+    "category": "system_info",
+    "description": "Hardware abstraction services.",
+    "severity": 0
+  },
+  "httpapi.dll": {
+    "category": "network",
+    "description": "HTTP server API.",
+    "severity": 1
+  },
+  "imm32.dll": {
+    "category": "system_info",
+    "description": "Input method management.",
+    "severity": 0
+  },
+  "iphlpapi.dll": {
+    "category": "system_info",
+    "description": "IP network configuration and statistics.",
+    "severity": 0
+  },
+  "kerberos.dll": {
+    "category": "crypto",
+    "description": "Kerberos authentication provider.",
+    "severity": 0
+  },
+  "kernel32.dll": {
+    "category": "system_info",
+    "description": "Core Win32 process, memory, file and synchronization services.",
+    "severity": 0
+  },
+  "kernelbase.dll": {
+    "category": "system_info",
+    "description": "Implementation support for core Win32 services.",
+    "severity": 0
+  },
+  "mpr.dll": {
+    "category": "network",
+    "description": "Multiple network provider services.",
+    "severity": 1
+  },
+  "mscoree.dll": {
+    "category": "misc",
+    "description": "Managed executable runtime bootstrap.",
+    "severity": 0
+  },
+  "mscorjit.dll": {
+    "category": "misc",
+    "description": "Managed just-in-time compiler.",
+    "severity": 0
+  },
+  "mscorwks.dll": {
+    "category": "misc",
+    "description": "Legacy common language runtime.",
+    "severity": 0
+  },
+  "msimg32.dll": {
+    "category": "ui",
+    "description": "Graphics blending support.",
+    "severity": 0
+  },
+  "mssip32.dll": {
+    "category": "crypto",
+    "description": "Subject interface package services.",
+    "severity": 0
+  },
+  "msv1_0.dll": {
+    "category": "crypto",
+    "description": "NTLM authentication provider.",
+    "severity": 0
+  },
+  "msvcp120.dll": {
+    "category": "misc",
+    "description": "Visual C++ 2013 standard library.",
+    "severity": 0
+  },
+  "msvcp140.dll": {
+    "category": "misc",
+    "description": "C++ standard library runtime.",
+    "severity": 0
+  },
+  "msvcr100.dll": {
+    "category": "misc",
+    "description": "Visual C 2010 runtime.",
+    "severity": 0
+  },
+  "msvcr110.dll": {
+    "category": "misc",
+    "description": "Visual C 2012 runtime.",
+    "severity": 0
+  },
+  "msvcr120.dll": {
+    "category": "misc",
+    "description": "Visual C 2013 runtime.",
+    "severity": 0
+  },
+  "msvcrt.dll": {
+    "category": "misc",
+    "description": "C runtime library.",
+    "severity": 0
+  },
+  "msvfw32.dll": {
+    "category": "ui",
+    "description": "Video for Windows services.",
+    "severity": 0
+  },
+  "mswsock.dll": {
+    "category": "network",
+    "description": "Winsock extension services.",
+    "severity": 1
+  },
+  "msxml3.dll": {
+    "category": "com",
+    "description": "XML parsing and COM services.",
+    "severity": 0
+  },
+  "msxml6.dll": {
+    "category": "com",
+    "description": "XML parsing and COM services.",
+    "severity": 0
+  },
+  "ncrypt.dll": {
+    "category": "crypto",
+    "description": "Cryptographic key storage.",
+    "severity": 0
+  },
+  "netapi32.dll": {
+    "category": "system_info",
+    "description": "Network account and share management.",
+    "severity": 0
+  },
+  "newdev.dll": {
+    "category": "system_info",
+    "description": "Device installation services.",
+    "severity": 0
+  },
+  "normaliz.dll": {
+    "category": "system_info",
+    "description": "Unicode normalization.",
+    "severity": 0
+  },
+  "ntdll.dll": {
+    "category": "system_info",
+    "description": "Native system services and runtime support.",
+    "severity": 0
+  },
+  "ntoskrnl.exe": {
+    "category": "system_info",
+    "description": "Windows kernel and executive services.",
+    "severity": 0
+  },
+  "ole32.dll": {
+    "category": "com",
+    "description": "COM object services.",
+    "severity": 0
+  },
+  "oleaut32.dll": {
+    "category": "com",
+    "description": "OLE automation services.",
+    "severity": 0
+  },
+  "opengl32.dll": {
+    "category": "ui",
+    "description": "OpenGL graphics.",
+    "severity": 0
+  },
+  "powrprof.dll": {
+    "category": "system_info",
+    "description": "Power management services.",
+    "severity": 0
+  },
+  "propsys.dll": {
+    "category": "ui",
+    "description": "Property system services.",
+    "severity": 0
+  },
+  "psapi.dll": {
+    "category": "system_info",
+    "description": "Process and module information.",
+    "severity": 0
+  },
+  "rasapi32.dll": {
+    "category": "network",
+    "description": "Remote access connection services.",
+    "severity": 1
+  },
+  "rpcns4.dll": {
+    "category": "com",
+    "description": "RPC name service support.",
+    "severity": 0
+  },
+  "rpcrt4.dll": {
+    "category": "com",
+    "description": "Remote procedure call runtime.",
+    "severity": 0
+  },
+  "rsaenh.dll": {
+    "category": "crypto",
+    "description": "Enhanced RSA cryptographic provider.",
+    "severity": 0
+  },
+  "samlib.dll": {
+    "category": "system_info",
+    "description": "Security account management support.",
+    "severity": 0
+  },
+  "schannel.dll": {
+    "category": "crypto",
+    "description": "TLS security provider.",
+    "severity": 0
+  },
+  "secur32.dll": {
+    "category": "crypto",
+    "description": "Security provider and authentication interface.",
+    "severity": 0
+  },
+  "setupapi.dll": {
+    "category": "system_info",
+    "description": "Device and software installation services.",
+    "severity": 0
+  },
+  "shell32.dll": {
+    "category": "ui",
+    "description": "Shell integration and file operations.",
+    "severity": 0
+  },
+  "shlwapi.dll": {
+    "category": "ui",
+    "description": "Shell utility functions.",
+    "severity": 0
+  },
+  "sspicli.dll": {
+    "category": "crypto",
+    "description": "Security support provider client services.",
+    "severity": 0
+  },
+  "ucrtbase.dll": {
+    "category": "misc",
+    "description": "Universal C runtime.",
+    "severity": 0
+  },
+  "urlmon.dll": {
+    "category": "network",
+    "description": "URL binding and download services.",
+    "severity": 1
+  },
+  "user32.dll": {
+    "category": "ui",
+    "description": "Window management and user input services.",
+    "severity": 0
+  },
+  "userenv.dll": {
+    "category": "system_info",
+    "description": "User environment and profile services.",
+    "severity": 0
+  },
+  "uxtheme.dll": {
+    "category": "ui",
+    "description": "Visual themes.",
+    "severity": 0
+  },
+  "vaultcli.dll": {
+    "category": "crypto",
+    "description": "Credential vault interface.",
+    "severity": 0
+  },
+  "vcruntime140.dll": {
+    "category": "misc",
+    "description": "Visual C runtime support.",
+    "severity": 0
+  },
+  "vcruntime140_1.dll": {
+    "category": "misc",
+    "description": "Visual C runtime exception support.",
+    "severity": 0
+  },
+  "version.dll": {
+    "category": "system_info",
+    "description": "File version resource services.",
+    "severity": 0
+  },
+  "wbemcomn.dll": {
+    "category": "wmi",
+    "description": "WMI common support.",
+    "severity": 1
+  },
+  "wbemprox.dll": {
+    "category": "wmi",
+    "description": "WMI proxy services.",
+    "severity": 1
+  },
+  "wbemuuid.dll": {
+    "category": "wmi",
+    "description": "WMI interface identifier support.",
+    "severity": 1
+  },
+  "wdf01000.sys": {
+    "category": "system_info",
+    "description": "Kernel driver framework runtime.",
+    "severity": 0
+  },
+  "wdfldr.sys": {
+    "category": "system_info",
+    "description": "Kernel driver framework loader.",
+    "severity": 0
+  },
+  "websocket.dll": {
+    "category": "network",
+    "description": "WebSocket protocol services.",
+    "severity": 1
+  },
+  "windowscodecs.dll": {
+    "category": "ui",
+    "description": "Image codecs.",
+    "severity": 0
+  },
+  "winhttp.dll": {
+    "category": "network",
+    "description": "HTTP client services.",
+    "severity": 1
+  },
+  "wininet.dll": {
+    "category": "network",
+    "description": "Internet HTTP and FTP client services.",
+    "severity": 1
+  },
+  "winmm.dll": {
+    "category": "system_info",
+    "description": "Multimedia and timer services.",
+    "severity": 0
+  },
+  "winspool.drv": {
+    "category": "system_info",
+    "description": "Printing spooler interface.",
+    "severity": 0
+  },
+  "winsta.dll": {
+    "category": "system_info",
+    "description": "Window station and session support.",
+    "severity": 0
+  },
+  "wintrust.dll": {
+    "category": "crypto",
+    "description": "Trust and signature verification.",
+    "severity": 0
+  },
+  "wldap32.dll": {
+    "category": "system_info",
+    "description": "LDAP directory services.",
+    "severity": 0
+  },
+  "ws2_32.dll": {
+    "category": "network",
+    "description": "Winsock networking.",
+    "severity": 1
+  },
+  "wsock32.dll": {
+    "category": "network",
+    "description": "Legacy Winsock networking.",
+    "severity": 1
+  },
+  "wtsapi32.dll": {
+    "category": "system_info",
+    "description": "Remote Desktop session services.",
+    "severity": 0
+  }
+}

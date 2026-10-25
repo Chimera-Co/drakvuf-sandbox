@@ -14,3 +14,4 @@ include = ["chimera_static*"]
 
 [tool.setuptools.package-data]
 "chimera_static.vendor.thrember" = ["LICENSE", "pefile_warnings.txt"]
+"chimera_static" = ["knowledge/*.json"]

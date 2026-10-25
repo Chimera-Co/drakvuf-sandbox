@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import io
+import hashlib
 
 import pefile
 
@@ -77,6 +78,22 @@ def _signature(data: bytes) -> dict:
                 out["subject"] = str(cert.subject.dn)[:300]
                 out["issuer"] = str(cert.issuer.dn)[:300]
                 out["not_after"] = cert.valid_to.isoformat()
+                out["not_before"] = cert.valid_from.isoformat()
+                out["serial"] = str(cert.serial_number)
+                fingerprint = getattr(cert, "sha256_fingerprint", None)
+                if callable(fingerprint):
+                    fingerprint = fingerprint()
+                if fingerprint is None:
+                    asn1 = getattr(cert, "asn1", None)
+                    if asn1 is not None and hasattr(asn1, "dump"):
+                        fingerprint = hashlib.sha256(asn1.dump()).hexdigest()
+                if fingerprint is not None:
+                    out["thumbprint"] = fingerprint.hex() if isinstance(fingerprint, bytes) else str(fingerprint)
+                    out["thumbprint_algorithm"] = "sha256"
+                countersigner = getattr(signer, "countersigner", None)
+                signing_time = getattr(countersigner, "signing_time", None)
+                if signing_time is not None:
+                    out["counter_signature_time"] = signing_time.isoformat()
         except Exception:
             pass
         try:
@@ -101,7 +118,7 @@ def analyze_pe(data: bytes, file_info: dict, verify_signature: bool = True) -> t
     pe.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY[d] for d in (
         "IMAGE_DIRECTORY_ENTRY_IMPORT", "IMAGE_DIRECTORY_ENTRY_EXPORT", "IMAGE_DIRECTORY_ENTRY_RESOURCE",
         "IMAGE_DIRECTORY_ENTRY_TLS", "IMAGE_DIRECTORY_ENTRY_DEBUG", "IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR",
-        "IMAGE_DIRECTORY_ENTRY_SECURITY")])
+        "IMAGE_DIRECTORY_ENTRY_SECURITY", "IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG")])
     fh, oh = pe.FILE_HEADER, pe.OPTIONAL_HEADER
     out: dict = {
         "machine": hex(fh.Machine), "timestamp": fh.TimeDateStamp, "timestamp_utc": _ts(fh.TimeDateStamp),
@@ -121,7 +138,7 @@ def analyze_pe(data: bytes, file_info: dict, verify_signature: bool = True) -> t
     sections, ep_section, packers = [], None, set()
     for s in pe.sections:
         name = _name(s.Name)
-        body = s.get_data()
+        body = s.get_data()[:1 << 20]
         flags = s.Characteristics
         rec = {"name": name, "virtual_size": s.Misc_VirtualSize, "raw_size": s.SizeOfRawData,
                "entropy": round(entropy(body), 3), "r": bool(flags & 0x40000000), "w": bool(flags & 0x80000000),
@@ -277,5 +294,13 @@ def analyze_pe(data: bytes, file_info: dict, verify_signature: bool = True) -> t
     elif sig.get("present") and sig.get("valid") is False:
         add("pe_bad_signature", "Digital signature does not verify", "medium", sig.get("verify_error", ""),
             ["T1553.002"])
+    from .pe_insight import enrich
+
+    try:
+        enrich(pe, data, out, file_info)
+    except MemoryError:
+        raise
+    except Exception as exc:
+        out["insight_error"] = f"{type(exc).__name__}: {str(exc)[:300]}"
     pe.close()
     return out, findings

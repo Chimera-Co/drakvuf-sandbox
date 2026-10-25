@@ -1,0 +1,177 @@
+{
+  "analysis_artefacts": {
+    "attack": [
+      "T1497.001"
+    ],
+    "keywords": [
+      "vmware",
+      "vbox",
+      "virtualbox",
+      "qemu",
+      "xen",
+      "wireshark",
+      "procmon",
+      "x64dbg",
+      "ollydbg",
+      "sbiedll",
+      "cuckoo",
+      "ida64",
+      "windbg",
+      "avast",
+      "kaspersky",
+      "sandboxie"
+    ],
+    "regexes": [],
+    "severity": 1
+  },
+  "base64": {
+    "attack": [
+      "T1027"
+    ],
+    "keywords": [],
+    "regexes": [
+      "(?<![A-Za-z0-9+/])[A-Za-z0-9+/]{128,}={0,2}(?![A-Za-z0-9+/])"
+    ],
+    "severity": 1
+  },
+  "credential_paths": {
+    "attack": [
+      "T1555"
+    ],
+    "keywords": [
+      "Login Data",
+      "Local State",
+      "wallet.dat",
+      "electrum",
+      "MetaMask",
+      "key4.db",
+      "logins.json",
+      "Cookies",
+      "/etc/shadow",
+      "\\Google\\Chrome\\User Data",
+      "\\Mozilla\\Firefox\\Profiles",
+      "\\Microsoft\\Edge\\User Data",
+      ".bitcoin",
+      ".ethereum",
+      "browser-extension"
+    ],
+    "regexes": [],
+    "severity": 2
+  },
+  "linux_persistence": {
+    "attack": [
+      "T1053.003",
+      "T1543.002"
+    ],
+    "keywords": [
+      "/etc/cron",
+      "/var/spool/cron",
+      "/etc/systemd/system",
+      "/usr/lib/systemd/system",
+      "~/.bashrc",
+      "/etc/ld.so.preload",
+      "authorized_keys",
+      "/etc/rc.local"
+    ],
+    "regexes": [],
+    "severity": 2
+  },
+  "ransom_note": {
+    "attack": [
+      "T1486"
+    ],
+    "keywords": [
+      "your files have been encrypted",
+      "decrypt your files",
+      "ransom",
+      "recover your files",
+      "bitcoin payment"
+    ],
+    "regexes": [],
+    "severity": 2
+  },
+  "recovery_inhibition": {
+    "attack": [
+      "T1490"
+    ],
+    "keywords": [
+      "vssadmin delete shadows",
+      "bcdedit /set",
+      "wmic shadowcopy delete",
+      "wbadmin delete"
+    ],
+    "regexes": [],
+    "severity": 3
+  },
+  "registry_persistence": {
+    "attack": [
+      "T1547.001"
+    ],
+    "keywords": [
+      "\\CurrentVersion\\Run",
+      "\\Winlogon",
+      "\\Image File Execution Options",
+      "\\AppInit_DLLs",
+      "\\Policies",
+      "\\Services"
+    ],
+    "regexes": [],
+    "severity": 2
+  },
+  "shell_commands": {
+    "attack": [
+      "T1059"
+    ],
+    "keywords": [
+      "cmd /c",
+      "cmd.exe /c",
+      "powershell -enc",
+      "powershell.exe -enc",
+      "schtasks",
+      "reg add",
+      "certutil -urlcache",
+      "rundll32",
+      "regsvr32",
+      "mshta",
+      "bitsadmin",
+      "wmic"
+    ],
+    "regexes": [
+      "powershell(?:\\.exe)?\\s+(?:-[a-z]+\\s+)*-(?:enc|encodedcommand)\\b",
+      "certutil(?:\\.exe)?\\s+-urlcache\\b",
+      "cmd(?:\\.exe)?\\s+/c\\b"
+    ],
+    "severity": 2
+  },
+  "target_extensions": {
+    "attack": [],
+    "keywords": [],
+    "regexes": [
+      "(?:\\*\\.(?:docx?|xlsx?|pdf|jpe?g|sql|bak|zip)[;,|\\s]*){3,}"
+    ],
+    "severity": 1
+  },
+  "tor": {
+    "attack": [
+      "T1090.003"
+    ],
+    "keywords": [
+      ".onion",
+      "tor2web"
+    ],
+    "regexes": [],
+    "severity": 2
+  },
+  "user_agent": {
+    "attack": [],
+    "keywords": [
+      "Mozilla/5.0",
+      "User-Agent:",
+      "curl/",
+      "Wget/",
+      "WinHttp.WinHttpRequest"
+    ],
+    "regexes": [],
+    "severity": 1
+  }
+}

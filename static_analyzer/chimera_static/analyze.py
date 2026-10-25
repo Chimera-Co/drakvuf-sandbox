@@ -108,6 +108,9 @@ def analyze(path: str, out_dir: str | None = None, file_name: str = "", timeout_
                                        "severity": _yara_severity(m["meta"]),
                                        "evidence": str(m["meta"].get("description", ""))[:200], "attack": [],
                                        "source": "yara"})
+    from .insight import flagged_strings
+
+    universal.update(stage("strings_insight", lambda: flagged_strings(data)) or {})
     result["universal"] = universal
     embedded_exec = [e for e in universal["embedded"] if e["type"] in ("pe", "elf")]
     if embedded_exec and t["format"] not in ("pe", "elf"):
@@ -127,6 +130,9 @@ def analyze(path: str, out_dir: str | None = None, file_name: str = "", timeout_
         got = stage("pe", lambda: analyze_pe(data, result["file"], verify_signature), heavy=True)
         if got:
             result["pe"], f = got
+            if result["pe"].get("insight_error"):
+                result["errors"].append({"stage": "pe_insight",
+                                         "error": result["pe"]["insight_error"]})
             result["findings"] += f
         if t.get("dotnet"):
             import pefile
@@ -144,6 +150,9 @@ def analyze(path: str, out_dir: str | None = None, file_name: str = "", timeout_
         got = stage("elf", lambda: analyze_elf(data), heavy=True)
         if got:
             result["elf"], f = got
+            if result["elf"].get("insight_error"):
+                result["errors"].append({"stage": "elf_insight",
+                                         "error": result["elf"]["insight_error"]})
             result["findings"] += f
     elif fmt == "pdf":
         from .plugins.pdf import analyze_pdf
@@ -196,6 +205,11 @@ def analyze(path: str, out_dir: str | None = None, file_name: str = "", timeout_
                                  "error": "archive members are listed, not unpacked or analyzed"})
     else:
         result["errors"].append({"stage": "plugins", "error": f"no type plugin for {fmt} yet (layers 0-1 only)"})
+
+    if fmt in ("pe", "elf"):
+        from .indicators import build
+
+        result["indicators"], result["indicators_summary"] = build(result)
 
     # ---- ML features (EMBER2024 / thrember v3), for formats that have a trained static model
     if ember and fmt in ML_FORMATS:

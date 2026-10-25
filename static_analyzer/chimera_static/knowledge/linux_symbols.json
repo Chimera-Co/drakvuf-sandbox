@@ -1,0 +1,2022 @@
+{
+  "__memcpy_chk": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Copies memory with a destination bound check.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "__printf_chk": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Prints formatted output with additional checks.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "__stack_chk_fail": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Terminates execution after a stack protector check fails.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "_exit": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Terminates a process without normal cleanup.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "accept": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Accepts a socket connection.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "accept4": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Accepts a connection with descriptor flags.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "access": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Checks file accessibility.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "bind": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Binds a socket to a local address.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "brk": {
+    "attack": [],
+    "attacker_use": "Can allocate memory or change its protections.",
+    "category": "memory",
+    "description": "Changes the program break.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "calloc": {
+    "attack": [],
+    "attacker_use": "Can allocate memory or change its protections.",
+    "category": "memory",
+    "description": "Allocates zeroed memory.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "capget": {
+    "attack": [
+      "T1548.001"
+    ],
+    "attacker_use": "Can change identities, privileges or namespaces.",
+    "category": "privilege",
+    "description": "Retrieves process capabilities.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "capset": {
+    "attack": [
+      "T1548.001"
+    ],
+    "attacker_use": "Can change identities, privileges or namespaces.",
+    "category": "privilege",
+    "description": "Sets process capabilities.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "chdir": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Changes the current directory.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "chmod": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Changes file permission bits.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "chown": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Changes file ownership.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "chroot": {
+    "attack": [
+      "T1548.001"
+    ],
+    "attacker_use": "Can change identities, privileges or namespaces.",
+    "category": "privilege",
+    "description": "Changes the root directory.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "clock_gettime": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves a clock value.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "clone": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Creates a child process with selectable shared resources.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "clone3": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Creates a child process using a structured argument block.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "close": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Closes a file descriptor.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "closedir": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can enumerate files and process directories.",
+    "category": "enumeration",
+    "description": "Closes a directory stream.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "closelog": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Closes a system logging connection.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "connect": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Connects a socket.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "copy_file_range": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Copies data between file descriptors.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "creat": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Creates or truncates a file.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "delete_module": {
+    "attack": [
+      "T1547.006"
+    ],
+    "attacker_use": "Can install or remove kernel modules.",
+    "category": "driver_kernel",
+    "description": "Unloads a kernel module.",
+    "lib": "libc",
+    "severity": 3
+  },
+  "dlclose": {
+    "attack": [
+      "T1129"
+    ],
+    "attacker_use": "Can load code or resolve symbols at run time.",
+    "category": "dynamic_loading",
+    "description": "Closes a shared object handle.",
+    "lib": "libdl",
+    "severity": 1
+  },
+  "dlerror": {
+    "attack": [
+      "T1129"
+    ],
+    "attacker_use": "Can load code or resolve symbols at run time.",
+    "category": "dynamic_loading",
+    "description": "Retrieves the last dynamic linking error.",
+    "lib": "libdl",
+    "severity": 1
+  },
+  "dlmopen": {
+    "attack": [
+      "T1129"
+    ],
+    "attacker_use": "Can load code or resolve symbols at run time.",
+    "category": "dynamic_loading",
+    "description": "Loads a shared object into a namespace.",
+    "lib": "libdl",
+    "severity": 1
+  },
+  "dlopen": {
+    "attack": [
+      "T1129"
+    ],
+    "attacker_use": "Can load code or resolve symbols at run time.",
+    "category": "dynamic_loading",
+    "description": "Loads a shared object.",
+    "lib": "libdl",
+    "severity": 1
+  },
+  "dlsym": {
+    "attack": [
+      "T1129"
+    ],
+    "attacker_use": "Can load code or resolve symbols at run time.",
+    "category": "dynamic_loading",
+    "description": "Resolves a shared object symbol.",
+    "lib": "libdl",
+    "severity": 1
+  },
+  "dlvsym": {
+    "attack": [
+      "T1129"
+    ],
+    "attacker_use": "Can load code or resolve symbols at run time.",
+    "category": "dynamic_loading",
+    "description": "Resolves a versioned shared object symbol.",
+    "lib": "libdl",
+    "severity": 1
+  },
+  "dup": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Duplicates a descriptor.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "dup2": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Duplicates a descriptor to a selected number.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "dup3": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Duplicates a descriptor with flags.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "epoll_create": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Creates an epoll instance.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "epoll_create1": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Creates an epoll instance with flags.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "epoll_ctl": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Controls an epoll instance.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "epoll_wait": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Waits for epoll events.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "execl": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Executes a file with a variadic argument list.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "execle": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Executes a file with a variadic list and environment.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "execlp": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Executes a file located using PATH.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "execv": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Executes a file with an argument vector.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "execve": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Replaces a process image using a path and environment.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "execveat": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Replaces a process image relative to a directory descriptor.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "execvp": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Executes a file located using PATH with an argument vector.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "execvpe": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Executes a PATH-located file with an explicit environment.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "exit": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Terminates a process with normal cleanup.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "faccessat": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Checks accessibility relative to a directory descriptor.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "fchdir": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Changes directory using a descriptor.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "fchmod": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Changes descriptor file permission bits.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "fchmodat": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Changes permissions relative to a directory descriptor.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "fchown": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Changes descriptor file ownership.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "fclose": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Closes a buffered stream.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "fcntl": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Controls descriptor properties.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "fdatasync": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Synchronizes file data.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "fdopendir": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can enumerate files and process directories.",
+    "category": "enumeration",
+    "description": "Opens a directory stream from a descriptor.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "fexecve": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Executes a file referenced by a descriptor.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "fflush": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Flushes a buffered stream.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "fgets": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Reads a line from a stream.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "finit_module": {
+    "attack": [
+      "T1547.006"
+    ],
+    "attacker_use": "Can install or remove kernel modules.",
+    "category": "driver_kernel",
+    "description": "Loads a kernel module from a file descriptor.",
+    "lib": "libc",
+    "severity": 3
+  },
+  "flock": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Applies or removes an advisory file lock.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "fopen": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Opens a buffered file stream.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "fork": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Creates a child process.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "fputs": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Writes a string to a stream.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "fread": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Reads from a buffered stream.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "free": {
+    "attack": [],
+    "attacker_use": "Can allocate memory or change its protections.",
+    "category": "memory",
+    "description": "Frees allocated memory.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "freeaddrinfo": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Frees address information.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "freeifaddrs": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Frees interface address information.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "fseek": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Changes a stream file position.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "fstat": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Retrieves descriptor file status.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "fstatat": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Retrieves file status relative to a directory descriptor.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "fsync": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Synchronizes file data and metadata.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "ftell": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Retrieves a stream file position.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "ftruncate": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Changes descriptor file length.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "fwrite": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Writes to a buffered stream.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "getaddrinfo": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Resolves a host and service to addresses.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "getcwd": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Retrieves the current directory.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "getdents": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can enumerate files and process directories.",
+    "category": "enumeration",
+    "description": "Reads directory entries.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "getdents64": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can enumerate files and process directories.",
+    "category": "enumeration",
+    "description": "Reads directory entries using 64-bit offsets.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "getegid": {
+    "attack": [
+      "T1548.001"
+    ],
+    "attacker_use": "Can change identities, privileges or namespaces.",
+    "category": "privilege",
+    "description": "Retrieves the effective group identifier.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "getentropy": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Fills a buffer with random bytes.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "getenv": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Retrieves an environment variable.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "geteuid": {
+    "attack": [
+      "T1548.001"
+    ],
+    "attacker_use": "Can change identities, privileges or namespaces.",
+    "category": "privilege",
+    "description": "Retrieves the effective user identifier.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "getgid": {
+    "attack": [
+      "T1548.001"
+    ],
+    "attacker_use": "Can change identities, privileges or namespaces.",
+    "category": "privilege",
+    "description": "Retrieves the real group identifier.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "getgrgid": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Looks up a group by identifier.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "getgrnam": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Looks up a group by name.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "getgroups": {
+    "attack": [
+      "T1548.001"
+    ],
+    "attacker_use": "Can change identities, privileges or namespaces.",
+    "category": "privilege",
+    "description": "Retrieves supplementary groups.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "gethostbyaddr": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Looks up a host by address.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "gethostbyname": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Resolves a host name.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "gethostname": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Retrieves the host name.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "getifaddrs": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Retrieves interface addresses.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "getpeername": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Retrieves the peer socket address.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "getpgrp": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Returns the process group identifier.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "getpid": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Returns the process identifier.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "getppid": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Returns the parent process identifier.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "getpwnam": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Looks up a user by name.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "getpwuid": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Looks up a user by identifier.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "getrandom": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves random bytes.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "getrlimit": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves resource limits.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "getrusage": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves resource usage.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "getsockname": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Retrieves the local socket address.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "getsockopt": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Retrieves a socket option.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "gettid": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Returns the calling thread identifier.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "gettimeofday": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves wall clock time.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "getuid": {
+    "attack": [
+      "T1548.001"
+    ],
+    "attacker_use": "Can change identities, privileges or namespaces.",
+    "category": "privilege",
+    "description": "Retrieves the real user identifier.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "getxattr": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Retrieves an extended attribute.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "htonl": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Converts a long integer to network byte order.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "htons": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Converts a short integer to network byte order.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "inet_ntop": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Converts a binary address to text.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "inet_pton": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Converts an address string to binary.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "init_module": {
+    "attack": [
+      "T1547.006"
+    ],
+    "attacker_use": "Can install or remove kernel modules.",
+    "category": "driver_kernel",
+    "description": "Loads a kernel module from memory.",
+    "lib": "libc",
+    "severity": 3
+  },
+  "inotify_add_watch": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can enumerate files and process directories.",
+    "category": "enumeration",
+    "description": "Adds a filesystem event watch.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "inotify_init": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can enumerate files and process directories.",
+    "category": "enumeration",
+    "description": "Creates a filesystem event instance.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "inotify_init1": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can enumerate files and process directories.",
+    "category": "enumeration",
+    "description": "Creates a filesystem event instance with flags.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "inotify_rm_watch": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can enumerate files and process directories.",
+    "category": "enumeration",
+    "description": "Removes a filesystem event watch.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "ioctl": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Controls a device.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "kill": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Sends a signal to a process.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "killpg": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Sends a signal to a process group.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "lchown": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Changes symbolic link ownership.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "link": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Creates a hard link.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "listen": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Marks a socket as passive.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "lseek": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Changes a file offset.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "lstat": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Retrieves symbolic link status.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "madvise": {
+    "attack": [],
+    "attacker_use": "Can allocate memory or change its protections.",
+    "category": "memory",
+    "description": "Advises the kernel about memory use.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "malloc": {
+    "attack": [],
+    "attacker_use": "Can allocate memory or change its protections.",
+    "category": "memory",
+    "description": "Allocates memory.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "memcpy": {
+    "attack": [],
+    "attacker_use": "Can allocate memory or change its protections.",
+    "category": "memory",
+    "description": "Copies nonoverlapping memory.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "memfd_create": {
+    "attack": [],
+    "attacker_use": "Can allocate memory or change its protections.",
+    "category": "memory",
+    "description": "Creates an anonymous memory-backed file.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "memmove": {
+    "attack": [],
+    "attacker_use": "Can allocate memory or change its protections.",
+    "category": "memory",
+    "description": "Copies memory allowing overlap.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "memset": {
+    "attack": [],
+    "attacker_use": "Can allocate memory or change its protections.",
+    "category": "memory",
+    "description": "Fills memory with a byte.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "mkdir": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Creates a directory.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "mkdirat": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Creates a directory relative to a descriptor.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "mkfifo": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Creates a named pipe.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "mknod": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Creates a filesystem node.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "mlock": {
+    "attack": [],
+    "attacker_use": "Can allocate memory or change its protections.",
+    "category": "memory",
+    "description": "Locks pages in memory.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "mmap": {
+    "attack": [],
+    "attacker_use": "Can allocate memory or change its protections.",
+    "category": "memory",
+    "description": "Maps files or anonymous memory.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "mmap64": {
+    "attack": [],
+    "attacker_use": "Can allocate memory or change its protections.",
+    "category": "memory",
+    "description": "Maps memory using a large file offset.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "mount": {
+    "attack": [
+      "T1548.001"
+    ],
+    "attacker_use": "Can change identities, privileges or namespaces.",
+    "category": "privilege",
+    "description": "Mounts a filesystem.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "mprotect": {
+    "attack": [],
+    "attacker_use": "Can allocate memory or change its protections.",
+    "category": "memory",
+    "description": "Changes memory protections.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "mremap": {
+    "attack": [],
+    "attacker_use": "Can allocate memory or change its protections.",
+    "category": "memory",
+    "description": "Resizes or moves a mapping.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "munlock": {
+    "attack": [],
+    "attacker_use": "Can allocate memory or change its protections.",
+    "category": "memory",
+    "description": "Unlocks pages in memory.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "munmap": {
+    "attack": [],
+    "attacker_use": "Can allocate memory or change its protections.",
+    "category": "memory",
+    "description": "Unmaps a memory region.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "nanosleep": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Suspends execution for an interval.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "ntohl": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Converts a long integer to host byte order.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "ntohs": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Converts a short integer to host byte order.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "open": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Opens a file.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "open64": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Opens a file with large file support.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "openat": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Opens a file relative to a directory descriptor.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "openat2": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Opens a file using extended resolution options.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "opendir": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can enumerate files and process directories.",
+    "category": "enumeration",
+    "description": "Opens a directory stream.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "openlog": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Opens a system logging connection.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "pclose": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Closes a command pipe and waits for termination.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "pipe": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Creates a pipe.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "pipe2": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Creates a pipe with descriptor flags.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "pkey_mprotect": {
+    "attack": [],
+    "attacker_use": "Can allocate memory or change its protections.",
+    "category": "memory",
+    "description": "Changes memory protections and a protection key.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "poll": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Waits for descriptor events.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "popen": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Opens a pipe to a shell command.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "posix_spawn": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Creates a process from a program image.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "posix_spawnp": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Creates a process using a PATH search.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "ppoll": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Waits for descriptor events with a signal mask.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "prctl": {
+    "attack": [
+      "T1622"
+    ],
+    "attacker_use": "Can detect tracing or alter process observability.",
+    "category": "anti_debug",
+    "description": "Controls process-specific behavior.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "pread": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Reads at a specified offset.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "process_vm_readv": {
+    "attack": [],
+    "attacker_use": "Can allocate memory or change its protections.",
+    "category": "memory",
+    "description": "Reads another process address space.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "process_vm_writev": {
+    "attack": [],
+    "attacker_use": "Can allocate memory or change its protections.",
+    "category": "memory",
+    "description": "Writes another process address space.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "pselect": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Waits for descriptor readiness with a signal mask.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "ptrace": {
+    "attack": [
+      "T1622"
+    ],
+    "attacker_use": "Can detect tracing or alter process observability.",
+    "category": "anti_debug",
+    "description": "Traces or controls a process.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "putenv": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Changes or adds an environment variable.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "pwrite": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Writes at a specified offset.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "raise": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Sends a signal to the calling thread.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "read": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Reads from a descriptor.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "readdir": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can enumerate files and process directories.",
+    "category": "enumeration",
+    "description": "Reads a directory entry.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "readdir64": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can enumerate files and process directories.",
+    "category": "enumeration",
+    "description": "Reads a directory entry with large file support.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "readlink": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Reads a symbolic link value.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "readlinkat": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Reads a symbolic link relative to a descriptor.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "readv": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Reads into multiple buffers.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "realloc": {
+    "attack": [],
+    "attacker_use": "Can allocate memory or change its protections.",
+    "category": "memory",
+    "description": "Resizes an allocation.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "realpath": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Resolves a canonical path.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "recv": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Receives data from a socket.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "recvfrom": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Receives data and its source address.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "recvmmsg": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Receives multiple socket messages.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "recvmsg": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Receives a message with ancillary data.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "remove": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Deletes a file or directory.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "rename": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Renames a file.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "renameat": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Renames a file relative to directory descriptors.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "rmdir": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Removes a directory.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "sbrk": {
+    "attack": [],
+    "attacker_use": "Can allocate memory or change its protections.",
+    "category": "memory",
+    "description": "Adjusts the program break.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "scandir": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can enumerate files and process directories.",
+    "category": "enumeration",
+    "description": "Scans a directory and sorts entries.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "seccomp": {
+    "attack": [
+      "T1622"
+    ],
+    "attacker_use": "Can detect tracing or alter process observability.",
+    "category": "anti_debug",
+    "description": "Controls secure computing filters.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "select": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Waits for descriptor readiness.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "send": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Sends data on a socket.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "sendfile": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Transfers data between descriptors.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "sendmmsg": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Sends multiple socket messages.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "sendmsg": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Sends a message with ancillary data.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "sendto": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Sends data to a destination.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "setegid": {
+    "attack": [
+      "T1548.001"
+    ],
+    "attacker_use": "Can change identities, privileges or namespaces.",
+    "category": "privilege",
+    "description": "Sets the effective group identifier.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "setenv": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Sets an environment variable.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "seteuid": {
+    "attack": [
+      "T1548.001"
+    ],
+    "attacker_use": "Can change identities, privileges or namespaces.",
+    "category": "privilege",
+    "description": "Sets the effective user identifier.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "setgid": {
+    "attack": [
+      "T1548.001"
+    ],
+    "attacker_use": "Can change identities, privileges or namespaces.",
+    "category": "privilege",
+    "description": "Sets the group identifier.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "setgroups": {
+    "attack": [
+      "T1548.001"
+    ],
+    "attacker_use": "Can change identities, privileges or namespaces.",
+    "category": "privilege",
+    "description": "Sets supplementary group identifiers.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "setns": {
+    "attack": [
+      "T1548.001"
+    ],
+    "attacker_use": "Can change identities, privileges or namespaces.",
+    "category": "privilege",
+    "description": "Joins a namespace.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "setpgid": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Sets a process group identifier.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "setregid": {
+    "attack": [
+      "T1548.001"
+    ],
+    "attacker_use": "Can change identities, privileges or namespaces.",
+    "category": "privilege",
+    "description": "Sets real and effective group identifiers.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "setresgid": {
+    "attack": [
+      "T1548.001"
+    ],
+    "attacker_use": "Can change identities, privileges or namespaces.",
+    "category": "privilege",
+    "description": "Sets real, effective and saved group identifiers.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "setresuid": {
+    "attack": [
+      "T1548.001"
+    ],
+    "attacker_use": "Can change identities, privileges or namespaces.",
+    "category": "privilege",
+    "description": "Sets real, effective and saved user identifiers.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "setreuid": {
+    "attack": [
+      "T1548.001"
+    ],
+    "attacker_use": "Can change identities, privileges or namespaces.",
+    "category": "privilege",
+    "description": "Sets real and effective user identifiers.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "setrlimit": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Sets resource limits.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "setsid": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Creates a new session.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "setsockopt": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Sets a socket option.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "setuid": {
+    "attack": [
+      "T1548.001"
+    ],
+    "attacker_use": "Can change identities, privileges or namespaces.",
+    "category": "privilege",
+    "description": "Sets the user identifier.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "setxattr": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Sets an extended attribute.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "shutdown": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Shuts down part of a full-duplex connection.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "sigaction": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Examines or changes signal actions.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "signal": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Installs a signal handler.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "sigpending": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Retrieves pending signals.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "sigprocmask": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Examines or changes blocked signals.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "sleep": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Suspends execution for seconds.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "socket": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Creates a communication endpoint.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "socketpair": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Creates a pair of connected sockets.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "stat": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Retrieves file status.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "statx": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Retrieves extended file status.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "symlink": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Creates a symbolic link.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "sysconf": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves runtime configuration values.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "sysinfo": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves system resource statistics.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "syslog": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Sends a log message to the system logger.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "system": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Executes a shell command.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "truncate": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Changes file length.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "umask": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Sets the file creation mask.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "umount": {
+    "attack": [
+      "T1548.001"
+    ],
+    "attacker_use": "Can change identities, privileges or namespaces.",
+    "category": "privilege",
+    "description": "Unmounts a filesystem.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "umount2": {
+    "attack": [
+      "T1548.001"
+    ],
+    "attacker_use": "Can change identities, privileges or namespaces.",
+    "category": "privilege",
+    "description": "Unmounts a filesystem with flags.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "uname": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves system identification information.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "unlink": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Removes a directory entry.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "unlinkat": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Removes an entry relative to a directory descriptor.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "unsetenv": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Removes an environment variable.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "unshare": {
+    "attack": [
+      "T1548.001"
+    ],
+    "attacker_use": "Can change identities, privileges or namespaces.",
+    "category": "privilege",
+    "description": "Disassociates shared execution context.",
+    "lib": "libc",
+    "severity": 2
+  },
+  "usleep": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Suspends execution for microseconds.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "vfork": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Creates a child sharing the parent address space until exec or exit.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "wait": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Waits for a child state change.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "waitid": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Waits for selected child state information.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "waitpid": {
+    "attack": [],
+    "attacker_use": "Can launch or control processes.",
+    "category": "process",
+    "description": "Waits for a selected child process.",
+    "lib": "libc",
+    "severity": 1
+  },
+  "write": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Writes to a descriptor.",
+    "lib": "libc",
+    "severity": 0
+  },
+  "writev": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Writes from multiple buffers.",
+    "lib": "libc",
+    "severity": 0
+  }
+}

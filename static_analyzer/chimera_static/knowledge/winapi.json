@@ -1,0 +1,5650 @@
+{
+  "AddDllDirectory": {
+    "attack": [
+      "T1027.007"
+    ],
+    "attacker_use": "Can resolve payload functionality at run time.",
+    "category": "dynamic_loading",
+    "description": "Adds a directory to the process DLL search path.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "AddVectoredExceptionHandler": {
+    "attack": [
+      "T1622"
+    ],
+    "attacker_use": "Can detect or interfere with debugging.",
+    "category": "anti_debug",
+    "description": "Registers a vectored exception handler.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "AdjustTokenPrivileges": {
+    "attack": [
+      "T1134"
+    ],
+    "attacker_use": "Can manipulate access tokens or impersonate another security context.",
+    "category": "privilege",
+    "description": "Enables or disables token privileges.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "AllocateAndInitializeSid": {
+    "attack": [
+      "T1134"
+    ],
+    "attacker_use": "Can manipulate access tokens or impersonate another security context.",
+    "category": "privilege",
+    "description": "Allocates and initializes a security identifier.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "BCryptCloseAlgorithmProvider": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Closes a cryptographic algorithm provider.",
+    "dll": "bcrypt.dll",
+    "severity": 1
+  },
+  "BCryptCreateHash": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Creates a hash or MAC object.",
+    "dll": "bcrypt.dll",
+    "severity": 1
+  },
+  "BCryptDecrypt": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Decrypts data.",
+    "dll": "bcrypt.dll",
+    "severity": 1
+  },
+  "BCryptDestroyHash": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Destroys a hash object.",
+    "dll": "bcrypt.dll",
+    "severity": 1
+  },
+  "BCryptDestroyKey": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Destroys a cryptographic key.",
+    "dll": "bcrypt.dll",
+    "severity": 1
+  },
+  "BCryptEncrypt": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Encrypts data.",
+    "dll": "bcrypt.dll",
+    "severity": 1
+  },
+  "BCryptExportKey": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Exports a cryptographic key.",
+    "dll": "bcrypt.dll",
+    "severity": 1
+  },
+  "BCryptFinalizeKeyPair": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Completes an asymmetric key pair.",
+    "dll": "bcrypt.dll",
+    "severity": 1
+  },
+  "BCryptFinishHash": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Retrieves a completed hash or MAC.",
+    "dll": "bcrypt.dll",
+    "severity": 1
+  },
+  "BCryptGenRandom": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Generates random bytes.",
+    "dll": "bcrypt.dll",
+    "severity": 1
+  },
+  "BCryptGenerateKeyPair": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Creates an asymmetric key pair.",
+    "dll": "bcrypt.dll",
+    "severity": 1
+  },
+  "BCryptGenerateSymmetricKey": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Creates a symmetric key object.",
+    "dll": "bcrypt.dll",
+    "severity": 1
+  },
+  "BCryptGetProperty": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Retrieves an object property.",
+    "dll": "bcrypt.dll",
+    "severity": 1
+  },
+  "BCryptHashData": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Adds data to a hash or MAC.",
+    "dll": "bcrypt.dll",
+    "severity": 1
+  },
+  "BCryptImportKey": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Imports a symmetric key.",
+    "dll": "bcrypt.dll",
+    "severity": 1
+  },
+  "BCryptImportKeyPair": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Imports an asymmetric key pair.",
+    "dll": "bcrypt.dll",
+    "severity": 1
+  },
+  "BCryptOpenAlgorithmProvider": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Opens a cryptographic algorithm provider.",
+    "dll": "bcrypt.dll",
+    "severity": 1
+  },
+  "BCryptSetProperty": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Sets an object property.",
+    "dll": "bcrypt.dll",
+    "severity": 1
+  },
+  "BitBlt": {
+    "attack": [
+      "T1113"
+    ],
+    "attacker_use": "Can copy display pixels for screen capture.",
+    "category": "screen_capture",
+    "description": "Transfers a rectangle of pixels between device contexts.",
+    "dll": "gdi32.dll",
+    "severity": 1
+  },
+  "CLSIDFromProgID": {
+    "attack": [],
+    "attacker_use": "Can instantiate COM objects for system functionality.",
+    "category": "com",
+    "description": "Looks up a class identifier from a programmatic identifier.",
+    "dll": "ole32.dll",
+    "severity": 1
+  },
+  "CLSIDFromString": {
+    "attack": [],
+    "attacker_use": "Can instantiate COM objects for system functionality.",
+    "category": "com",
+    "description": "Converts a class identifier string to a CLSID.",
+    "dll": "ole32.dll",
+    "severity": 1
+  },
+  "CallNextHookEx": {
+    "attack": [
+      "T1056.001"
+    ],
+    "attacker_use": "Can observe or synthesize user input.",
+    "category": "keylogging_input",
+    "description": "Passes hook information to the next procedure.",
+    "dll": "user32.dll",
+    "severity": 2
+  },
+  "CertCloseStore": {
+    "attack": [],
+    "attacker_use": "Can encode data, inspect certificates or protect stored data.",
+    "category": "crypto",
+    "description": "Closes a certificate store.",
+    "dll": "crypt32.dll",
+    "severity": 1
+  },
+  "CertEnumCertificatesInStore": {
+    "attack": [],
+    "attacker_use": "Can encode data, inspect certificates or protect stored data.",
+    "category": "crypto",
+    "description": "Enumerates certificates in a store.",
+    "dll": "crypt32.dll",
+    "severity": 1
+  },
+  "CertFindCertificateInStore": {
+    "attack": [],
+    "attacker_use": "Can encode data, inspect certificates or protect stored data.",
+    "category": "crypto",
+    "description": "Finds a certificate in a store.",
+    "dll": "crypt32.dll",
+    "severity": 1
+  },
+  "CertFreeCertificateContext": {
+    "attack": [],
+    "attacker_use": "Can encode data, inspect certificates or protect stored data.",
+    "category": "crypto",
+    "description": "Frees a certificate context.",
+    "dll": "crypt32.dll",
+    "severity": 1
+  },
+  "CertGetCertificateContextProperty": {
+    "attack": [],
+    "attacker_use": "Can encode data, inspect certificates or protect stored data.",
+    "category": "crypto",
+    "description": "Retrieves a certificate property.",
+    "dll": "crypt32.dll",
+    "severity": 1
+  },
+  "CertOpenStore": {
+    "attack": [],
+    "attacker_use": "Can encode data, inspect certificates or protect stored data.",
+    "category": "crypto",
+    "description": "Opens a certificate store.",
+    "dll": "crypt32.dll",
+    "severity": 1
+  },
+  "CertOpenSystemStore": {
+    "attack": [],
+    "attacker_use": "Can encode data, inspect certificates or protect stored data.",
+    "category": "crypto",
+    "description": "Opens a system certificate store.",
+    "dll": "crypt32.dll",
+    "severity": 1
+  },
+  "ChangeServiceConfig": {
+    "attack": [
+      "T1543.003"
+    ],
+    "attacker_use": "Can configure a service for execution or persistence.",
+    "category": "service",
+    "description": "Changes service configuration parameters.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "ChangeServiceConfig2": {
+    "attack": [
+      "T1543.003"
+    ],
+    "attacker_use": "Can configure a service for execution or persistence.",
+    "category": "service",
+    "description": "Changes optional service configuration parameters.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "CheckRemoteDebuggerPresent": {
+    "attack": [
+      "T1622"
+    ],
+    "attacker_use": "Can detect or interfere with debugging.",
+    "category": "anti_debug",
+    "description": "Determines whether a specified process is being debugged.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "CheckTokenMembership": {
+    "attack": [
+      "T1134"
+    ],
+    "attacker_use": "Can manipulate access tokens or impersonate another security context.",
+    "category": "privilege",
+    "description": "Determines whether a token contains a security identifier.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "CloseHandle": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "synchronization",
+    "description": "Closes an open object handle.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "CloseServiceHandle": {
+    "attack": [
+      "T1543.003"
+    ],
+    "attacker_use": "Can configure a service for execution or persistence.",
+    "category": "service",
+    "description": "Closes a service object handle.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "CmRegisterCallbackEx": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Registers a registry operation callback.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "CmUnRegisterCallback": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Unregisters a registry callback.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "CoCreateInstance": {
+    "attack": [],
+    "attacker_use": "Can instantiate COM objects for system functionality.",
+    "category": "com",
+    "description": "Creates an instance of a COM class.",
+    "dll": "ole32.dll",
+    "severity": 1
+  },
+  "CoCreateInstanceEx": {
+    "attack": [],
+    "attacker_use": "Can instantiate COM objects for system functionality.",
+    "category": "com",
+    "description": "Creates a COM instance on a specified computer.",
+    "dll": "ole32.dll",
+    "severity": 1
+  },
+  "CoGetClassObject": {
+    "attack": [],
+    "attacker_use": "Can instantiate COM objects for system functionality.",
+    "category": "com",
+    "description": "Retrieves a COM class object.",
+    "dll": "ole32.dll",
+    "severity": 1
+  },
+  "CoGetObject": {
+    "attack": [],
+    "attacker_use": "Can instantiate COM objects for system functionality.",
+    "category": "com",
+    "description": "Binds a display name to an object.",
+    "dll": "ole32.dll",
+    "severity": 1
+  },
+  "CoInitialize": {
+    "attack": [],
+    "attacker_use": "Can instantiate COM objects for system functionality.",
+    "category": "com",
+    "description": "Initializes COM on the calling thread.",
+    "dll": "ole32.dll",
+    "severity": 1
+  },
+  "CoInitializeEx": {
+    "attack": [],
+    "attacker_use": "Can instantiate COM objects for system functionality.",
+    "category": "com",
+    "description": "Initializes COM with a concurrency model.",
+    "dll": "ole32.dll",
+    "severity": 1
+  },
+  "CoInitializeSecurity": {
+    "attack": [],
+    "attacker_use": "Can instantiate COM objects for system functionality.",
+    "category": "com",
+    "description": "Initializes COM process security.",
+    "dll": "ole32.dll",
+    "severity": 1
+  },
+  "CoSetProxyBlanket": {
+    "attack": [],
+    "attacker_use": "Can instantiate COM objects for system functionality.",
+    "category": "com",
+    "description": "Sets authentication information on a proxy.",
+    "dll": "ole32.dll",
+    "severity": 1
+  },
+  "CoTaskMemAlloc": {
+    "attack": [],
+    "attacker_use": "Can instantiate COM objects for system functionality.",
+    "category": "com",
+    "description": "Allocates COM task memory.",
+    "dll": "ole32.dll",
+    "severity": 1
+  },
+  "CoTaskMemFree": {
+    "attack": [],
+    "attacker_use": "Can instantiate COM objects for system functionality.",
+    "category": "com",
+    "description": "Frees COM task memory.",
+    "dll": "ole32.dll",
+    "severity": 1
+  },
+  "CoUninitialize": {
+    "attack": [],
+    "attacker_use": "Can instantiate COM objects for system functionality.",
+    "category": "com",
+    "description": "Closes COM on the calling thread.",
+    "dll": "ole32.dll",
+    "severity": 1
+  },
+  "CommandLineToArgv": {
+    "attack": [
+      "T1218"
+    ],
+    "attacker_use": "Can launch programs or invoke shell functionality.",
+    "category": "execution",
+    "description": "Parses a Unicode command line into arguments.",
+    "dll": "shell32.dll",
+    "severity": 1
+  },
+  "ConnectNamedPipe": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Waits for a client to connect to a named pipe.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "ContinueDebugEvent": {
+    "attack": [
+      "T1622"
+    ],
+    "attacker_use": "Can detect or interfere with debugging.",
+    "category": "anti_debug",
+    "description": "Continues a thread after a debugging event.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "ControlService": {
+    "attack": [
+      "T1543.003"
+    ],
+    "attacker_use": "Can configure a service for execution or persistence.",
+    "category": "service",
+    "description": "Sends a control code to a service.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "ConvertThreadToFiber": {
+    "attack": [],
+    "attacker_use": "Can control execution or coordinate payload threads.",
+    "category": "thread",
+    "description": "Converts a thread into a fiber.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "CopyFile": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Copies an existing file.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "CopyFileEx": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Copies a file with extended options.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "CreateCompatibleBitmap": {
+    "attack": [
+      "T1113"
+    ],
+    "attacker_use": "Can copy display pixels for screen capture.",
+    "category": "screen_capture",
+    "description": "Creates a device-compatible bitmap.",
+    "dll": "gdi32.dll",
+    "severity": 1
+  },
+  "CreateCompatibleDC": {
+    "attack": [
+      "T1113"
+    ],
+    "attacker_use": "Can copy display pixels for screen capture.",
+    "category": "screen_capture",
+    "description": "Creates a memory device context compatible with a device.",
+    "dll": "gdi32.dll",
+    "severity": 1
+  },
+  "CreateDIBSection": {
+    "attack": [
+      "T1113"
+    ],
+    "attacker_use": "Can copy display pixels for screen capture.",
+    "category": "screen_capture",
+    "description": "Creates a bitmap with directly accessible pixel storage.",
+    "dll": "gdi32.dll",
+    "severity": 1
+  },
+  "CreateDirectory": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Creates a directory.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "CreateEvent": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "synchronization",
+    "description": "Creates or opens an event object.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "CreateFiber": {
+    "attack": [],
+    "attacker_use": "Can control execution or coordinate payload threads.",
+    "category": "thread",
+    "description": "Allocates a fiber object.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "CreateFile": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Creates or opens a file or I/O device.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "CreateFileMapping": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Creates or opens a file mapping object.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "CreateMutex": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "synchronization",
+    "description": "Creates or opens a named mutex.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "CreateNamedPipe": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Creates a named pipe instance.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "CreatePipe": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Creates an anonymous pipe.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "CreateProcess": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Creates a process and its primary thread.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "CreateProcessAsUser": {
+    "attack": [
+      "T1134"
+    ],
+    "attacker_use": "Can manipulate access tokens or impersonate another security context.",
+    "category": "privilege",
+    "description": "Creates a process in a specified token security context.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "CreateProcessWithLogon": {
+    "attack": [
+      "T1134"
+    ],
+    "attacker_use": "Can manipulate access tokens or impersonate another security context.",
+    "category": "privilege",
+    "description": "Creates a process using supplied logon credentials.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "CreateProcessWithToken": {
+    "attack": [
+      "T1134"
+    ],
+    "attacker_use": "Can manipulate access tokens or impersonate another security context.",
+    "category": "privilege",
+    "description": "Creates a process in a specified token security context.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "CreateRemoteThread": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate another process during code injection.",
+    "category": "injection",
+    "description": "Creates a thread in another process.",
+    "dll": "kernel32.dll",
+    "severity": 3
+  },
+  "CreateRemoteThreadEx": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate another process during code injection.",
+    "category": "injection",
+    "description": "Creates a thread in another process with extended attributes.",
+    "dll": "kernel32.dll",
+    "severity": 3
+  },
+  "CreateSemaphore": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "synchronization",
+    "description": "Creates or opens a semaphore.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "CreateService": {
+    "attack": [
+      "T1543.003"
+    ],
+    "attacker_use": "Can configure a service for execution or persistence.",
+    "category": "service",
+    "description": "Creates a service object.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "CreateThread": {
+    "attack": [],
+    "attacker_use": "Can control execution or coordinate payload threads.",
+    "category": "thread",
+    "description": "Creates a thread in the calling process.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "CreateToolhelp32Snapshot": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Takes a snapshot of processes and related objects.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "CreateWindowEx": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "ui",
+    "description": "Creates a window with extended styles.",
+    "dll": "user32.dll",
+    "severity": 0
+  },
+  "CredDelete": {
+    "attack": [
+      "T1555"
+    ],
+    "attacker_use": "Can access stored credentials or authentication secrets.",
+    "category": "credential",
+    "description": "Deletes a credential from a credential set.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "CredEnumerate": {
+    "attack": [
+      "T1555"
+    ],
+    "attacker_use": "Can access stored credentials or authentication secrets.",
+    "category": "credential",
+    "description": "Enumerates credentials in a credential set.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "CredFree": {
+    "attack": [
+      "T1555"
+    ],
+    "attacker_use": "Can access stored credentials or authentication secrets.",
+    "category": "credential",
+    "description": "Frees a credential management buffer.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "CredRead": {
+    "attack": [
+      "T1555"
+    ],
+    "attacker_use": "Can access stored credentials or authentication secrets.",
+    "category": "credential",
+    "description": "Reads a credential from a credential set.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "CredWrite": {
+    "attack": [
+      "T1555"
+    ],
+    "attacker_use": "Can access stored credentials or authentication secrets.",
+    "category": "credential",
+    "description": "Writes a credential to a credential set.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "CryptAcquireContext": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Acquires a cryptographic service provider handle.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "CryptBinaryToString": {
+    "attack": [],
+    "attacker_use": "Can encode data, inspect certificates or protect stored data.",
+    "category": "crypto",
+    "description": "Converts binary data to an encoded string.",
+    "dll": "crypt32.dll",
+    "severity": 1
+  },
+  "CryptCreateHash": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Creates a hash object.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "CryptDecrypt": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Decrypts data.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "CryptDeriveKey": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Derives a key from a hash value.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "CryptDestroyHash": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Destroys a hash object.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "CryptDestroyKey": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Destroys a cryptographic key.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "CryptEncrypt": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Encrypts data.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "CryptExportKey": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Exports a cryptographic key.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "CryptGenKey": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Generates a cryptographic key.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "CryptGenRandom": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Generates cryptographically random bytes.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "CryptGetHashParam": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Retrieves a hash parameter.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "CryptHashData": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Adds data to a hash.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "CryptImportKey": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Imports a cryptographic key.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "CryptProtectData": {
+    "attack": [],
+    "attacker_use": "Can encode data, inspect certificates or protect stored data.",
+    "category": "crypto",
+    "description": "Encrypts data using data protection services.",
+    "dll": "crypt32.dll",
+    "severity": 1
+  },
+  "CryptQueryObject": {
+    "attack": [],
+    "attacker_use": "Can encode data, inspect certificates or protect stored data.",
+    "category": "crypto",
+    "description": "Retrieves information about a cryptographic object.",
+    "dll": "crypt32.dll",
+    "severity": 1
+  },
+  "CryptReleaseContext": {
+    "attack": [],
+    "attacker_use": "Can encrypt payloads or files; cryptography alone is ordinary.",
+    "category": "crypto",
+    "description": "Releases a cryptographic provider handle.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "CryptStringToBinary": {
+    "attack": [],
+    "attacker_use": "Can encode data, inspect certificates or protect stored data.",
+    "category": "crypto",
+    "description": "Decodes a string into binary data.",
+    "dll": "crypt32.dll",
+    "severity": 1
+  },
+  "CryptUnprotectData": {
+    "attack": [
+      "T1555"
+    ],
+    "attacker_use": "Can decrypt stored application secrets in the current security context.",
+    "category": "credential",
+    "description": "Decrypts data protected by data protection services.",
+    "dll": "crypt32.dll",
+    "severity": 2
+  },
+  "DebugActiveProcess": {
+    "attack": [
+      "T1622"
+    ],
+    "attacker_use": "Can detect or interfere with debugging.",
+    "category": "anti_debug",
+    "description": "Attaches a debugger to an active process.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "DebugActiveProcessStop": {
+    "attack": [
+      "T1622"
+    ],
+    "attacker_use": "Can detect or interfere with debugging.",
+    "category": "anti_debug",
+    "description": "Stops debugging an active process.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "DebugBreak": {
+    "attack": [
+      "T1622"
+    ],
+    "attacker_use": "Can detect or interfere with debugging.",
+    "category": "anti_debug",
+    "description": "Raises a breakpoint exception in the calling process.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "DecryptFile": {
+    "attack": [],
+    "attacker_use": "Can access encrypted files when the current user has the required key.",
+    "category": "crypto",
+    "description": "Decrypts an encrypted file using the Encrypting File System.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "DeleteCriticalSection": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "synchronization",
+    "description": "Deletes a critical section.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "DeleteDC": {
+    "attack": [
+      "T1113"
+    ],
+    "attacker_use": "Can copy display pixels for screen capture.",
+    "category": "screen_capture",
+    "description": "Deletes a device context.",
+    "dll": "gdi32.dll",
+    "severity": 1
+  },
+  "DeleteFile": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Deletes an existing file.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "DeleteObject": {
+    "attack": [
+      "T1113"
+    ],
+    "attacker_use": "Can copy display pixels for screen capture.",
+    "category": "screen_capture",
+    "description": "Deletes a graphics object.",
+    "dll": "gdi32.dll",
+    "severity": 1
+  },
+  "DeleteService": {
+    "attack": [
+      "T1543.003"
+    ],
+    "attacker_use": "Can configure a service for execution or persistence.",
+    "category": "service",
+    "description": "Marks a service for deletion.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "DestroyWindow": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "ui",
+    "description": "Destroys a window.",
+    "dll": "user32.dll",
+    "severity": 0
+  },
+  "DeviceIoControl": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Sends a control code to a device driver.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "DisconnectNamedPipe": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Disconnects a named pipe client.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "DispatchMessage": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "ui",
+    "description": "Dispatches a message to a window procedure.",
+    "dll": "user32.dll",
+    "severity": 0
+  },
+  "DnsQuery": {
+    "attack": [],
+    "attacker_use": "Can resolve names or send DNS queries.",
+    "category": "network",
+    "description": "Queries DNS records.",
+    "dll": "dnsapi.dll",
+    "severity": 1
+  },
+  "DnsQueryEx": {
+    "attack": [],
+    "attacker_use": "Can resolve names or send DNS queries.",
+    "category": "network",
+    "description": "Performs an extended DNS query.",
+    "dll": "dnsapi.dll",
+    "severity": 1
+  },
+  "DnsRecordListFree": {
+    "attack": [],
+    "attacker_use": "Can resolve names or send DNS queries.",
+    "category": "network",
+    "description": "Frees a list of DNS records.",
+    "dll": "dnsapi.dll",
+    "severity": 1
+  },
+  "DuplicateHandle": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "synchronization",
+    "description": "Duplicates an object handle.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "DuplicateToken": {
+    "attack": [
+      "T1134"
+    ],
+    "attacker_use": "Can manipulate access tokens or impersonate another security context.",
+    "category": "privilege",
+    "description": "Creates an impersonation token.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "DuplicateTokenEx": {
+    "attack": [
+      "T1134"
+    ],
+    "attacker_use": "Can manipulate access tokens or impersonate another security context.",
+    "category": "privilege",
+    "description": "Creates a primary or impersonation token.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "EncryptFile": {
+    "attack": [],
+    "attacker_use": "Can deny access to files by enabling filesystem encryption.",
+    "category": "crypto",
+    "description": "Encrypts a file using the Encrypting File System.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "EnterCriticalSection": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "synchronization",
+    "description": "Acquires a critical section.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "EnumChildWindows": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "ui",
+    "description": "Enumerates child windows.",
+    "dll": "user32.dll",
+    "severity": 0
+  },
+  "EnumDeviceDrivers": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can enumerate processes, modules or drivers.",
+    "category": "enumeration",
+    "description": "Retrieves loaded device driver addresses.",
+    "dll": "psapi.dll",
+    "severity": 1
+  },
+  "EnumProcessModules": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can enumerate processes, modules or drivers.",
+    "category": "enumeration",
+    "description": "Retrieves module handles for a process.",
+    "dll": "psapi.dll",
+    "severity": 1
+  },
+  "EnumProcessModulesEx": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can enumerate processes, modules or drivers.",
+    "category": "enumeration",
+    "description": "Retrieves selected module handles for a process.",
+    "dll": "psapi.dll",
+    "severity": 1
+  },
+  "EnumProcesses": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can enumerate processes, modules or drivers.",
+    "category": "enumeration",
+    "description": "Retrieves process identifiers.",
+    "dll": "psapi.dll",
+    "severity": 1
+  },
+  "EnumServicesStatusEx": {
+    "attack": [
+      "T1543.003"
+    ],
+    "attacker_use": "Can configure a service for execution or persistence.",
+    "category": "service",
+    "description": "Enumerates services and their status.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "EnumSystemFirmwareTables": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Enumerates firmware tables.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "EnumWindows": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "ui",
+    "description": "Enumerates top-level windows.",
+    "dll": "user32.dll",
+    "severity": 0
+  },
+  "ExAllocatePoolWithTag": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Allocates tagged pool memory.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "ExFreePoolWithTag": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Frees tagged pool memory.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "ExitProcess": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Ends the calling process.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "ExitThread": {
+    "attack": [],
+    "attacker_use": "Can control execution or coordinate payload threads.",
+    "category": "thread",
+    "description": "Ends the calling thread.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "FindClose": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Closes a file search handle.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "FindFirstFile": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Searches for the first matching file.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "FindFirstFileEx": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Searches for the first matching file with extended options.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "FindNextFile": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Continues a file search.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "FindWindow": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "ui",
+    "description": "Finds a top-level window by class or title.",
+    "dll": "user32.dll",
+    "severity": 0
+  },
+  "FindWindowEx": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "ui",
+    "description": "Finds a child window by class or title.",
+    "dll": "user32.dll",
+    "severity": 0
+  },
+  "FlushFileBuffers": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Flushes buffered file data.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "FlushViewOfFile": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Writes mapped pages to disk.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "FreeEnvironmentStrings": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Frees an environment block.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "FreeLibrary": {
+    "attack": [
+      "T1027.007"
+    ],
+    "attacker_use": "Can resolve payload functionality at run time.",
+    "category": "dynamic_loading",
+    "description": "Decrements a loaded module reference count.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "FtpGetFile": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over internet protocols.",
+    "category": "internet",
+    "description": "Retrieves a file from an FTP server.",
+    "dll": "wininet.dll",
+    "severity": 1
+  },
+  "FtpPutFile": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over internet protocols.",
+    "category": "internet",
+    "description": "Uploads a file to an FTP server.",
+    "dll": "wininet.dll",
+    "severity": 1
+  },
+  "GetAdaptersAddresses": {
+    "attack": [
+      "T1016"
+    ],
+    "attacker_use": "Can discover network configuration and connections.",
+    "category": "enumeration",
+    "description": "Retrieves adapter addresses.",
+    "dll": "iphlpapi.dll",
+    "severity": 1
+  },
+  "GetAdaptersInfo": {
+    "attack": [
+      "T1016"
+    ],
+    "attacker_use": "Can discover network configuration and connections.",
+    "category": "enumeration",
+    "description": "Retrieves IPv4 adapter information.",
+    "dll": "iphlpapi.dll",
+    "severity": 1
+  },
+  "GetAddrInfo": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Resolves a host and service into addresses.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "GetAsyncKeyState": {
+    "attack": [
+      "T1056.001"
+    ],
+    "attacker_use": "Can observe or synthesize user input.",
+    "category": "keylogging_input",
+    "description": "Retrieves current and recent key state.",
+    "dll": "user32.dll",
+    "severity": 2
+  },
+  "GetCommandLine": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Retrieves the command line of the current process.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GetComputerName": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves the computer NetBIOS name.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetComputerNameEx": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves a specified computer name.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetCurrentDirectory": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Retrieves the current directory.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetCurrentProcess": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Returns a pseudo handle for the current process.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GetCurrentProcessId": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Returns the calling process identifier.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GetCurrentThread": {
+    "attack": [],
+    "attacker_use": "Can control execution or coordinate payload threads.",
+    "category": "thread",
+    "description": "Returns a pseudo handle for the current thread.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GetCurrentThreadId": {
+    "attack": [],
+    "attacker_use": "Can control execution or coordinate payload threads.",
+    "category": "thread",
+    "description": "Returns the calling thread identifier.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GetCursorPos": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "ui",
+    "description": "Retrieves the cursor position.",
+    "dll": "user32.dll",
+    "severity": 0
+  },
+  "GetDC": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "ui",
+    "description": "Retrieves a display device context.",
+    "dll": "user32.dll",
+    "severity": 0
+  },
+  "GetDIBits": {
+    "attack": [
+      "T1113"
+    ],
+    "attacker_use": "Can copy display pixels for screen capture.",
+    "category": "screen_capture",
+    "description": "Retrieves bitmap pixel data.",
+    "dll": "gdi32.dll",
+    "severity": 1
+  },
+  "GetDesktopWindow": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "ui",
+    "description": "Retrieves a handle to the desktop window.",
+    "dll": "user32.dll",
+    "severity": 0
+  },
+  "GetDeviceDriverBaseName": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can enumerate processes, modules or drivers.",
+    "category": "enumeration",
+    "description": "Retrieves a device driver base name.",
+    "dll": "psapi.dll",
+    "severity": 1
+  },
+  "GetDiskFreeSpaceEx": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Retrieves available disk space.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetDriveType": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Determines the type of a drive.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetEnvironmentStrings": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Retrieves the environment block of the current process.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GetEnvironmentVariable": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Retrieves an environment variable.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GetExitCodeProcess": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Retrieves a process termination status.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GetExtendedTcpTable": {
+    "attack": [
+      "T1016"
+    ],
+    "attacker_use": "Can discover network configuration and connections.",
+    "category": "enumeration",
+    "description": "Retrieves TCP connections with additional information.",
+    "dll": "iphlpapi.dll",
+    "severity": 1
+  },
+  "GetExtendedUdpTable": {
+    "attack": [
+      "T1016"
+    ],
+    "attacker_use": "Can discover network configuration and connections.",
+    "category": "enumeration",
+    "description": "Retrieves UDP endpoints with additional information.",
+    "dll": "iphlpapi.dll",
+    "severity": 1
+  },
+  "GetFileAttributes": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Retrieves file or directory attributes.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetFileAttributesEx": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Retrieves extended file attributes.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetFileSize": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Retrieves the size of a file.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetFileSizeEx": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Retrieves a file size as a 64-bit value.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetFileTime": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Retrieves file timestamps.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetForegroundWindow": {
+    "attack": [
+      "T1056.001"
+    ],
+    "attacker_use": "Can observe or synthesize user input.",
+    "category": "keylogging_input",
+    "description": "Retrieves the foreground window handle.",
+    "dll": "user32.dll",
+    "severity": 2
+  },
+  "GetFullPathName": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Retrieves the full path of a file.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetIpNetTable": {
+    "attack": [
+      "T1016"
+    ],
+    "attacker_use": "Can discover network configuration and connections.",
+    "category": "enumeration",
+    "description": "Retrieves the IPv4 neighbor table.",
+    "dll": "iphlpapi.dll",
+    "severity": 1
+  },
+  "GetKeyState": {
+    "attack": [
+      "T1056.001"
+    ],
+    "attacker_use": "Can observe or synthesize user input.",
+    "category": "keylogging_input",
+    "description": "Retrieves the state of a virtual key.",
+    "dll": "user32.dll",
+    "severity": 2
+  },
+  "GetKeyboardLayout": {
+    "attack": [
+      "T1056.001"
+    ],
+    "attacker_use": "Can observe or synthesize user input.",
+    "category": "keylogging_input",
+    "description": "Retrieves the active input locale identifier.",
+    "dll": "user32.dll",
+    "severity": 2
+  },
+  "GetKeyboardState": {
+    "attack": [
+      "T1056.001"
+    ],
+    "attacker_use": "Can observe or synthesize user input.",
+    "category": "keylogging_input",
+    "description": "Copies the keyboard key state table.",
+    "dll": "user32.dll",
+    "severity": 2
+  },
+  "GetLastInputInfo": {
+    "attack": [],
+    "attacker_use": "Can test for recent user activity before executing a payload.",
+    "category": "anti_vm",
+    "description": "Retrieves the time of the last input event.",
+    "dll": "user32.dll",
+    "severity": 1
+  },
+  "GetLocalTime": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves the current local time.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetLogicalDriveStrings": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Retrieves the valid drive names.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetLogicalDrives": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Retrieves a bitmask of logical drives.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetLongPathName": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Converts a path to its long form.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetMessage": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "ui",
+    "description": "Retrieves a message from the thread queue.",
+    "dll": "user32.dll",
+    "severity": 0
+  },
+  "GetModuleFileName": {
+    "attack": [
+      "T1027.007"
+    ],
+    "attacker_use": "Can resolve payload functionality at run time.",
+    "category": "dynamic_loading",
+    "description": "Retrieves the path of a loaded module.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GetModuleFileNameEx": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can enumerate processes, modules or drivers.",
+    "category": "enumeration",
+    "description": "Retrieves a module file name in another process.",
+    "dll": "psapi.dll",
+    "severity": 1
+  },
+  "GetModuleHandle": {
+    "attack": [
+      "T1027.007"
+    ],
+    "attacker_use": "Can resolve payload functionality at run time.",
+    "category": "dynamic_loading",
+    "description": "Retrieves a handle to a loaded module.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GetModuleHandleEx": {
+    "attack": [
+      "T1027.007"
+    ],
+    "attacker_use": "Can resolve payload functionality at run time.",
+    "category": "dynamic_loading",
+    "description": "Retrieves a loaded module handle with specified options.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GetModuleInformation": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can enumerate processes, modules or drivers.",
+    "category": "enumeration",
+    "description": "Retrieves information about a module.",
+    "dll": "psapi.dll",
+    "severity": 1
+  },
+  "GetNativeSystemInfo": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves native system configuration information.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetNetworkParams": {
+    "attack": [
+      "T1016"
+    ],
+    "attacker_use": "Can discover network configuration and connections.",
+    "category": "enumeration",
+    "description": "Retrieves local network parameters.",
+    "dll": "iphlpapi.dll",
+    "severity": 1
+  },
+  "GetProcAddress": {
+    "attack": [
+      "T1027.007"
+    ],
+    "attacker_use": "Can resolve payload functionality at run time.",
+    "category": "dynamic_loading",
+    "description": "Retrieves the address of an exported function or variable.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GetProcessDEPPolicy": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Retrieves a process DEP policy.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GetProcessHeap": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Returns the default process heap.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GetProcessHeaps": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Retrieves handles to process heaps.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GetProcessId": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Returns a process identifier from its handle.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GetProcessImageFileName": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can enumerate processes, modules or drivers.",
+    "category": "enumeration",
+    "description": "Retrieves the process executable file name.",
+    "dll": "psapi.dll",
+    "severity": 1
+  },
+  "GetProcessTimes": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Retrieves process timing information.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GetRawInputData": {
+    "attack": [
+      "T1056.001"
+    ],
+    "attacker_use": "Can observe or synthesize user input.",
+    "category": "keylogging_input",
+    "description": "Retrieves raw input data.",
+    "dll": "user32.dll",
+    "severity": 2
+  },
+  "GetRawInputDeviceList": {
+    "attack": [
+      "T1056.001"
+    ],
+    "attacker_use": "Can observe or synthesize user input.",
+    "category": "keylogging_input",
+    "description": "Enumerates raw input devices.",
+    "dll": "user32.dll",
+    "severity": 2
+  },
+  "GetSecurityInfo": {
+    "attack": [
+      "T1134"
+    ],
+    "attacker_use": "Can manipulate access tokens or impersonate another security context.",
+    "category": "privilege",
+    "description": "Retrieves security information about an object.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "GetShortPathName": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Retrieves the short form of a path.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetStartupInfo": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Retrieves the startup parameters of the current process.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GetSystemDefaultLangID": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves the system default language identifier.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetSystemDirectory": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Retrieves the system directory.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetSystemFirmwareTable": {
+    "attack": [],
+    "attacker_use": "Can inspect firmware identifiers for virtualization artefacts.",
+    "category": "anti_vm",
+    "description": "Retrieves a firmware table.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GetSystemInfo": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves system configuration information for the calling environment.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetSystemMetrics": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "ui",
+    "description": "Retrieves a system metric or configuration setting.",
+    "dll": "user32.dll",
+    "severity": 0
+  },
+  "GetSystemPowerStatus": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves system power information.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetSystemTime": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves the current UTC system time.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetSystemTimeAsFileTime": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves the system time as a file time.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetTcpTable": {
+    "attack": [
+      "T1016"
+    ],
+    "attacker_use": "Can discover network configuration and connections.",
+    "category": "enumeration",
+    "description": "Retrieves IPv4 TCP connections.",
+    "dll": "iphlpapi.dll",
+    "severity": 1
+  },
+  "GetTempFileName": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Creates a name for a temporary file.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetTempPath": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Retrieves the temporary file directory.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetThreadContext": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate another process during code injection.",
+    "category": "injection",
+    "description": "Retrieves a thread context.",
+    "dll": "kernel32.dll",
+    "severity": 2
+  },
+  "GetThreadId": {
+    "attack": [],
+    "attacker_use": "Can control execution or coordinate payload threads.",
+    "category": "thread",
+    "description": "Returns the identifier of a thread.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GetThreadPriority": {
+    "attack": [],
+    "attacker_use": "Can control execution or coordinate payload threads.",
+    "category": "thread",
+    "description": "Retrieves a thread priority.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GetTickCount": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves elapsed milliseconds since system startup.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetTickCount64": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves elapsed milliseconds since startup as a 64-bit value.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetTokenInformation": {
+    "attack": [
+      "T1134"
+    ],
+    "attacker_use": "Can manipulate access tokens or impersonate another security context.",
+    "category": "privilege",
+    "description": "Retrieves information about an access token.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "GetUdpTable": {
+    "attack": [
+      "T1016"
+    ],
+    "attacker_use": "Can discover network configuration and connections.",
+    "category": "enumeration",
+    "description": "Retrieves IPv4 UDP endpoints.",
+    "dll": "iphlpapi.dll",
+    "severity": 1
+  },
+  "GetUserDefaultLangID": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves the user default language identifier.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetUserName": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves the user name associated with the calling thread.",
+    "dll": "advapi32.dll",
+    "severity": 0
+  },
+  "GetUserNameEx": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves a user name in a specified format.",
+    "dll": "secur32.dll",
+    "severity": 0
+  },
+  "GetVersionEx": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves operating system version information.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetVolumeInformation": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Retrieves information about a volume.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GetWindowText": {
+    "attack": [
+      "T1056.001"
+    ],
+    "attacker_use": "Can observe or synthesize user input.",
+    "category": "keylogging_input",
+    "description": "Retrieves window title text.",
+    "dll": "user32.dll",
+    "severity": 2
+  },
+  "GetWindowThreadProcessId": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "ui",
+    "description": "Retrieves the thread and process that created a window.",
+    "dll": "user32.dll",
+    "severity": 0
+  },
+  "GetWindowsDirectory": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Retrieves the Windows directory.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GlobalAlloc": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Allocates global memory.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GlobalFree": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Frees global memory.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GlobalLock": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Locks a global memory object.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "GlobalMemoryStatusEx": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves physical and virtual memory information.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "GlobalUnlock": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Unlocks a global memory object.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "HeapAlloc": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Allocates memory from a heap.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "HeapCreate": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Creates a private heap.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "HeapDestroy": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Destroys a private heap.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "HeapFree": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Frees a heap allocation.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "HeapReAlloc": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Resizes a heap allocation.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "HeapSize": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Returns the size of a heap allocation.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "HeapWalk": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Enumerates blocks in a heap.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "HttpAddRequestHeaders": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over internet protocols.",
+    "category": "internet",
+    "description": "Adds HTTP request headers.",
+    "dll": "wininet.dll",
+    "severity": 1
+  },
+  "HttpEndRequest": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over internet protocols.",
+    "category": "internet",
+    "description": "Ends an extended HTTP request.",
+    "dll": "wininet.dll",
+    "severity": 1
+  },
+  "HttpOpenRequest": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over internet protocols.",
+    "category": "internet",
+    "description": "Creates an HTTP request handle.",
+    "dll": "wininet.dll",
+    "severity": 1
+  },
+  "HttpQueryInfo": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over internet protocols.",
+    "category": "internet",
+    "description": "Retrieves HTTP headers or status information.",
+    "dll": "wininet.dll",
+    "severity": 1
+  },
+  "HttpSendRequest": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over internet protocols.",
+    "category": "internet",
+    "description": "Sends an HTTP request.",
+    "dll": "wininet.dll",
+    "severity": 1
+  },
+  "HttpSendRequestEx": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over internet protocols.",
+    "category": "internet",
+    "description": "Starts sending an extended HTTP request.",
+    "dll": "wininet.dll",
+    "severity": 1
+  },
+  "ImpersonateLoggedOnUser": {
+    "attack": [
+      "T1134"
+    ],
+    "attacker_use": "Can manipulate access tokens or impersonate another security context.",
+    "category": "privilege",
+    "description": "Impersonates the security context of a logged-on user.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "ImpersonateNamedPipeClient": {
+    "attack": [
+      "T1134"
+    ],
+    "attacker_use": "Can manipulate access tokens or impersonate another security context.",
+    "category": "privilege",
+    "description": "Impersonates a named pipe client.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "InitializeCriticalSection": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "synchronization",
+    "description": "Initializes a critical section.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "InternetCloseHandle": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over internet protocols.",
+    "category": "internet",
+    "description": "Closes an internet handle.",
+    "dll": "wininet.dll",
+    "severity": 1
+  },
+  "InternetConnect": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over internet protocols.",
+    "category": "internet",
+    "description": "Opens an FTP or HTTP server session.",
+    "dll": "wininet.dll",
+    "severity": 1
+  },
+  "InternetCrackUrl": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over internet protocols.",
+    "category": "internet",
+    "description": "Splits a URL into components.",
+    "dll": "wininet.dll",
+    "severity": 1
+  },
+  "InternetGetConnectedState": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over internet protocols.",
+    "category": "internet",
+    "description": "Retrieves internet connection state.",
+    "dll": "wininet.dll",
+    "severity": 1
+  },
+  "InternetOpen": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over internet protocols.",
+    "category": "internet",
+    "description": "Initializes an internet session.",
+    "dll": "wininet.dll",
+    "severity": 1
+  },
+  "InternetOpenUrl": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over internet protocols.",
+    "category": "internet",
+    "description": "Opens a resource specified by a URL.",
+    "dll": "wininet.dll",
+    "severity": 1
+  },
+  "InternetQueryOption": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over internet protocols.",
+    "category": "internet",
+    "description": "Retrieves an internet option.",
+    "dll": "wininet.dll",
+    "severity": 1
+  },
+  "InternetReadFile": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over internet protocols.",
+    "category": "internet",
+    "description": "Reads data from an internet handle.",
+    "dll": "wininet.dll",
+    "severity": 1
+  },
+  "InternetSetOption": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over internet protocols.",
+    "category": "internet",
+    "description": "Sets an internet option.",
+    "dll": "wininet.dll",
+    "severity": 1
+  },
+  "InternetWriteFile": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over internet protocols.",
+    "category": "internet",
+    "description": "Writes data to an internet handle.",
+    "dll": "wininet.dll",
+    "severity": 1
+  },
+  "IoCompleteRequest": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Completes an I/O request packet.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "IoCreateDevice": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Creates a device object.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "IoCreateSymbolicLink": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Creates a symbolic link for a device.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "IoDeleteDevice": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Deletes a device object.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "IoDeleteSymbolicLink": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Deletes a symbolic link.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "IsDebuggerPresent": {
+    "attack": [
+      "T1622"
+    ],
+    "attacker_use": "Can detect or interfere with debugging.",
+    "category": "anti_debug",
+    "description": "Determines whether the calling process is being debugged.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "IsWow64Process": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Determines whether a process runs under WOW64.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "IsWow64Process2": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Retrieves process and native machine architecture information.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "KeDelayExecutionThread": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Waits for a specified interval.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "KeInitializeApc": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Initializes an APC object.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "KeInsertQueueApc": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Queues an APC object.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "KeStackAttachProcess": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Attaches a thread to a process address space.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "KeUnstackDetachProcess": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Detaches a thread from an attached process.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "LdrGetProcedureAddress": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Retrieves the address of an exported procedure.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "LdrLoadDll": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Loads a DLL into a process.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "LdrUnloadDll": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Unloads a DLL.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "LeaveCriticalSection": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "synchronization",
+    "description": "Releases a critical section.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "LoadLibrary": {
+    "attack": [
+      "T1027.007"
+    ],
+    "attacker_use": "Can resolve payload functionality at run time.",
+    "category": "dynamic_loading",
+    "description": "Loads a module into the calling process.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "LoadLibraryEx": {
+    "attack": [
+      "T1027.007"
+    ],
+    "attacker_use": "Can resolve payload functionality at run time.",
+    "category": "dynamic_loading",
+    "description": "Loads a module with specified options.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "LoadTypeLib": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "com",
+    "description": "Loads a type library.",
+    "dll": "oleaut32.dll",
+    "severity": 0
+  },
+  "LocalAlloc": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Allocates local memory.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "LocalFree": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Frees local memory.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "LogonUser": {
+    "attack": [
+      "T1134"
+    ],
+    "attacker_use": "Can manipulate access tokens or impersonate another security context.",
+    "category": "privilege",
+    "description": "Attempts to log a user on to the local computer.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "LookupPrivilegeName": {
+    "attack": [
+      "T1134"
+    ],
+    "attacker_use": "Can manipulate access tokens or impersonate another security context.",
+    "category": "privilege",
+    "description": "Retrieves the name of a privilege.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "LookupPrivilegeValue": {
+    "attack": [
+      "T1134"
+    ],
+    "attacker_use": "Can manipulate access tokens or impersonate another security context.",
+    "category": "privilege",
+    "description": "Retrieves a privilege locally unique identifier.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "LsaEnumerateLogonSessions": {
+    "attack": [
+      "T1555"
+    ],
+    "attacker_use": "Can access stored credentials or authentication secrets.",
+    "category": "credential",
+    "description": "Retrieves identifiers of existing logon sessions.",
+    "dll": "secur32.dll",
+    "severity": 2
+  },
+  "LsaGetLogonSessionData": {
+    "attack": [
+      "T1555"
+    ],
+    "attacker_use": "Can access stored credentials or authentication secrets.",
+    "category": "credential",
+    "description": "Retrieves information about a logon session.",
+    "dll": "secur32.dll",
+    "severity": 2
+  },
+  "LsaOpenPolicy": {
+    "attack": [
+      "T1555"
+    ],
+    "attacker_use": "Can access stored credentials or authentication secrets.",
+    "category": "credential",
+    "description": "Opens a handle to a policy object.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "LsaRetrievePrivateData": {
+    "attack": [
+      "T1555"
+    ],
+    "attacker_use": "Can access stored credentials or authentication secrets.",
+    "category": "credential",
+    "description": "Retrieves private data from a policy object.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "LsaStorePrivateData": {
+    "attack": [
+      "T1555"
+    ],
+    "attacker_use": "Can access stored credentials or authentication secrets.",
+    "category": "credential",
+    "description": "Stores private data in a policy object.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "MapViewOfFile": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Maps a view of a file mapping into a process.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "MapViewOfFileEx": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Maps a file view at a specified address.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "MessageBox": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "ui",
+    "description": "Displays a message box.",
+    "dll": "user32.dll",
+    "severity": 0
+  },
+  "MiniDumpWriteDump": {
+    "attack": [
+      "T1003.001"
+    ],
+    "attacker_use": "Can write process memory dumps that may contain credentials.",
+    "category": "credential",
+    "description": "Writes user-mode minidump information to a file.",
+    "dll": "dbghelp.dll",
+    "severity": 2
+  },
+  "MmCopyMemory": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Copies virtual or physical memory into a buffer.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "MmGetSystemRoutineAddress": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Retrieves the address of an exported kernel routine.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "MmMapIoSpace": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Maps physical I/O space into system virtual address space.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "MmUnmapIoSpace": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Unmaps previously mapped I/O space.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "Module32First": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Retrieves the first module in a snapshot.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "Module32Next": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Retrieves the next module in a snapshot.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "MoveFile": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Moves a file or directory.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "MoveFileEx": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Moves a file with extended options.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "NCryptCreatePersistedKey": {
+    "attack": [],
+    "attacker_use": "Can access persisted cryptographic keys.",
+    "category": "crypto",
+    "description": "Creates a key in a key storage provider.",
+    "dll": "ncrypt.dll",
+    "severity": 1
+  },
+  "NCryptDecrypt": {
+    "attack": [],
+    "attacker_use": "Can access persisted cryptographic keys.",
+    "category": "crypto",
+    "description": "Decrypts data using a key.",
+    "dll": "ncrypt.dll",
+    "severity": 1
+  },
+  "NCryptEncrypt": {
+    "attack": [],
+    "attacker_use": "Can access persisted cryptographic keys.",
+    "category": "crypto",
+    "description": "Encrypts data using a key.",
+    "dll": "ncrypt.dll",
+    "severity": 1
+  },
+  "NCryptExportKey": {
+    "attack": [],
+    "attacker_use": "Can access persisted cryptographic keys.",
+    "category": "crypto",
+    "description": "Exports a key to a blob.",
+    "dll": "ncrypt.dll",
+    "severity": 1
+  },
+  "NCryptFinalizeKey": {
+    "attack": [],
+    "attacker_use": "Can access persisted cryptographic keys.",
+    "category": "crypto",
+    "description": "Completes creation of a persisted key.",
+    "dll": "ncrypt.dll",
+    "severity": 1
+  },
+  "NCryptFreeObject": {
+    "attack": [],
+    "attacker_use": "Can access persisted cryptographic keys.",
+    "category": "crypto",
+    "description": "Frees a key storage object.",
+    "dll": "ncrypt.dll",
+    "severity": 1
+  },
+  "NCryptOpenKey": {
+    "attack": [],
+    "attacker_use": "Can access persisted cryptographic keys.",
+    "category": "crypto",
+    "description": "Opens a persisted key.",
+    "dll": "ncrypt.dll",
+    "severity": 1
+  },
+  "NCryptOpenStorageProvider": {
+    "attack": [],
+    "attacker_use": "Can access persisted cryptographic keys.",
+    "category": "crypto",
+    "description": "Opens a key storage provider.",
+    "dll": "ncrypt.dll",
+    "severity": 1
+  },
+  "NetApiBufferFree": {
+    "attack": [
+      "T1018"
+    ],
+    "attacker_use": "Can enumerate users, shares or network systems.",
+    "category": "enumeration",
+    "description": "Frees a network management buffer.",
+    "dll": "netapi32.dll",
+    "severity": 1
+  },
+  "NetGetJoinInformation": {
+    "attack": [
+      "T1018"
+    ],
+    "attacker_use": "Can enumerate users, shares or network systems.",
+    "category": "enumeration",
+    "description": "Retrieves domain join status.",
+    "dll": "netapi32.dll",
+    "severity": 1
+  },
+  "NetLocalGroupEnum": {
+    "attack": [
+      "T1018"
+    ],
+    "attacker_use": "Can enumerate users, shares or network systems.",
+    "category": "enumeration",
+    "description": "Enumerates local groups.",
+    "dll": "netapi32.dll",
+    "severity": 1
+  },
+  "NetLocalGroupGetMembers": {
+    "attack": [
+      "T1018"
+    ],
+    "attacker_use": "Can enumerate users, shares or network systems.",
+    "category": "enumeration",
+    "description": "Retrieves local group members.",
+    "dll": "netapi32.dll",
+    "severity": 1
+  },
+  "NetServerEnum": {
+    "attack": [
+      "T1018"
+    ],
+    "attacker_use": "Can enumerate users, shares or network systems.",
+    "category": "enumeration",
+    "description": "Enumerates visible servers of a specified type.",
+    "dll": "netapi32.dll",
+    "severity": 1
+  },
+  "NetSessionEnum": {
+    "attack": [
+      "T1018"
+    ],
+    "attacker_use": "Can enumerate users, shares or network systems.",
+    "category": "enumeration",
+    "description": "Enumerates sessions on a server.",
+    "dll": "netapi32.dll",
+    "severity": 1
+  },
+  "NetShareEnum": {
+    "attack": [
+      "T1018"
+    ],
+    "attacker_use": "Can enumerate users, shares or network systems.",
+    "category": "enumeration",
+    "description": "Enumerates shared resources on a server.",
+    "dll": "netapi32.dll",
+    "severity": 1
+  },
+  "NetUserEnum": {
+    "attack": [
+      "T1018"
+    ],
+    "attacker_use": "Can enumerate users, shares or network systems.",
+    "category": "enumeration",
+    "description": "Enumerates user accounts on a server.",
+    "dll": "netapi32.dll",
+    "severity": 1
+  },
+  "NetUserGetInfo": {
+    "attack": [
+      "T1018"
+    ],
+    "attacker_use": "Can enumerate users, shares or network systems.",
+    "category": "enumeration",
+    "description": "Retrieves information about a user account.",
+    "dll": "netapi32.dll",
+    "severity": 1
+  },
+  "NetWkstaGetInfo": {
+    "attack": [
+      "T1018"
+    ],
+    "attacker_use": "Can enumerate users, shares or network systems.",
+    "category": "enumeration",
+    "description": "Retrieves workstation configuration information.",
+    "dll": "netapi32.dll",
+    "severity": 1
+  },
+  "NtAdjustPrivilegesToken": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Adjusts privileges in a token.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtAllocateVirtualMemory": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Reserves or commits virtual memory in a process.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "NtClose": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Closes an object handle.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtCreateFile": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Creates or opens a file object.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtCreateSection": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Creates a section object.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "NtCreateThreadEx": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Creates a thread with extended attributes.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "NtDelayExecution": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Suspends the calling thread for an interval.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtDeviceIoControlFile": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Sends a device control request.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtDuplicateObject": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Duplicates an object handle.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtFreeVirtualMemory": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Releases or decommits virtual memory in a process.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "NtGetContextThread": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Retrieves a thread context.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "NtLoadDriver": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Loads a kernel driver.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtMapViewOfSection": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Maps a section view into a process.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "NtOpenFile": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Opens a file object.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtOpenProcess": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Opens a process object.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtOpenProcessToken": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Opens a process token.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtOpenSection": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Opens a section object.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "NtOpenThread": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Opens a thread object.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtProtectVirtualMemory": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Changes protection on process virtual memory.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "NtQueryDirectoryFile": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Retrieves directory entries.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtQueryInformationProcess": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Retrieves information about a process.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtQueryInformationThread": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Retrieves information about a thread.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtQueryObject": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Retrieves object information.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtQuerySystemInformation": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Retrieves system information.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtQueueApcThread": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Queues an asynchronous procedure call to a thread.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "NtReadFile": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Reads data from a file object.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtReadVirtualMemory": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Reads virtual memory from a process.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "NtResumeThread": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Resumes a suspended thread.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "NtSetContextThread": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Sets a thread context.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "NtSetInformationProcess": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Sets information on a process.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtSetInformationThread": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Sets information on a thread.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtSuspendThread": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Suspends a thread.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "NtTerminateProcess": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Terminates a process.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtTerminateThread": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Terminates a thread.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtUnloadDriver": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Unloads a kernel driver.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtUnmapViewOfSection": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Unmaps a section view from a process.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "NtWaitForSingleObject": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Waits for an object to become signaled.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtWriteFile": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Writes data to a file object.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "NtWriteVirtualMemory": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Writes virtual memory to a process.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "ObDereferenceObject": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Decrements an object reference count.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "ObReferenceObjectByHandle": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "References an object using a handle.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "ObRegisterCallbacks": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Registers object handle operation callbacks.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "ObUnRegisterCallbacks": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Removes object handle operation callbacks.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "OpenDesktop": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "ui",
+    "description": "Opens a desktop object.",
+    "dll": "user32.dll",
+    "severity": 0
+  },
+  "OpenEvent": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "synchronization",
+    "description": "Opens an existing event object.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "OpenFileMapping": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Opens a named file mapping object.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "OpenMutex": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "synchronization",
+    "description": "Opens an existing named mutex.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "OpenProcess": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Opens an existing process object.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "OpenProcessToken": {
+    "attack": [
+      "T1134"
+    ],
+    "attacker_use": "Can manipulate access tokens or impersonate another security context.",
+    "category": "privilege",
+    "description": "Opens a process access token.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "OpenSCManager": {
+    "attack": [
+      "T1543.003"
+    ],
+    "attacker_use": "Can configure a service for execution or persistence.",
+    "category": "service",
+    "description": "Opens the service control manager database.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "OpenService": {
+    "attack": [
+      "T1543.003"
+    ],
+    "attacker_use": "Can configure a service for execution or persistence.",
+    "category": "service",
+    "description": "Opens an existing service.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "OpenThread": {
+    "attack": [],
+    "attacker_use": "Can control execution or coordinate payload threads.",
+    "category": "thread",
+    "description": "Opens an existing thread object.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "OpenThreadToken": {
+    "attack": [
+      "T1134"
+    ],
+    "attacker_use": "Can manipulate access tokens or impersonate another security context.",
+    "category": "privilege",
+    "description": "Opens a thread access token.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "OutputDebugString": {
+    "attack": [
+      "T1622"
+    ],
+    "attacker_use": "Can detect or interfere with debugging.",
+    "category": "anti_debug",
+    "description": "Sends a string to the debugger.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "PeekNamedPipe": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Copies pipe data without removing it.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "PostMessage": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "ui",
+    "description": "Posts a message to a thread message queue.",
+    "dll": "user32.dll",
+    "severity": 0
+  },
+  "Process32First": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Retrieves the first process in a snapshot.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "Process32Next": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Retrieves the next process in a snapshot.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "PsLookupProcessByProcessId": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Retrieves a referenced process object by identifier.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "PsLookupThreadByThreadId": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Retrieves a referenced thread object by identifier.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "PsSetCreateProcessNotifyRoutine": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Registers or removes a process creation callback.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "PsSetCreateProcessNotifyRoutineEx": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Registers or removes an extended process creation callback.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "PsSetCreateThreadNotifyRoutine": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Registers a thread creation callback.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "PsSetLoadImageNotifyRoutine": {
+    "attack": [
+      "T1014"
+    ],
+    "attacker_use": "Can implement kernel-mode monitoring or manipulation.",
+    "category": "driver_kernel",
+    "description": "Registers an image load callback.",
+    "dll": "ntoskrnl.exe",
+    "severity": 2
+  },
+  "QueryFullProcessImageName": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Retrieves the executable image name of a process.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "QueryPerformanceCounter": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves the current performance counter value.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "QueryPerformanceFrequency": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "system_info",
+    "description": "Retrieves the performance counter frequency.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "QueryServiceConfig": {
+    "attack": [
+      "T1543.003"
+    ],
+    "attacker_use": "Can configure a service for execution or persistence.",
+    "category": "service",
+    "description": "Retrieves service configuration parameters.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "QueryServiceStatusEx": {
+    "attack": [
+      "T1543.003"
+    ],
+    "attacker_use": "Can configure a service for execution or persistence.",
+    "category": "service",
+    "description": "Retrieves extended service status.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "QueueUserAPC": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate another process during code injection.",
+    "category": "injection",
+    "description": "Queues a user-mode asynchronous procedure call to a thread.",
+    "dll": "kernel32.dll",
+    "severity": 2
+  },
+  "RaiseException": {
+    "attack": [
+      "T1622"
+    ],
+    "attacker_use": "Can detect or interfere with debugging.",
+    "category": "anti_debug",
+    "description": "Raises a software exception.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "ReadFile": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Reads data from a file or device.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "ReadFileEx": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Reads data asynchronously with a completion routine.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "ReadProcessMemory": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate another process during code injection.",
+    "category": "injection",
+    "description": "Reads memory from a specified process.",
+    "dll": "kernel32.dll",
+    "severity": 2
+  },
+  "RegCloseKey": {
+    "attack": [
+      "T1112"
+    ],
+    "attacker_use": "Can inspect or change system configuration and persistence settings.",
+    "category": "registry",
+    "description": "Closes a registry key handle.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "RegConnectRegistry": {
+    "attack": [
+      "T1112"
+    ],
+    "attacker_use": "Can inspect or change system configuration and persistence settings.",
+    "category": "registry",
+    "description": "Connects to a registry on another computer.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "RegCreateKey": {
+    "attack": [
+      "T1112"
+    ],
+    "attacker_use": "Can inspect or change system configuration and persistence settings.",
+    "category": "registry",
+    "description": "Creates or opens a registry key.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "RegCreateKeyEx": {
+    "attack": [
+      "T1112"
+    ],
+    "attacker_use": "Can inspect or change system configuration and persistence settings.",
+    "category": "registry",
+    "description": "Creates or opens a registry key with extended options.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "RegDeleteKey": {
+    "attack": [
+      "T1112"
+    ],
+    "attacker_use": "Can inspect or change system configuration and persistence settings.",
+    "category": "registry",
+    "description": "Deletes a registry key.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "RegDeleteKeyEx": {
+    "attack": [
+      "T1112"
+    ],
+    "attacker_use": "Can inspect or change system configuration and persistence settings.",
+    "category": "registry",
+    "description": "Deletes a key in a specified registry view.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "RegDeleteTree": {
+    "attack": [
+      "T1112"
+    ],
+    "attacker_use": "Can inspect or change system configuration and persistence settings.",
+    "category": "registry",
+    "description": "Deletes subkeys and values recursively.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "RegDeleteValue": {
+    "attack": [
+      "T1112"
+    ],
+    "attacker_use": "Can inspect or change system configuration and persistence settings.",
+    "category": "registry",
+    "description": "Deletes a named registry value.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "RegEnumKey": {
+    "attack": [
+      "T1112"
+    ],
+    "attacker_use": "Can inspect or change system configuration and persistence settings.",
+    "category": "registry",
+    "description": "Enumerates subkeys of a registry key.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "RegEnumKeyEx": {
+    "attack": [
+      "T1112"
+    ],
+    "attacker_use": "Can inspect or change system configuration and persistence settings.",
+    "category": "registry",
+    "description": "Enumerates subkeys and associated information.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "RegEnumValue": {
+    "attack": [
+      "T1112"
+    ],
+    "attacker_use": "Can inspect or change system configuration and persistence settings.",
+    "category": "registry",
+    "description": "Enumerates registry values.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "RegGetValue": {
+    "attack": [
+      "T1112"
+    ],
+    "attacker_use": "Can inspect or change system configuration and persistence settings.",
+    "category": "registry",
+    "description": "Retrieves a registry value.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "RegLoadKey": {
+    "attack": [
+      "T1112"
+    ],
+    "attacker_use": "Can inspect or change system configuration and persistence settings.",
+    "category": "registry",
+    "description": "Loads registry data into a subkey.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "RegNotifyChangeKeyValue": {
+    "attack": [
+      "T1112"
+    ],
+    "attacker_use": "Can inspect or change system configuration and persistence settings.",
+    "category": "registry",
+    "description": "Requests notification of registry changes.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "RegOpenKey": {
+    "attack": [
+      "T1112"
+    ],
+    "attacker_use": "Can inspect or change system configuration and persistence settings.",
+    "category": "registry",
+    "description": "Opens a registry key.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "RegOpenKeyEx": {
+    "attack": [
+      "T1112"
+    ],
+    "attacker_use": "Can inspect or change system configuration and persistence settings.",
+    "category": "registry",
+    "description": "Opens a registry key with specified access.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "RegQueryValue": {
+    "attack": [
+      "T1112"
+    ],
+    "attacker_use": "Can inspect or change system configuration and persistence settings.",
+    "category": "registry",
+    "description": "Retrieves the default value of a registry key.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "RegQueryValueEx": {
+    "attack": [
+      "T1112"
+    ],
+    "attacker_use": "Can inspect or change system configuration and persistence settings.",
+    "category": "registry",
+    "description": "Retrieves the type and data of a registry value.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "RegRestoreKey": {
+    "attack": [
+      "T1112"
+    ],
+    "attacker_use": "Can inspect or change system configuration and persistence settings.",
+    "category": "registry",
+    "description": "Restores registry data from a file.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "RegSaveKey": {
+    "attack": [
+      "T1112"
+    ],
+    "attacker_use": "Can inspect or change system configuration and persistence settings.",
+    "category": "registry",
+    "description": "Saves a registry key and its descendants to a file.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "RegSetValue": {
+    "attack": [
+      "T1112"
+    ],
+    "attacker_use": "Can inspect or change system configuration and persistence settings.",
+    "category": "registry",
+    "description": "Sets the default value of a registry key.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "RegSetValueEx": {
+    "attack": [
+      "T1112"
+    ],
+    "attacker_use": "Can inspect or change system configuration and persistence settings.",
+    "category": "registry",
+    "description": "Sets the data and type of a registry value.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "RegisterClassEx": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "ui",
+    "description": "Registers an extended window class.",
+    "dll": "user32.dll",
+    "severity": 0
+  },
+  "RegisterRawInputDevices": {
+    "attack": [
+      "T1056.001"
+    ],
+    "attacker_use": "Can observe or synthesize user input.",
+    "category": "keylogging_input",
+    "description": "Registers devices that supply raw input.",
+    "dll": "user32.dll",
+    "severity": 2
+  },
+  "RegisterServiceCtrlHandlerEx": {
+    "attack": [
+      "T1543.003"
+    ],
+    "attacker_use": "Can configure a service for execution or persistence.",
+    "category": "service",
+    "description": "Registers an extended service control handler.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "ReleaseDC": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "ui",
+    "description": "Releases a device context.",
+    "dll": "user32.dll",
+    "severity": 0
+  },
+  "ReleaseMutex": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "synchronization",
+    "description": "Releases ownership of a mutex.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "ReleaseSemaphore": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "synchronization",
+    "description": "Increases a semaphore count.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "RemoveDirectory": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Deletes an empty directory.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "RemoveVectoredExceptionHandler": {
+    "attack": [
+      "T1622"
+    ],
+    "attacker_use": "Can detect or interfere with debugging.",
+    "category": "anti_debug",
+    "description": "Removes a vectored exception handler.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "ResetEvent": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "synchronization",
+    "description": "Resets an event to the nonsignaled state.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "ResumeThread": {
+    "attack": [],
+    "attacker_use": "Can control execution or coordinate payload threads.",
+    "category": "thread",
+    "description": "Decrements a thread suspension count.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "RevertToSelf": {
+    "attack": [
+      "T1134"
+    ],
+    "attacker_use": "Can manipulate access tokens or impersonate another security context.",
+    "category": "privilege",
+    "description": "Ends thread impersonation.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "RtlAdjustPrivilege": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Enables or disables a privilege.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "RtlCompressBuffer": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Compresses a buffer.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "RtlCopyMemory": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Copies a memory block.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "RtlCreateUserThread": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Creates a user-mode thread.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "RtlDecompressBuffer": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Decompresses a buffer.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "RtlGetVersion": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Retrieves operating system version information.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "RtlInitUnicodeString": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Initializes a counted Unicode string.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "RtlMoveMemory": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Copies a memory block allowing overlap.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "RtlZeroMemory": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Fills a memory block with zeros.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "SHFileOperation": {
+    "attack": [
+      "T1218"
+    ],
+    "attacker_use": "Can launch programs or invoke shell functionality.",
+    "category": "execution",
+    "description": "Copies, moves, renames or deletes files through the shell.",
+    "dll": "shell32.dll",
+    "severity": 1
+  },
+  "SHGetFolderPath": {
+    "attack": [
+      "T1218"
+    ],
+    "attacker_use": "Can launch programs or invoke shell functionality.",
+    "category": "execution",
+    "description": "Retrieves a special folder path.",
+    "dll": "shell32.dll",
+    "severity": 1
+  },
+  "SHGetKnownFolderPath": {
+    "attack": [
+      "T1218"
+    ],
+    "attacker_use": "Can launch programs or invoke shell functionality.",
+    "category": "execution",
+    "description": "Retrieves a known folder path.",
+    "dll": "shell32.dll",
+    "severity": 1
+  },
+  "SafeArrayCreate": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "com",
+    "description": "Creates a safe array.",
+    "dll": "oleaut32.dll",
+    "severity": 0
+  },
+  "SafeArrayDestroy": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "com",
+    "description": "Destroys a safe array.",
+    "dll": "oleaut32.dll",
+    "severity": 0
+  },
+  "SelectObject": {
+    "attack": [
+      "T1113"
+    ],
+    "attacker_use": "Can copy display pixels for screen capture.",
+    "category": "screen_capture",
+    "description": "Selects an object into a device context.",
+    "dll": "gdi32.dll",
+    "severity": 1
+  },
+  "SendARP": {
+    "attack": [
+      "T1016"
+    ],
+    "attacker_use": "Can discover network configuration and connections.",
+    "category": "enumeration",
+    "description": "Sends an ARP request.",
+    "dll": "iphlpapi.dll",
+    "severity": 1
+  },
+  "SendInput": {
+    "attack": [
+      "T1056.001"
+    ],
+    "attacker_use": "Can observe or synthesize user input.",
+    "category": "keylogging_input",
+    "description": "Inserts synthetic keyboard or mouse events.",
+    "dll": "user32.dll",
+    "severity": 2
+  },
+  "SendMessage": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "ui",
+    "description": "Sends a message to a window procedure.",
+    "dll": "user32.dll",
+    "severity": 0
+  },
+  "SetCurrentDirectory": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Changes the current directory.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "SetDefaultDllDirectories": {
+    "attack": [
+      "T1027.007"
+    ],
+    "attacker_use": "Can resolve payload functionality at run time.",
+    "category": "dynamic_loading",
+    "description": "Sets the default DLL search directories.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "SetDllDirectory": {
+    "attack": [
+      "T1027.007"
+    ],
+    "attacker_use": "Can resolve payload functionality at run time.",
+    "category": "dynamic_loading",
+    "description": "Changes the DLL search path.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "SetEndOfFile": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Sets the physical file size at the current position.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "SetEnvironmentVariable": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Sets an environment variable in the current process.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "SetEvent": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "synchronization",
+    "description": "Sets an event to the signaled state.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "SetFileAttributes": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Sets file or directory attributes.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "SetFileInformationByHandle": {
+    "attack": [],
+    "attacker_use": "Can rename or delete files through an existing handle.",
+    "category": "file",
+    "description": "Sets information for a file using its handle.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "SetFilePointer": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Moves a file pointer.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "SetFilePointerEx": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Moves a file pointer using a 64-bit distance.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "SetFileTime": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Sets file timestamps.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "SetProcessDEPPolicy": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Changes the DEP policy of the current process.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "SetSecurityInfo": {
+    "attack": [
+      "T1134"
+    ],
+    "attacker_use": "Can manipulate access tokens or impersonate another security context.",
+    "category": "privilege",
+    "description": "Sets security information on an object.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "SetServiceStatus": {
+    "attack": [
+      "T1543.003"
+    ],
+    "attacker_use": "Can configure a service for execution or persistence.",
+    "category": "service",
+    "description": "Updates service status information.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "SetThreadContext": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate another process during code injection.",
+    "category": "injection",
+    "description": "Sets a thread context.",
+    "dll": "kernel32.dll",
+    "severity": 2
+  },
+  "SetThreadPriority": {
+    "attack": [],
+    "attacker_use": "Can control execution or coordinate payload threads.",
+    "category": "thread",
+    "description": "Sets a thread priority.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "SetThreadToken": {
+    "attack": [
+      "T1134"
+    ],
+    "attacker_use": "Can manipulate access tokens or impersonate another security context.",
+    "category": "privilege",
+    "description": "Assigns an impersonation token to a thread.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "SetTokenInformation": {
+    "attack": [
+      "T1134"
+    ],
+    "attacker_use": "Can manipulate access tokens or impersonate another security context.",
+    "category": "privilege",
+    "description": "Sets information on an access token.",
+    "dll": "advapi32.dll",
+    "severity": 2
+  },
+  "SetUnhandledExceptionFilter": {
+    "attack": [
+      "T1622"
+    ],
+    "attacker_use": "Can detect or interfere with debugging.",
+    "category": "anti_debug",
+    "description": "Sets a top-level exception filter.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "SetWinEventHook": {
+    "attack": [],
+    "attacker_use": "Can monitor window and accessibility events.",
+    "category": "hooking",
+    "description": "Sets an event hook for a range of accessibility events.",
+    "dll": "user32.dll",
+    "severity": 1
+  },
+  "SetWindowPos": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "ui",
+    "description": "Changes a window position and size.",
+    "dll": "user32.dll",
+    "severity": 0
+  },
+  "SetWindowsHook": {
+    "attack": [],
+    "attacker_use": "Can intercept window messages or user input.",
+    "category": "hooking",
+    "description": "Installs a hook procedure using the legacy hook interface.",
+    "dll": "user32.dll",
+    "severity": 1
+  },
+  "SetWindowsHookEx": {
+    "attack": [
+      "T1056.001"
+    ],
+    "attacker_use": "Can observe or synthesize user input.",
+    "category": "keylogging_input",
+    "description": "Installs a hook procedure in a hook chain.",
+    "dll": "user32.dll",
+    "severity": 2
+  },
+  "ShellExecute": {
+    "attack": [
+      "T1218"
+    ],
+    "attacker_use": "Can launch programs or invoke shell functionality.",
+    "category": "execution",
+    "description": "Performs an operation on a file through the shell.",
+    "dll": "shell32.dll",
+    "severity": 1
+  },
+  "ShellExecuteEx": {
+    "attack": [
+      "T1218"
+    ],
+    "attacker_use": "Can launch programs or invoke shell functionality.",
+    "category": "execution",
+    "description": "Performs a shell operation with extended parameters.",
+    "dll": "shell32.dll",
+    "severity": 1
+  },
+  "ShowWindow": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "ui",
+    "description": "Sets a window show state.",
+    "dll": "user32.dll",
+    "severity": 0
+  },
+  "Sleep": {
+    "attack": [],
+    "attacker_use": "Can control execution or coordinate payload threads.",
+    "category": "thread",
+    "description": "Suspends execution for an interval.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "SleepEx": {
+    "attack": [],
+    "attacker_use": "Can control execution or coordinate payload threads.",
+    "category": "thread",
+    "description": "Suspends execution with optional alertable waiting.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "StartService": {
+    "attack": [
+      "T1543.003"
+    ],
+    "attacker_use": "Can configure a service for execution or persistence.",
+    "category": "service",
+    "description": "Starts a service.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "StartServiceCtrlDispatcher": {
+    "attack": [
+      "T1543.003"
+    ],
+    "attacker_use": "Can configure a service for execution or persistence.",
+    "category": "service",
+    "description": "Connects a service process to the service control manager.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "StretchBlt": {
+    "attack": [
+      "T1113"
+    ],
+    "attacker_use": "Can copy display pixels for screen capture.",
+    "category": "screen_capture",
+    "description": "Copies and scales a bitmap between device contexts.",
+    "dll": "gdi32.dll",
+    "severity": 1
+  },
+  "SuspendThread": {
+    "attack": [],
+    "attacker_use": "Can control execution or coordinate payload threads.",
+    "category": "thread",
+    "description": "Suspends a thread.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "SwitchDesktop": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "ui",
+    "description": "Makes a desktop visible and active.",
+    "dll": "user32.dll",
+    "severity": 0
+  },
+  "SwitchToFiber": {
+    "attack": [],
+    "attacker_use": "Can control execution or coordinate payload threads.",
+    "category": "thread",
+    "description": "Schedules a fiber.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "SwitchToThread": {
+    "attack": [],
+    "attacker_use": "Can control execution or coordinate payload threads.",
+    "category": "thread",
+    "description": "Yields execution to another ready thread.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "SysAllocString": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "com",
+    "description": "Allocates a BSTR string.",
+    "dll": "oleaut32.dll",
+    "severity": 0
+  },
+  "SysFreeString": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "com",
+    "description": "Frees a BSTR string.",
+    "dll": "oleaut32.dll",
+    "severity": 0
+  },
+  "TerminateProcess": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Terminates a specified process.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "TerminateThread": {
+    "attack": [],
+    "attacker_use": "Can control execution or coordinate payload threads.",
+    "category": "thread",
+    "description": "Terminates a thread.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "Thread32First": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Retrieves the first thread in a snapshot.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "Thread32Next": {
+    "attack": [
+      "T1057"
+    ],
+    "attacker_use": "Can discover or control processes.",
+    "category": "process",
+    "description": "Retrieves the next thread in a snapshot.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "TlsAlloc": {
+    "attack": [],
+    "attacker_use": "Can control execution or coordinate payload threads.",
+    "category": "thread",
+    "description": "Allocates a thread local storage index.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "TlsFree": {
+    "attack": [],
+    "attacker_use": "Can control execution or coordinate payload threads.",
+    "category": "thread",
+    "description": "Releases a thread local storage index.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "TlsGetValue": {
+    "attack": [],
+    "attacker_use": "Can control execution or coordinate payload threads.",
+    "category": "thread",
+    "description": "Retrieves a value from thread local storage.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "TlsSetValue": {
+    "attack": [],
+    "attacker_use": "Can control execution or coordinate payload threads.",
+    "category": "thread",
+    "description": "Stores a value in thread local storage.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "TranslateMessage": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "ui",
+    "description": "Translates virtual key messages.",
+    "dll": "user32.dll",
+    "severity": 0
+  },
+  "URLDownloadToCacheFile": {
+    "attack": [
+      "T1105"
+    ],
+    "attacker_use": "Can retrieve remote content.",
+    "category": "internet",
+    "description": "Downloads a URL resource to the internet cache.",
+    "dll": "urlmon.dll",
+    "severity": 1
+  },
+  "URLDownloadToFile": {
+    "attack": [
+      "T1105"
+    ],
+    "attacker_use": "Can retrieve remote content.",
+    "category": "internet",
+    "description": "Downloads a URL resource to a file.",
+    "dll": "urlmon.dll",
+    "severity": 1
+  },
+  "URLOpenBlockingStream": {
+    "attack": [
+      "T1105"
+    ],
+    "attacker_use": "Can retrieve remote content.",
+    "category": "internet",
+    "description": "Opens a blocking stream for a URL.",
+    "dll": "urlmon.dll",
+    "severity": 1
+  },
+  "URLOpenStream": {
+    "attack": [
+      "T1105"
+    ],
+    "attacker_use": "Can retrieve remote content.",
+    "category": "internet",
+    "description": "Opens an asynchronous URL stream.",
+    "dll": "urlmon.dll",
+    "severity": 1
+  },
+  "UnhookWindowsHookEx": {
+    "attack": [
+      "T1056.001"
+    ],
+    "attacker_use": "Can observe or synthesize user input.",
+    "category": "keylogging_input",
+    "description": "Removes a hook procedure.",
+    "dll": "user32.dll",
+    "severity": 2
+  },
+  "UnmapViewOfFile": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Unmaps a mapped file view.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "VariantClear": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "com",
+    "description": "Clears a VARIANT.",
+    "dll": "oleaut32.dll",
+    "severity": 0
+  },
+  "VariantInit": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "com",
+    "description": "Initializes a VARIANT.",
+    "dll": "oleaut32.dll",
+    "severity": 0
+  },
+  "VirtualAlloc": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Reserves or commits virtual memory.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "VirtualAllocEx": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate another process during code injection.",
+    "category": "injection",
+    "description": "Reserves or commits memory in a specified process.",
+    "dll": "kernel32.dll",
+    "severity": 2
+  },
+  "VirtualAllocExNuma": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate another process during code injection.",
+    "category": "injection",
+    "description": "Allocates memory in a specified process with a preferred NUMA node.",
+    "dll": "kernel32.dll",
+    "severity": 2
+  },
+  "VirtualFree": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Releases or decommits virtual memory.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "VirtualFreeEx": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate another process during code injection.",
+    "category": "injection",
+    "description": "Releases or decommits memory in a specified process.",
+    "dll": "kernel32.dll",
+    "severity": 2
+  },
+  "VirtualProtect": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Changes protection on committed memory pages.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "VirtualProtectEx": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate another process during code injection.",
+    "category": "injection",
+    "description": "Changes protection on committed pages in a specified process.",
+    "dll": "kernel32.dll",
+    "severity": 2
+  },
+  "VirtualQuery": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Retrieves information about a virtual memory region.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "VirtualQueryEx": {
+    "attack": [],
+    "attacker_use": "Can allocate or change memory used for payloads.",
+    "category": "memory",
+    "description": "Retrieves information about memory in a specified process.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "WSAAccept": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Accepts a connection with optional conditional acceptance.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "WSACleanup": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Terminates Winsock use by a process.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "WSAConnect": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Establishes a socket connection with additional parameters.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "WSAEventSelect": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Associates network events with an event object.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "WSAIoctl": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Controls socket operation.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "WSARecv": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Receives data into multiple buffers.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "WSASend": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Sends data from multiple buffers.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "WSASocket": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Creates a socket with extended options.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "WSAStartup": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Initializes Winsock use by a process.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "WTSEnumerateProcesses": {
+    "attack": [
+      "T1033"
+    ],
+    "attacker_use": "Can discover logged-on users and sessions.",
+    "category": "enumeration",
+    "description": "Enumerates processes on a server.",
+    "dll": "wtsapi32.dll",
+    "severity": 1
+  },
+  "WTSEnumerateSessions": {
+    "attack": [
+      "T1033"
+    ],
+    "attacker_use": "Can discover logged-on users and sessions.",
+    "category": "enumeration",
+    "description": "Enumerates sessions on a server.",
+    "dll": "wtsapi32.dll",
+    "severity": 1
+  },
+  "WTSFreeMemory": {
+    "attack": [
+      "T1033"
+    ],
+    "attacker_use": "Can discover logged-on users and sessions.",
+    "category": "enumeration",
+    "description": "Frees memory returned by session APIs.",
+    "dll": "wtsapi32.dll",
+    "severity": 1
+  },
+  "WTSQuerySessionInformation": {
+    "attack": [
+      "T1033"
+    ],
+    "attacker_use": "Can discover logged-on users and sessions.",
+    "category": "enumeration",
+    "description": "Retrieves information about a session.",
+    "dll": "wtsapi32.dll",
+    "severity": 1
+  },
+  "WTSQueryUserToken": {
+    "attack": [
+      "T1033"
+    ],
+    "attacker_use": "Can discover logged-on users and sessions.",
+    "category": "enumeration",
+    "description": "Retrieves a primary access token for a session user.",
+    "dll": "wtsapi32.dll",
+    "severity": 1
+  },
+  "WaitForDebugEvent": {
+    "attack": [
+      "T1622"
+    ],
+    "attacker_use": "Can detect or interfere with debugging.",
+    "category": "anti_debug",
+    "description": "Waits for a debugging event.",
+    "dll": "kernel32.dll",
+    "severity": 1
+  },
+  "WaitForMultipleObjects": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "synchronization",
+    "description": "Waits for one or more objects to become signaled.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "WaitForMultipleObjectsEx": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "synchronization",
+    "description": "Waits on objects with optional alertable waiting.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "WaitForSingleObject": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "synchronization",
+    "description": "Waits for an object to become signaled.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "WaitForSingleObjectEx": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "synchronization",
+    "description": "Waits on an object with optional alertable waiting.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "WinHttpAddRequestHeaders": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over HTTP.",
+    "category": "internet",
+    "description": "Adds HTTP request headers.",
+    "dll": "winhttp.dll",
+    "severity": 1
+  },
+  "WinHttpCloseHandle": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over HTTP.",
+    "category": "internet",
+    "description": "Closes a WinHTTP handle.",
+    "dll": "winhttp.dll",
+    "severity": 1
+  },
+  "WinHttpConnect": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over HTTP.",
+    "category": "internet",
+    "description": "Specifies the target server for a session.",
+    "dll": "winhttp.dll",
+    "severity": 1
+  },
+  "WinHttpGetIEProxyConfigForCurrentUser": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over HTTP.",
+    "category": "internet",
+    "description": "Retrieves the current user browser proxy configuration.",
+    "dll": "winhttp.dll",
+    "severity": 1
+  },
+  "WinHttpOpen": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over HTTP.",
+    "category": "internet",
+    "description": "Initializes a WinHTTP session.",
+    "dll": "winhttp.dll",
+    "severity": 1
+  },
+  "WinHttpOpenRequest": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over HTTP.",
+    "category": "internet",
+    "description": "Creates an HTTP request handle.",
+    "dll": "winhttp.dll",
+    "severity": 1
+  },
+  "WinHttpQueryDataAvailable": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over HTTP.",
+    "category": "internet",
+    "description": "Retrieves the amount of available response data.",
+    "dll": "winhttp.dll",
+    "severity": 1
+  },
+  "WinHttpQueryHeaders": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over HTTP.",
+    "category": "internet",
+    "description": "Retrieves HTTP response headers.",
+    "dll": "winhttp.dll",
+    "severity": 1
+  },
+  "WinHttpReadData": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over HTTP.",
+    "category": "internet",
+    "description": "Reads response data.",
+    "dll": "winhttp.dll",
+    "severity": 1
+  },
+  "WinHttpReceiveResponse": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over HTTP.",
+    "category": "internet",
+    "description": "Waits for an HTTP response.",
+    "dll": "winhttp.dll",
+    "severity": 1
+  },
+  "WinHttpSendRequest": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over HTTP.",
+    "category": "internet",
+    "description": "Sends an HTTP request.",
+    "dll": "winhttp.dll",
+    "severity": 1
+  },
+  "WinHttpSetOption": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over HTTP.",
+    "category": "internet",
+    "description": "Sets a WinHTTP option.",
+    "dll": "winhttp.dll",
+    "severity": 1
+  },
+  "WinHttpSetTimeouts": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over HTTP.",
+    "category": "internet",
+    "description": "Sets WinHTTP timeouts.",
+    "dll": "winhttp.dll",
+    "severity": 1
+  },
+  "WinHttpWriteData": {
+    "attack": [
+      "T1071.001"
+    ],
+    "attacker_use": "Can transfer data over HTTP.",
+    "category": "internet",
+    "description": "Writes request data.",
+    "dll": "winhttp.dll",
+    "severity": 1
+  },
+  "WmiFreeBuffer": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "wmi",
+    "description": "Frees a buffer allocated by a WMI function.",
+    "dll": "advapi32.dll",
+    "severity": 0
+  },
+  "WmiOpenBlock": {
+    "attack": [],
+    "attacker_use": "Can access WMI provider data for host discovery.",
+    "category": "wmi",
+    "description": "Opens a WMI data block.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "WmiQueryAllData": {
+    "attack": [],
+    "attacker_use": "Can collect provider data about the host.",
+    "category": "wmi",
+    "description": "Retrieves all instances of a WMI data block.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "WmiQuerySingleInstance": {
+    "attack": [],
+    "attacker_use": "Can inspect a selected WMI provider instance.",
+    "category": "wmi",
+    "description": "Retrieves one instance of a WMI data block.",
+    "dll": "advapi32.dll",
+    "severity": 1
+  },
+  "Wow64GetThreadContext": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate another process during code injection.",
+    "category": "injection",
+    "description": "Retrieves the context of a WOW64 thread.",
+    "dll": "kernel32.dll",
+    "severity": 2
+  },
+  "Wow64SetThreadContext": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate another process during code injection.",
+    "category": "injection",
+    "description": "Sets the context of a WOW64 thread.",
+    "dll": "kernel32.dll",
+    "severity": 2
+  },
+  "WriteFile": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Writes data to a file or device.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "WriteFileEx": {
+    "attack": [],
+    "attacker_use": "",
+    "category": "file",
+    "description": "Writes data asynchronously with a completion routine.",
+    "dll": "kernel32.dll",
+    "severity": 0
+  },
+  "WriteProcessMemory": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate another process during code injection.",
+    "category": "injection",
+    "description": "Writes memory to a specified process.",
+    "dll": "kernel32.dll",
+    "severity": 2
+  },
+  "ZwAdjustPrivilegesToken": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Adjusts privileges in a token.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwAllocateVirtualMemory": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Reserves or commits virtual memory in a process.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "ZwClose": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Closes an object handle.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwCreateFile": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Creates or opens a file object.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwCreateSection": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Creates a section object.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "ZwCreateThreadEx": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Creates a thread with extended attributes.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "ZwDelayExecution": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Suspends the calling thread for an interval.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwDeviceIoControlFile": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Sends a device control request.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwDuplicateObject": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Duplicates an object handle.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwFreeVirtualMemory": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Releases or decommits virtual memory in a process.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "ZwGetContextThread": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Retrieves a thread context.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "ZwLoadDriver": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Loads a kernel driver.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwMapViewOfSection": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Maps a section view into a process.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "ZwOpenFile": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Opens a file object.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwOpenProcess": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Opens a process object.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwOpenProcessToken": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Opens a process token.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwOpenSection": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Opens a section object.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "ZwOpenThread": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Opens a thread object.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwProtectVirtualMemory": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Changes protection on process virtual memory.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "ZwQueryDirectoryFile": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Retrieves directory entries.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwQueryInformationProcess": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Retrieves information about a process.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwQueryInformationThread": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Retrieves information about a thread.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwQueryObject": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Retrieves object information.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwQuerySystemInformation": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Retrieves system information.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwQueueApcThread": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Queues an asynchronous procedure call to a thread.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "ZwReadFile": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Reads data from a file object.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwReadVirtualMemory": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Reads virtual memory from a process.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "ZwResumeThread": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Resumes a suspended thread.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "ZwSetContextThread": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Sets a thread context.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "ZwSetInformationProcess": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Sets information on a process.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwSetInformationThread": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Sets information on a thread.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwSuspendThread": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Suspends a thread.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "ZwTerminateProcess": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Terminates a process.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwTerminateThread": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Terminates a thread.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwUnloadDriver": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Unloads a kernel driver.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwUnmapViewOfSection": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Unmaps a section view from a process.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "ZwWaitForSingleObject": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Waits for an object to become signaled.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwWriteFile": {
+    "attack": [
+      "T1106"
+    ],
+    "attacker_use": "Can access native services directly.",
+    "category": "evasion",
+    "description": "Writes data to a file object.",
+    "dll": "ntdll.dll",
+    "severity": 1
+  },
+  "ZwWriteVirtualMemory": {
+    "attack": [
+      "T1055"
+    ],
+    "attacker_use": "Can manipulate process memory or execution through native services.",
+    "category": "injection",
+    "description": "Writes virtual memory to a process.",
+    "dll": "ntdll.dll",
+    "severity": 2
+  },
+  "accept": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Accepts an incoming connection.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "bind": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Associates a local address with a socket.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "closesocket": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Closes a socket.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "connect": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Connects a socket to a remote address.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "freeaddrinfo": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Frees address information.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "getaddrinfo": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Resolves a host and service into addresses.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "gethostbyname": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Retrieves host information by name.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "gethostname": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Retrieves the local host name.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "getsockopt": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Retrieves a socket option.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "inet_addr": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Converts an IPv4 address string to a network address.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "inet_ntoa": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Converts an IPv4 address to a string.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "ioctlsocket": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Controls socket I/O modes.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "keybd_event": {
+    "attack": [
+      "T1056.001"
+    ],
+    "attacker_use": "Can observe or synthesize user input.",
+    "category": "keylogging_input",
+    "description": "Synthesizes a keystroke.",
+    "dll": "user32.dll",
+    "severity": 2
+  },
+  "listen": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Places a socket in a listening state.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "mouse_event": {
+    "attack": [
+      "T1056.001"
+    ],
+    "attacker_use": "Can observe or synthesize user input.",
+    "category": "keylogging_input",
+    "description": "Synthesizes mouse events.",
+    "dll": "user32.dll",
+    "severity": 2
+  },
+  "recv": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Receives data from a socket.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "recvfrom": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Receives a datagram and its source address.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "select": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Determines the status of sockets.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "send": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Sends data on a connected socket.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "sendto": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Sends a datagram to a specified destination.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "setsockopt": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Sets a socket option.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "shutdown": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Disables sends or receives on a socket.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  },
+  "socket": {
+    "attack": [],
+    "attacker_use": "Can communicate with remote systems.",
+    "category": "network",
+    "description": "Creates a socket.",
+    "dll": "ws2_32.dll",
+    "severity": 1
+  }
+}
