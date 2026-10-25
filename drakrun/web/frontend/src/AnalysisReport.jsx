@@ -1,3 +1,6 @@
+import { AnalysisDashboard, ProcessWorkspace } from "./AnalysisDashboard.jsx";
+import { LogWorkspace } from "./StructuredLogs.jsx";
+import "./AnalysisWorkspace.css";
 import { useCallback, useEffect, useState } from "react";
 import { getLog, getLogList, getProcessLog } from "./api.js";
 import { TabSwitcher, Tab, useTabContext } from "./TabSwitcher.jsx";
@@ -219,6 +222,7 @@ function AnalysisReportTabs({
     analysisSummary,
     selectedProcess,
     setSelectedProcess,
+    onFilterProcess,
     activeReportTab,
     setActiveReportTab,
     isOffline,
@@ -266,23 +270,45 @@ function AnalysisReportTabs({
                     getHeader={getHeader}
                 >
                     <PaddedTab tab="Summary report">
-                        <AnalysisSummary
-                            analysisSummary={analysisSummary}
-                            setSelectedProcess={setSelectedProcess}
+                        <AnalysisDashboard
+                            analysisId={analysis.id}
+                            summary={analysisSummary}
+                            onSelect={setSelectedProcess}
+                            isOffline={isOffline}
                         />
                     </PaddedTab>
                     {!isOffline ? (
                         <PaddedTab tab="General logs">
-                            <AnalysisLogViewer analysisId={analysis.id} />
+                            <LogWorkspace
+                                analysisId={analysis.id}
+                                selectedProcess={selectedProcess}
+                                onProcessSelect={setSelectedProcess}
+                                processes={analysisSummary?.processes}
+                                onFilterProcess={onFilterProcess}
+                            />
                         </PaddedTab>
                     ) : (
                         []
                     )}
                     <PaddedTab tab="Process info">
-                        <ProcessLogViewer
-                            analysisId={analysis.id}
-                            selectedProcess={selectedProcess}
-                        />
+                        {isOffline ? (
+                            <ProcessLogViewer
+                                analysisId={analysis.id}
+                                selectedProcess={selectedProcess}
+                            />
+                        ) : (
+                            <ProcessWorkspace
+                                analysisId={analysis.id}
+                                selectedProcess={selectedProcess}
+                                summary={analysisSummary}
+                                analysisStart={
+                                    analysis.time_execution_started ||
+                                    analysis.time_started
+                                }
+                                onSelect={setSelectedProcess}
+                                isOffline={isOffline}
+                            />
+                        )}
                     </PaddedTab>
                     {analysis.screenshots ? (
                         <PaddedTab tab="Screenshots">
@@ -350,22 +376,29 @@ export function AnalysisReport() {
 
     return (
         <>
-            <div className="row">
+            <div
+                className={`analysis-workspace ${isStatic ? "analysis-static-only" : ""}`}
+            >
                 {!isStatic && (
-                    <div className="col-6">
+                    <aside className="analysis-process-column">
                         <ProcessTreeView
                             analysisId={analysis.id}
                             sampleName={analysis.options?.sample_filename}
+                            sampleSeqid={analysisSummary?.startup?.process}
+                            ttps={analysisSummary?.ttps}
                             selectedProcess={selectedProcess}
                             onProcessSelect={onSelectProcess}
                         />
-                    </div>
+                    </aside>
                 )}
-                <div className={isStatic ? "col-12" : "col-6"}>
+                <div className="analysis-main-column">
                     {!isOffline ? (
                         <VerdictCard analysisId={analysis.id} />
                     ) : null}
-                    <AnalysisMetadataTable analysis={analysis} />
+                    <details className="mb-2">
+                        <summary>Analysis metadata</summary>
+                        <AnalysisMetadataTable analysis={analysis} />
+                    </details>
                     {!isOffline ? (
                         <div className="card">
                             <div className="card-body">
@@ -459,15 +492,12 @@ export function AnalysisReport() {
                     ) : (
                         []
                     )}
-                </div>
-            </div>
-            <div className="row py-4">
-                <div className="col">
                     <AnalysisReportTabs
                         analysis={analysis}
                         analysisSummary={analysisSummary}
                         selectedProcess={selectedProcess}
                         setSelectedProcess={onSelectProcess}
+                        onFilterProcess={setSelectedProcess}
                         activeReportTab={activeReportTab}
                         setActiveReportTab={setActiveReportTab}
                         isOffline={isOffline}

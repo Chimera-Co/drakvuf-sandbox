@@ -285,6 +285,36 @@ def logs(path: LogsRequestPath):
     )
 
 
+@api.get("/logs/<task_uid>/<log_type>/stats")
+def log_statistics(path: LogsRequestPath):
+    from drakrun.web.log_stats import get_stats
+
+    try:
+        return jsonify(get_stats(path.task_uid, path.log_type, config.s3))
+    except (FileNotFoundError, ValueError):
+        return jsonify({"error": "Data not found"}), 404
+
+
+@api.get("/logs/<task_uid>/stats")
+def analysis_log_statistics(path: AnalysisRequestPath):
+    from drakrun.web.log_stats import combined_stats
+
+    try:
+        return jsonify(combined_stats(path.task_uid, config.s3))
+    except (FileNotFoundError, ValueError):
+        return jsonify({"error": "Data not found"}), 404
+
+
+@api.get("/logs/<task_uid>/stats/process/<seqid>")
+def process_log_statistics(path: ProcessInfoRequestPath):
+    from drakrun.web.log_stats import process_stats
+
+    try:
+        return jsonify(process_stats(path.task_uid, path.seqid, config.s3))
+    except (FileNotFoundError, ValueError):
+        return jsonify({"error": "Data not found"}), 404
+
+
 @api.get("/process_info/<task_uid>/<seqid>")
 def process_info(path: ProcessInfoRequestPath):
     task_uid = path.task_uid

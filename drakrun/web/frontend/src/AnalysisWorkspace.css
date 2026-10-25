@@ -1,0 +1,121 @@
+.analysis-workspace {
+    display: grid;
+    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+    gap: 1rem;
+    align-items: start;
+}
+.analysis-static-only {
+    grid-template-columns: minmax(0, 1fr);
+}
+.analysis-process-column {
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow: auto;
+    min-width: 0;
+}
+.analysis-main-column,
+.min-width-0 {
+    min-width: 0;
+}
+.analysis-main-column > .card:first-child {
+    height: 340px;
+    overflow: auto;
+}
+.analysis-explorer {
+    display: grid;
+    grid-template-columns: minmax(180px, 25%) minmax(0, 1fr);
+    gap: 1rem;
+}
+.analysis-explorer > aside {
+    max-height: 650px;
+    overflow: auto;
+    border-right: 1px solid var(--bs-border-color);
+}
+.analysis-event-table {
+    table-layout: fixed;
+    min-width: 560px;
+}
+.analysis-event-table td {
+    overflow-wrap: anywhere;
+    vertical-align: top;
+}
+.analysis-drawer {
+    position: fixed;
+    inset: 5vh 2vw 5vh auto;
+    width: min(680px, 94vw);
+    z-index: 1055;
+    overflow: auto;
+    box-shadow: 0 1rem 3rem #0004;
+}
+.analysis-screenshot-stage {
+    height: min(55vh, 550px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--chimera-base02);
+}
+.analysis-screenshot-stage img {
+    max-height: 100%;
+    object-fit: contain;
+}
+.decision-score {
+    height: 15px;
+    position: relative;
+    border-radius: 3px;
+    background: linear-gradient(
+        to right,
+        var(--chimera-yellow) 0% 50%,
+        var(--chimera-red) 50% 100%
+    );
+}
+.decision-threshold {
+    position: absolute;
+    left: 50%;
+    top: -3px;
+    bottom: -3px;
+    border-left: 2px dashed var(--bs-body-color);
+}
+.decision-marker {
+    position: absolute;
+    top: -4px;
+    bottom: -4px;
+    width: 4px;
+    transform: translateX(-2px);
+    background: var(--chimera-base03);
+    border: 1px solid var(--chimera-base3);
+}
+.syntax-function,
+.syntax-label {
+    color: var(--chimera-blue-ink);
+}
+.syntax-variable,
+.syntax-preprocessor {
+    color: var(--chimera-violet);
+}
+.syntax-char {
+    color: var(--chimera-cyan-ink);
+}
+@media (max-width: 1000px) {
+    .analysis-workspace {
+        grid-template-columns: minmax(200px, 240px) minmax(0, 1fr);
+        gap: 0.5rem;
+    }
+    .analysis-main-column .card-body {
+        padding: 0.65rem;
+    }
+}
+@media (max-width: 760px) {
+    .analysis-workspace,
+    .analysis-explorer {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .analysis-process-column {
+        position: static;
+        max-height: 320px;
+    }
+}
+
+.decision-component {
+    background: var(--chimera-base1);
+}

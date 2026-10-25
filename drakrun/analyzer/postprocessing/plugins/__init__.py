@@ -1,6 +1,7 @@
 from drakrun.lib.paths import DUMPS_DIR, DUMPS_ZIP, IPT_DIR, IPT_ZIP
 
 from .build_chimera_report import build_chimera_report
+from .build_log_stats import build_log_stats
 from .build_process_tree import build_process_tree
 from .capa_plugin.capa_processor import capa_analysis
 from .classify_sample import classify_sample
@@ -121,4 +122,5 @@ POSTPROCESS_PLUGINS = [
     PostprocessPlugin(
         function=index_logs, requires=["process_tree.json"], generates=["log_index"]
     ),
+    PostprocessPlugin(function=build_log_stats, requires=[], generates=[]),
 ]

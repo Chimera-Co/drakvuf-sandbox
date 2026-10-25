@@ -1,3 +1,4 @@
+import { CodeExplorer, SourceCode, GenericBlock } from "./CodeExplorer.jsx";
 import { useState } from "react";
 import {
     Area,
@@ -559,174 +560,23 @@ export function Capabilities({ data, deep }) {
     );
 }
 
-export function HighlightedCode({ code = "" }) {
-    const tokens = code.split(
-        /(\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b(?:0x[\da-fA-F]+|\d+(?:\.\d+)?)\b|\b(?:if|else|return|while|for|switch|case|break|goto|sizeof|do|int|void|char|long|short|unsigned|signed|float|double|const|struct|bool|undefined\d*)\b)/g,
-    );
-    let line = 1;
-    return (
-        <pre className="static-code text-break" aria-label="Decompiled source">
-            <code>
-                <span className="static-line" aria-hidden="true">
-                    {line}
-                </span>
-                {tokens.map((token, i) => {
-                    const kind = /^(\/\/|\/\*)/.test(token)
-                        ? "comment"
-                        : /^["']/.test(token)
-                          ? "string"
-                          : /^\d/.test(token)
-                            ? "number"
-                            : /^(if|else|return|while|for|switch|case|break|goto|sizeof|do)$/.test(
-                                    token,
-                                )
-                              ? "keyword"
-                              : /^(int|void|char|long|short|unsigned|signed|float|double|const|struct|bool|undefined\d*)$/.test(
-                                      token,
-                                  )
-                                ? "type"
-                                : "plain";
-                    return (
-                        <span key={i} className={`syntax-${kind}`}>
-                            {token.split("\n").map((part, j) => (
-                                <span key={j}>
-                                    {j > 0 && (
-                                        <>
-                                            {"\n"}
-                                            <span
-                                                className="static-line"
-                                                aria-hidden="true"
-                                            >
-                                                {++line}
-                                            </span>
-                                        </>
-                                    )}
-                                    {part}
-                                </span>
-                            ))}
-                        </span>
-                    );
-                })}
-            </code>
-        </pre>
-    );
+export function HighlightedCode(props) {
+    return <SourceCode {...props} />;
 }
-export function Code({ deep, format }) {
-    const [query, setQuery] = useState("");
-    const [selected, setSelected] = useState(null);
-    const [message, setMessage] = useState("");
-    const ghidra = deep?.ghidra;
-    const funcs = (ghidra?.functions || []).filter((f) =>
-        `${f.name} ${f.address} ${(f.capa || []).join(" ")}`
-            .toLowerCase()
-            .includes(query.toLowerCase()),
-    );
-    const current = funcs.find((f) => f === selected) || funcs[0];
-    if (!ghidra || !ghidra.functions?.length)
-        return (
-            <section aria-label="Code">
-                <h6>Decompiled code</h6>
-                <p>
-                    {!["pe", "elf"].includes(format)
-                        ? "Decompilation is available only for PE and ELF files."
-                        : !deep
-                          ? "Deep pass not run yet. Code appears when decompilation finishes."
-                          : "Decompiler is off or did not produce a result for this analysis."}
-                </p>
-            </section>
-        );
-    return (
-        <section aria-label="Code">
-            <p className="small text-muted">
-                Ghidra {ghidra.version} · {ghidra.language} ·{" "}
-                {ghidra.decompiled} decompiled / {ghidra.functions_total}{" "}
-                functions
-            </p>
-            <div className="static-code-layout">
-                <aside>
-                    <label className="w-100">
-                        Search functions
-                        <input
-                            className="form-control form-control-sm mb-2"
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                        />
-                    </label>
-                    {funcs.map((f, i) => (
-                        <button
-                            type="button"
-                            className={`btn text-start w-100 border mb-1 text-break ${current === f ? "btn-outline-primary" : "btn-outline-secondary"}`}
-                            key={i}
-                            aria-pressed={current === f}
-                            onClick={() => {
-                                setSelected(f);
-                                setMessage("");
-                            }}
-                        >
-                            <strong>{f.name}</strong>
-                            <div className="small font-monospace">
-                                {f.address} · {f.size} bytes
-                            </div>
-                            <Chips values={f.reasons} />
-                            <Chips values={f.capa} />
-                        </button>
-                    ))}
-                </aside>
-                <div className="static-source">
-                    {current ? (
-                        <>
-                            <div className="d-flex gap-2 align-items-center">
-                                <h6 className="text-break">{current.name}</h6>
-                                <button
-                                    type="button"
-                                    className="btn btn-sm btn-outline-secondary ms-auto"
-                                    disabled={!current.c}
-                                    onClick={async () => {
-                                        try {
-                                            await navigator.clipboard.writeText(
-                                                current.c,
-                                            );
-                                            setMessage("Copied code");
-                                        } catch {
-                                            setMessage(
-                                                "Copy unavailable; select the source manually.",
-                                            );
-                                        }
-                                    }}
-                                >
-                                    Copy code
-                                </button>
-                                <span role="status">{message}</span>
-                            </div>
-                            {current.truncated && (
-                                <p className="text-warning-emphasis">
-                                    Truncated: only part of this function is
-                                    shown.
-                                </p>
-                            )}
-                            {current.error && (
-                                <p className="text-danger">
-                                    Decompilation error: {current.error}
-                                </p>
-                            )}
-                            {current.c ? (
-                                <HighlightedCode code={current.c} />
-                            ) : (
-                                <p>No source available.</p>
-                            )}
-                        </>
-                    ) : (
-                        <p>No functions match.</p>
-                    )}
-                </div>
-            </div>
-        </section>
-    );
+export function Code(props) {
+    return <CodeExplorer {...props} />;
 }
 export function FormatDetails({ data }) {
     const fmt = data.type?.format;
     const b = data[fmt];
     if (!b) return <p>Format details not reported.</p>;
+    if (!["zip", "apk", "pdf", "ole", "ooxml"].includes(fmt))
+        return (
+            <section aria-label="Format details">
+                <h6>{fmt}</h6>
+                <GenericBlock value={b} />
+            </section>
+        );
     if (fmt === "zip") {
         const flagged = [
             ...(b.executables || []),
@@ -952,7 +802,26 @@ function Workspace({ data, analysisId }) {
         analysisId,
     );
     const deep = deepState.data;
-    const formatTab = ["pdf", "ole", "ooxml", "zip", "apk"].includes(fmt);
+    const formatTab = Object.keys(data).some(
+        (key) =>
+            ![
+                "schema",
+                "type",
+                "file",
+                "universal",
+                "findings",
+                "coverage",
+                "score",
+                "level",
+                "container",
+                "duration_s",
+                "analyzer_version",
+                "source",
+                "error",
+            ].includes(key) &&
+            data[key] &&
+            typeof data[key] === "object",
+    );
     const tabs = [
         "Overview",
         "Structure",
@@ -1055,8 +924,56 @@ function Workspace({ data, analysisId }) {
             {tab === "Structure" && <Structure data={data} />}
             {tab === "Strings" && <Strings data={data} deep={deep} />}
             {tab === "Capabilities" && <Capabilities data={data} deep={deep} />}
-            {tab === "Code" && <Code deep={deep} format={fmt} />}
-            {tab === "Format details" && <FormatDetails data={data} />}
+            {tab === "Code" && (
+                <Code deep={deep} format={fmt} source={data.source} />
+            )}
+            {tab === "Format details" && (
+                <>
+                    {["pdf", "ole", "ooxml", "zip", "apk"].includes(fmt) && (
+                        <FormatDetails data={data} />
+                    )}
+                    {Object.entries(data)
+                        .filter(
+                            ([key, value]) =>
+                                ![
+                                    "schema",
+                                    "type",
+                                    "file",
+                                    "universal",
+                                    "findings",
+                                    "coverage",
+                                    "score",
+                                    "level",
+                                    "container",
+                                    "duration_s",
+                                    "analyzer_version",
+                                    "source",
+                                    "error",
+                                    ...([
+                                        "pdf",
+                                        "ole",
+                                        "ooxml",
+                                        "zip",
+                                        "apk",
+                                    ].includes(fmt)
+                                        ? [fmt]
+                                        : []),
+                                ].includes(key) &&
+                                value &&
+                                typeof value === "object",
+                        )
+                        .map(([key, value]) => (
+                            <section
+                                key={key}
+                                aria-label={`${key} format details`}
+                                className="mb-3"
+                            >
+                                <h6>{key}</h6>
+                                <GenericBlock value={value} />
+                            </section>
+                        ))}
+                </>
+            )}
         </div>
     );
 }

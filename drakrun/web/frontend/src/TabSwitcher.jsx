@@ -34,7 +34,43 @@ export function TabSwitcher({
                                     className={`nav-link ${activeTab === tab ? "active" : ""}`}
                                     type="button"
                                     role="tab"
-                                    onClick={() => onTabSwitch(tab)}
+                                    aria-selected={activeTab === tab}
+                                    tabIndex={activeTab === tab ? 0 : -1}
+                                    onKeyDown={(event) => {
+                                        if (
+                                            ![
+                                                "ArrowLeft",
+                                                "ArrowRight",
+                                                "Home",
+                                                "End",
+                                            ].includes(event.key)
+                                        )
+                                            return;
+                                        event.preventDefault();
+                                        const buttons = [
+                                            ...event.currentTarget.parentElement.querySelectorAll(
+                                                '[role="tab"]',
+                                            ),
+                                        ];
+                                        const current = buttons.indexOf(
+                                            event.currentTarget,
+                                        );
+                                        const index =
+                                            event.key === "Home"
+                                                ? 0
+                                                : event.key === "End"
+                                                  ? buttons.length - 1
+                                                  : (current +
+                                                        (event.key ===
+                                                        "ArrowRight"
+                                                            ? 1
+                                                            : -1) +
+                                                        buttons.length) %
+                                                    buttons.length;
+                                        buttons[index]?.focus();
+                                        buttons[index]?.click();
+                                    }}
+                                    onClick={() => onTabSwitch?.(tab)}
                                     key={`tab-${tab}`}
                                 >
                                     {getHeader(tab)}

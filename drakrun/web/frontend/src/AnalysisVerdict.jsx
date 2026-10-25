@@ -78,7 +78,7 @@ function Explanation({ lines = [] }) {
     ];
     return (
         <ul className="mb-0 small">
-            {ordered.map((line, idx) => (
+            {ordered.slice(0, 10).map((line, idx) => (
                 <li
                     key={idx}
                     className={
@@ -107,6 +107,57 @@ function formatScore(score) {
     return typeof score === "number" ? score.toFixed(2) : "–";
 }
 
+export function ScoreBar({
+    score,
+    label = "Decision score (0-1)",
+    threshold = true,
+}) {
+    const valid = typeof score === "number" && Number.isFinite(score);
+    return (
+        <div className="my-2">
+            <div className="small">
+                {label}: {formatScore(score)}
+            </div>
+            <div
+                className={`decision-score ${threshold ? "" : "decision-component"}`}
+                role="meter"
+                aria-label={label}
+                aria-valuemin={0}
+                aria-valuemax={1}
+                {...(valid
+                    ? { "aria-valuenow": Math.max(0, Math.min(1, score)) }
+                    : {})}
+            >
+                <span className="decision-band" />
+                {threshold && (
+                    <span
+                        className="decision-threshold"
+                        title="Malicious threshold 0.5"
+                    />
+                )}
+                {valid && (
+                    <span
+                        className="decision-marker"
+                        style={{
+                            left: `${Math.max(0, Math.min(1, score)) * 100}%`,
+                        }}
+                    />
+                )}
+            </div>
+            <div className="d-flex justify-content-between small text-muted">
+                <span>0</span>
+                {threshold && (
+                    <span>
+                        Suspicious band (model dependent) · 0.5 malicious
+                        threshold
+                    </span>
+                )}
+                <span>1</span>
+            </div>
+        </div>
+    );
+}
+
 function ComponentRow({ name, component }) {
     return (
         <tr>
@@ -116,6 +167,14 @@ function ComponentRow({ name, component }) {
                 <span className="ms-1">
                     decision score {formatScore(component.score)}
                 </span>
+                <span className="small ms-2">
+                    weight {component.weight ?? "–"}
+                </span>
+                <ScoreBar
+                    score={component.score}
+                    label={`${name} decision score (0-1)`}
+                    threshold={false}
+                />
                 {component.model ? (
                     <span className="text-muted ms-2 small">
                         {component.model} {component.model_version}
@@ -161,9 +220,15 @@ export function VerdictCard({ analysisId }) {
                     <span className="fs-5 me-2">
                         <LabelBadge label={data.label} />
                     </span>
-                    <span>
-                        combined decision score {formatScore(data.score)}
-                    </span>
+                    {!(
+                        typeof data.calibrated_probability === "number" &&
+                        data.calibrated_probability >= 0 &&
+                        data.calibrated_probability <= 1
+                    ) && (
+                        <span>
+                            combined decision score {formatScore(data.score)}
+                        </span>
+                    )}
                     {data.family ? (
                         <span className="ms-3">family {data.family}</span>
                     ) : null}
@@ -171,10 +236,35 @@ export function VerdictCard({ analysisId }) {
                         {data.model} {data.model_version}
                     </span>
                 </div>
-                <div className="small text-muted mb-2">
-                    Decision score: 0.50 is the malicious threshold. It is not a
-                    probability.
-                </div>
+                {typeof data.calibrated_probability === "number" &&
+                data.calibrated_probability >= 0 &&
+                data.calibrated_probability <= 1 ? (
+                    <div>
+                        Calibrated probability:{" "}
+                        {(data.calibrated_probability * 100).toFixed(1)}%
+                    </div>
+                ) : (
+                    <>
+                        <ScoreBar score={data.score} />
+                        <div className="small text-muted mb-2">
+                            Scores are not probabilities until the model is
+                            calibrated
+                        </div>
+                        <div className="small text-muted mb-2">
+                            Decision score: 0.50 is the malicious threshold. It
+                            is not a probability.
+                        </div>
+                    </>
+                )}
+                {components.length > 1 && (
+                    <div
+                        className={`alert py-2 small ${new Set(components.map(([, c]) => c.label)).size > 1 ? "alert-warning" : "alert-secondary"}`}
+                    >
+                        {new Set(components.map(([, c]) => c.label)).size > 1
+                            ? "Dynamic and static disagree"
+                            : "Dynamic and static agree"}
+                    </div>
+                )}
                 {components.length ? (
                     <table className="datatable-table">
                         <tbody>
