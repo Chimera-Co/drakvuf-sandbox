@@ -1,4 +1,4 @@
-# CHIMERA current state (verified 25 Oct 2026, updated after the P0/P1 work the same day)
+# CHIMERA current state (verified 25 Oct 2026, updated after the P0/P1/P2 work the same day)
 
 Everything below was checked on the CHIMERA host on 25 Oct 2026 with the command or file named. Historical results
 from earlier documents are marked as such and were not re-run.
@@ -7,10 +7,10 @@ from earlier documents are marked as such and were not re-run.
 
 | Item | State | How verified |
 |---|---|---|
-| Working branch | `sprint/final` at `16ccf04` (18 commits ahead of `origin/sprint/final`, not pushed) | `git log` |
-| Deployed source | `/opt/chimera/src` (files copied per change, then installed into `/opt/chimera/venv`); every change up to `16ccf04` is deployed, backups under `/var/backups/chimera-*` | file compare, services |
+| Working branch | `sprint/final` at `2476dc2` (37 commits ahead of `origin/sprint/final`, not pushed) | `git log` |
+| Deployed source | `/opt/chimera/src` (files copied per change, then installed into `/opt/chimera/venv`); every change up to `2476dc2` is deployed, backups under `/var/backups/chimera-*` | file compare, services |
 | Deployed classifier | `/etc/drakrun/classifier/`, `model.py` sha256 `74dba488…` (`f09beb4`: partial static never votes benign; static-only runs say the sample was not executed) | `sha256sum` |
-| Deployed web bundle | Rebuilt 25 Oct with R4, R6, R7, R8, R10 | browser check |
+| Deployed web bundle | Rebuilt 25 Oct: analysis dashboard (process tree top left, log statistics, structured log tables, file explorer), static sub-tabs with the code viewer, Memory dumps tab, Threat intel card | browser check |
 | Classifier and static analysis | Merged from `classifierUndStatico`; static image `localhost/chimera-static:0.1.0` (id `7d3d92a26f94`, ReversingLabs YARA, libfuzzy ssdeep, oletools; previous images tagged `pre-r2`, `pre-r3`, `pre-ssdeep`, `pre-r12`); `drakrun-static-worker` running | services, image |
 | Upstream DRAKVUF fixes | tklengyel/drakvuf#1886 (use-after-free in `refresh_shadow_copy`) and #1887 (libvmi bump) **merged 24 Oct** | `gh pr view` |
 
@@ -20,19 +20,19 @@ from earlier documents are marked as such and were not re-run.
 |---|---|
 | Hypervisor | Xen 4.19.2 (CHIMERA patch for the altp2m freeze, `vm-freeze-root-cause.md`) |
 | DRAKVUF | `v1.1-da982ab` with the local use-after-free fix (now upstream) |
-| Memory | 16 GiB total, dom0 6 GiB; guests: Windows 5 GiB, Linux 4 GiB |
+| Memory | 16 GiB total, dom0 6 GiB; guests: Windows 5 GiB, Linux 4 GiB, static-analysis VM 3.5 GiB (always on). With the static VM, a Windows and a Linux detonation no longer fit together: memory admission runs them one after the other |
 | CPUs | 16 logical (dom0 has 8 vCPUs) |
 | Disk | 488 GB free of 901 GB |
-| Services (all `active`) | `chimera-inetsim`, `chimera-net`, `chimera-xenstat`, `drakrun-web`, `drakrun-worker@1`, `@2`, `drakrun-evasion-worker@1`, `@2`, `drakrun-static-worker`, `redis-server` |
+| Services (all `active`) | `chimera-inetsim`, `chimera-net`, `chimera-xenstat`, `chimera-static-vm`, `drakrun-web`, `drakrun-worker@1`, `@2`, `drakrun-evasion-worker@1`, `@2`, `drakrun-static-worker`, `drakrun-static-deep-worker`, `redis-server` |
 
 ## 3. Tests
 
 | Suite | Result | Note |
 |---|---|---|
-| `test/unit` (drakrun) | **646 passed** | `.venv/bin/python -m pytest -q test/unit --confcutdir=test/unit -p no:cacheprovider` |
-| `classifier/tests` | **21 passed, 1 skipped** | the skip is the optional thrember parity test |
-| Frontend (vitest) | **47 passed** | Node 22 |
-| `static_analyzer/tests` | **33 passed** | inside the image: `podman build --network=host --target test -f static_analyzer/Containerfile static_analyzer` (R5) |
+| `test/unit` (drakrun) | **718 passed** | `.venv/bin/python -m pytest -q test/unit --confcutdir=test/unit -p no:cacheprovider` |
+| `classifier/tests` | **22 passed, 1 skipped** | the skip is the optional thrember parity test |
+| Frontend (vitest) | **102 passed** | Node 22 |
+| `static_analyzer/tests` | **53 passed** | inside the image: `podman build --network=host --target test -f static_analyzer/Containerfile static_analyzer` (R5) |
 
 ## 3a. Roadmap progress (25 Oct)
 
@@ -41,9 +41,13 @@ from earlier documents are marked as such and were not re-run.
 | P0 R1–R5 | Done and deployed |
 | P1 R6 combined report, R7 analysis modes, R8 hashes and list filters, R9 classifier freeze | Done and deployed; R7 checked live with a static-only run (VM workers never saw the job) |
 | P2 R10 IOC export, R12 Office macros and ZIP listing | Done and deployed |
-| P2 R11 offline intelligence | Not started: needs a dated feed snapshot (download needs the owner's OK; abuse.ch rate limits) |
+| P2 R11 offline intelligence | Code done and deployed (`intel-offline.md`): bundle builder for a connected host, `drakrun intel import`, matching in the report, Threat intel card. **No bundle imported yet**: the first feed download needs the owner's OK, so the card shows "Offline feeds missing" |
 | P2 R13 one dynamic analysis at a time | Not started: changes VM scheduling close to the freeze |
-| Static analysis isolation | Per-sample rootful podman container in dom0 (no network, read-only, no capabilities, uid 65534, limits). Stronger options for later: gVisor runtime, rootless podman, or a static-analysis domU |
+| Static analysis isolation | **Static-analysis VM live** (`[static] backend = "vm"`): Debian 12 domU without a network interface runs the same locked-down containers; dom0 container as fallback (`static-analysis.md`) |
+| Static analysis depth | LNK, RTF, script (decoded layers, ATT&CK rules) and .NET plugins; Ghidra listing with disassembly, callers and callees; code viewer with syntax highlighting |
+| Memory dumps | Scanned after each run on the deep queue (`memdump_scan_enabled = true`), shown in the report and the Memory dumps tab; not classifier features. Checked on `d3820759`: 64 dumps, 16 scanned in 54 s, no YARA hits (benign sample) |
+| Screenshots | Every 2 s when the screen changes by 2 % or more, plus one every 30 s; at most 90. The Windows "Networks" flyout is suppressed in the post-restore script |
+| Classifier retraining | Training filter on usable calls (`d3cb3d6`) and the calibration cohort tooling (`calibration-cohort.md`) are ready; retraining is on the classifier owner's machine |
 
 ## 4. Data and experiments
 
