@@ -1,0 +1,28 @@
+# CHIMERA decompiler image: Ghidra headless (the deep pass's decompilation step).
+#   Put ghidra_11.1.2_PUBLIC_20240709.zip (github.com/NationalSecurityAgency/ghidra/releases, Ghidra_11.1.2_build)
+#   into static_analyzer/ghidra/dist/, then:
+#   podman build --network=host -t localhost/chimera-ghidra:11.1.2 -f static_analyzer/ghidra/Containerfile \
+#       static_analyzer/ghidra
+# --network=host: see static_analyzer/Containerfile (netavark FORWARD rule vs CHIMERA_GUARD).
+# 11.1.2 is the last Ghidra release that runs on JDK 17, which is what Debian 12 ships; 11.2+ needs JDK 21.
+# Run only through drakrun/analyzer/static/sandbox.py: --network none, --read-only, --cap-drop ALL,
+# no-new-privileges, uid 65534, noexec mounts, memory/CPU/PID/time limits. Ghidra imports and analyzes the
+# file as data; nothing in this image executes the sample.
+FROM docker.io/library/python:3.11-slim-bookworm
+ARG GHIDRA_ZIP=ghidra_11.1.2_PUBLIC_20240709.zip
+ARG GHIDRA_SHA256=219ec130b901645779948feeb7cc86f131dd2da6c36284cf538c3a7f3d44b588
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openjdk-17-jdk-headless unzip \
+ && rm -rf /var/lib/apt/lists/*
+COPY dist/${GHIDRA_ZIP} /tmp/ghidra.zip
+RUN echo "${GHIDRA_SHA256}  /tmp/ghidra.zip" | sha256sum -c - \
+ && unzip -q /tmp/ghidra.zip -d /opt \
+ && mv /opt/ghidra_11.1.2_PUBLIC /opt/ghidra \
+ && rm /tmp/ghidra.zip \
+ && rm -rf /opt/ghidra/docs /opt/ghidra/Extensions/Eclipse \
+ && apt-get purge -y unzip && apt-get autoremove -y
+COPY chimera_decompile.py run.sh /opt/chimera-ghidra/
+RUN chmod 755 /opt/chimera-ghidra/run.sh && chmod 644 /opt/chimera-ghidra/chimera_decompile.py
+USER 65534:65534
+WORKDIR /
+ENTRYPOINT ["/opt/chimera-ghidra/run.sh"]

@@ -13,3 +13,4 @@ drakrun/tools/get-explorer-pid
 .venv/
 graphify-out/
 scripts/chimera/bench/behaviour-probe/probe.exe
+static_analyzer/ghidra/dist/

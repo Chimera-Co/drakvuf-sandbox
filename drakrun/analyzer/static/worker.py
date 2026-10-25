@@ -26,7 +26,7 @@ from rq import Queue, Worker
 from drakrun.lib.config import load_config
 from drakrun.lib.paths import ANALYSES_DIR, STATIC_DIR
 
-from .sandbox import SCHEMA, run_in_container, stage_sample
+from .sandbox import SCHEMA, ghidra_wall_s, run_ghidra, run_in_container, stage_sample
 
 logger = logging.getLogger(__name__)
 STATIC_QUEUE_NAME = "chimera-static"
@@ -106,7 +106,9 @@ def run_static_job(
     return {"error": None, "score": result.get("score"), "level": result.get("level")}
 
 
-def _enqueue_deep(settings, analysis_id: str, file_name: str, base, result: dict) -> bool:
+def _enqueue_deep(
+    settings, analysis_id: str, file_name: str, base, result: dict
+) -> bool:
     if not settings.deep_enabled or result.get("error"):
         return False
     if (result.get("type") or {}).get("format") not in DEEP_FORMATS:
@@ -114,7 +116,9 @@ def _enqueue_deep(settings, analysis_id: str, file_name: str, base, result: dict
     from rq import get_current_job
 
     job = get_current_job()
-    if job is None:  # called outside a worker (tests, tools): no queue to hand the deep pass to
+    if (
+        job is None
+    ):  # called outside a worker (tests, tools): no queue to hand the deep pass to
         return False
     try:
         Queue(name=DEEP_QUEUE_NAME, connection=job.connection).enqueue(
@@ -123,7 +127,11 @@ def _enqueue_deep(settings, analysis_id: str, file_name: str, base, result: dict
             file_name,
             str(base or STATIC_DIR),
             job_id=f"static-deep-{analysis_id}",
-            job_timeout=int(settings.deep_timeout_s + 120),
+            job_timeout=int(
+                settings.deep_timeout_s
+                + (ghidra_wall_s(settings) if settings.ghidra_enabled else 0)
+                + 120
+            ),
             result_ttl=24 * 3600,
         )
     except Exception:
@@ -147,33 +155,75 @@ def run_deep_job(analysis_id: str, file_name: str, base: Optional[str] = None) -
     directory = job_dir(analysis_id, Path(base) if base else None)
     started = time.time()
     try:
-        result = run_in_container(settings, analysis_id, directory, file_name, deep=True)
+        result = run_in_container(
+            settings, analysis_id, directory, file_name, deep=True
+        )
+        if (
+            settings.ghidra_enabled
+            and not result.get("error")
+            and result.get("format") in DEEP_FORMATS
+        ):
+            result["ghidra"] = _decompile(settings, analysis_id, directory, result)
     finally:
         shutil.rmtree(directory / "in", ignore_errors=True)
-    result["job"] = {"analysis_id": analysis_id, "wall_s": round(time.time() - started, 2)}
+    result["job"] = {
+        "analysis_id": analysis_id,
+        "wall_s": round(time.time() - started, 2),
+    }
     _write_json(directory, "deep.json", result)
     shutil.rmtree(directory / "out", ignore_errors=True)
     if base is None or Path(base) == STATIC_DIR:
         _refresh_report(analysis_id)
     if result.get("error"):
-        logger.error("[static] deep pass %s failed: %s", analysis_id, str(result["error"])[:500])
+        logger.error(
+            "[static] deep pass %s failed: %s", analysis_id, str(result["error"])[:500]
+        )
         raise StaticAnalysisFailed(str(result["error"])[:500])
     return {"error": None, "errors": len(result.get("errors") or [])}
 
 
+def _decompile(
+    settings, analysis_id: str, directory: Path, result: dict
+) -> Optional[dict]:
+    """Ghidra on the functions capa pointed at (then entry points, exports, largest). A failure is recorded
+    as a deep-pass error, never fatal."""
+    targets = [
+        {"addr": address, "rule": rule.get("name")}
+        for rule in (result.get("capa") or {}).get("rules") or []
+        for address in rule.get("addresses") or []
+    ]
+    started = time.time()
+    doc = run_ghidra(settings, analysis_id, directory, targets)
+    result.setdefault("timings_s", {})["ghidra"] = round(time.time() - started, 3)
+    if doc.get("error") and "functions" not in doc:
+        result.setdefault("errors", []).append(
+            {"stage": "ghidra", "error": str(doc["error"])[:300]}
+        )
+        return None
+    return doc
+
+
 def _refresh_report(analysis_id: str) -> None:
-    from drakrun.analyzer.postprocessing.plugins.build_chimera_report import build_report, render_html
+    from drakrun.analyzer.postprocessing.plugins.build_chimera_report import (
+        build_report,
+        render_html,
+    )
 
     directory = ANALYSES_DIR / str(uuid.UUID(analysis_id))
     if not (directory / "chimera-report.json").is_file():
         return  # the analysis is still running; its postprocessing will read deep.json itself
     try:
         report = build_report(directory)
-        (directory / "chimera-report.json").write_text(json.dumps(report, indent=1, allow_nan=False),
-                                                       encoding="utf-8")
-        (directory / "chimera-report.html").write_text(render_html(report), encoding="utf-8")
+        (directory / "chimera-report.json").write_text(
+            json.dumps(report, indent=1, allow_nan=False), encoding="utf-8"
+        )
+        (directory / "chimera-report.html").write_text(
+            render_html(report), encoding="utf-8"
+        )
     except Exception:
-        logger.exception("[static] report refresh after the deep pass failed for %s", analysis_id)
+        logger.exception(
+            "[static] report refresh after the deep pass failed for %s", analysis_id
+        )
 
 
 def load_deep(analysis_id: str, base: Optional[Path] = None) -> Optional[dict]:
@@ -184,7 +234,11 @@ def load_deep(analysis_id: str, base: Optional[Path] = None) -> Optional[dict]:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    return data if isinstance(data, dict) and data.get("schema") == "chimera-deep/1" else None
+    return (
+        data
+        if isinstance(data, dict) and data.get("schema") == "chimera-deep/1"
+        else None
+    )
 
 
 def load_static(analysis_id: str, base: Optional[Path] = None) -> Optional[dict]:
@@ -216,7 +270,9 @@ def static_worker_main(burst: bool = False, deep: bool = False):
     STATIC_DIR.mkdir(mode=0o711, parents=True, exist_ok=True)
     worker = Worker(
         # The deep pass has its own worker so a slow capa run never holds up the fast pass.
-        queues=[DEEP_QUEUE_NAME] if deep else [STATIC_QUEUE_NAME, STATIC_ONLY_QUEUE_NAME],
+        queues=(
+            [DEEP_QUEUE_NAME] if deep else [STATIC_QUEUE_NAME, STATIC_ONLY_QUEUE_NAME]
+        ),
         name=f"chimera-static{'-deep' if deep else ''}@{os.uname().nodename}",
         connection=Redis(
             host=config.redis.host,

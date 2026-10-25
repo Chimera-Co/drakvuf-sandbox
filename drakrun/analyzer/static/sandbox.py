@@ -132,3 +132,84 @@ def run_in_container(settings, analysis_id: str, job_dir: Path, file_name: str, 
         return {"schema": schema, "error": f"{exc}", "container": status}
     result["container"] = {"engine": settings.engine, "image": settings.image, **status}
     return result
+
+
+GHIDRA_STARTUP_S = 90  # JVM start, import and the script itself, on top of analysis + decompile budgets
+
+
+def ghidra_wall_s(settings) -> float:
+    return settings.ghidra_analysis_timeout_s + settings.ghidra_decompile_budget_s + GHIDRA_STARTUP_S
+
+
+def build_ghidra_command(settings, analysis_id: str, sample: Path, work: Path, out_dir: Path) -> list[str]:
+    """Decompiler container: the analyzer's isolation flags; more PIDs (JVM threads) and a disk-backed /work."""
+    opts = "noexec,nosuid,nodev" if settings.engine == "podman" else ""
+    ro, rw = ("ro," + opts).rstrip(","), ("rw," + opts).rstrip(",")
+    memory = f"{settings.ghidra_memory_mb}m"
+    heap = f"{max(512, settings.ghidra_memory_mb - 512)}M"  # leave room for the JVM's native memory
+    return [
+        settings.engine, "run", "--rm",
+        "--name", f"chimera-ghidra-{uuid.UUID(analysis_id)}",
+        "--network", "none",
+        "--read-only",
+        "--cap-drop", "ALL",
+        "--security-opt", "no-new-privileges",
+        "--user", f"{settings.container_uid}:{settings.container_gid}",
+        "--pids-limit", "256",
+        "--memory", memory, "--memory-swap", memory,
+        "--cpus", "2",
+        "--ulimit", "core=0", "--ulimit", "nofile=1024:1024",
+        "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=64m",
+        "-v", f"{sample}:/in/sample:{ro}",
+        "-v", f"{work}:/work:{rw}",
+        "-v", f"{out_dir}:/out:{rw}",
+        settings.ghidra_image,
+        "/in/sample", "/work", "/out",
+        str(int(settings.ghidra_analysis_timeout_s)), heap, str(int(settings.ghidra_max_functions)),
+        str(int(settings.ghidra_decompile_budget_s)),
+    ]
+
+
+def run_ghidra(settings, analysis_id: str, job_dir: Path, targets: list[dict]) -> dict:
+    """Decompile the staged sample; return ghidra.json's content, or {"error": ...}. Never raises."""
+    staged = job_dir / "in" / "sample"
+    work, out = job_dir / "ghidra-work", job_dir / "ghidra-out"
+    for directory in (work, out):
+        if directory.exists():
+            shutil.rmtree(directory)
+        directory.mkdir(mode=0o700)
+    (work / "targets.json").write_text(json.dumps({"addresses": targets[:200]}), encoding="utf-8")
+    for directory in (work, out):
+        if os.geteuid() == 0:
+            for path in (directory, *directory.iterdir()):
+                os.chown(path, settings.container_uid, settings.container_gid)
+        else:
+            os.chmod(directory, 0o777)  # development only (rootless engine maps uids)
+    name = f"chimera-ghidra-{uuid.UUID(analysis_id)}"
+    wall = ghidra_wall_s(settings)
+    try:
+        proc = subprocess.run(build_ghidra_command(settings, analysis_id, staged, work, out),
+                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                              timeout=wall)
+        if proc.returncode != 0:
+            tail = proc.stderr.decode("utf-8", "replace")[-500:]
+            return {"error": f"decompiler exited with {proc.returncode}: {tail}"}
+        result_path = out / "ghidra.json"
+        if result_path.is_symlink() or not result_path.is_file():
+            return {"error": "no ghidra.json written"}
+        if result_path.stat().st_size > settings.max_output_bytes:
+            return {"error": "ghidra.json too large"}
+        doc = json.loads(result_path.read_bytes())
+        return doc if isinstance(doc, dict) else {"error": "ghidra.json is not an object"}
+    except subprocess.TimeoutExpired:
+        for verb in ("kill", "rm"):
+            subprocess.run([settings.engine, verb, *(["-f"] if verb == "rm" else []), name],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
+        return {"error": f"decompiler timed out after {wall:.0f}s"}
+    except FileNotFoundError:
+        return {"error": f"container engine {settings.engine!r} not installed"}
+    except (OSError, ValueError) as exc:
+        return {"error": str(exc)[:300]}
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+        shutil.rmtree(out, ignore_errors=True)

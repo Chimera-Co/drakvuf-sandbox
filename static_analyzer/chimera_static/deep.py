@@ -87,6 +87,9 @@ def _capa(path: str, fmt: str) -> dict:
                        for a in meta.get("attack") or [] if a.get("id")],
             "mbc": [{k: m.get(k) for k in ("id", "objective", "behavior")} for m in meta.get("mbc") or [] if m.get("id")],
             "matches": len(match.get("matches") or []),
+            # where it matched (function, block or instruction addresses): the decompiler starts there
+            "addresses": [hex(a["value"]) for a, _ in (match.get("matches") or [])[:10]
+                          if isinstance(a, dict) and a.get("type") == "absolute" and isinstance(a.get("value"), int)],
         })
     rules.sort(key=lambda r: (r["namespace"] or "", r["name"]))
     return {"version": (doc.get("meta") or {}).get("version"), "rules_total": len(rules), "rules": rules[:MAX_RULES],

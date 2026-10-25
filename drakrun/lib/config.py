@@ -123,6 +123,14 @@ class StaticConfigSection(BaseModel):
     deep_enabled: bool = False
     deep_timeout_s: float = Field(default=240, gt=0, allow_inf_nan=False)
     deep_memory_mb: int = Field(default=2048, ge=512)
+    # Decompilation in the deep pass: Ghidra headless in its own image (a JVM cannot run inside the
+    # self-limiting analyzer process), same isolation flags; capa's match addresses pick the functions.
+    ghidra_enabled: bool = False
+    ghidra_image: str = "localhost/chimera-ghidra:11.1.2"
+    ghidra_analysis_timeout_s: int = Field(default=180, ge=10)
+    ghidra_decompile_budget_s: int = Field(default=120, ge=10)
+    ghidra_memory_mb: int = Field(default=2048, ge=1024)
+    ghidra_max_functions: int = Field(default=40, ge=1, le=200)
 
 
 class MemdumpConfigSection(BaseModel):

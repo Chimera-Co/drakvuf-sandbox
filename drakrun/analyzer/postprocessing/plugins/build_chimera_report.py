@@ -178,6 +178,7 @@ def _stage_deep(deep, ev: "_Evidence", claim, attack: list) -> dict:
         "name": "chimera-static --deep",
         "capa": (deep.get("capa") or {}).get("version"),
         "floss": (deep.get("floss") or {}).get("version"),
+        "ghidra": (deep.get("ghidra") or {}).get("version"),
     }
     eid = ev.add("deep.json", "", "chimera-static:deep")
     if deep.get("error"):
@@ -240,7 +241,11 @@ def _stage_deep(deep, ev: "_Evidence", claim, attack: list) -> dict:
         "reason": "; ".join(f"{e.get('stage')}: {e.get('error')}" for e in errors)[:300]
         or None,
         "producer": producer,
-        "payload": {"capabilities": capa.get("rules_total"), "hidden_strings": decoded},
+        "payload": {
+            "capabilities": capa.get("rules_total"),
+            "hidden_strings": decoded,
+            "decompiled_functions": (deep.get("ghidra") or {}).get("decompiled"),
+        },
         "evidence_ids": [eid],
     }
 
