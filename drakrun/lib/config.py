@@ -101,6 +101,12 @@ class ClassifierConfigSection(BaseModel):
     timeout_s: float = Field(default=60, gt=0, allow_inf_nan=False)
 
 
+class IntelConfigSection(BaseModel):
+    enabled: bool = False
+    db_path: pathlib.Path = pathlib.Path("/var/lib/drakrun/intel/intel.db")
+    max_bundle_bytes: int = Field(default=200 * 1024 * 1024, gt=0)
+
+
 class StaticConfigSection(BaseModel):
     """Static analysis of every upload, run beside the detonation in a locked-down container."""
 
@@ -141,6 +147,11 @@ class StaticConfigSection(BaseModel):
     vm_boot_timeout_s: float = Field(default=120, gt=0, allow_inf_nan=False)
     vm_restart_every: int = Field(default=100, ge=1)
     vm_result_disk_mb: int = Field(default=128, ge=16)
+    # Static analysis of the run's memory dumps (dumps.zip) on the deep queue after the analysis:
+    # unpacked payloads show their YARA matches and PE structure there. Never feeds the classifier.
+    memdump_scan_enabled: bool = False
+    memdump_scan_max: int = Field(default=16, ge=1, le=64)
+    memdump_scan_max_mb: int = Field(default=32, ge=1)
 
 
 class ScreenshotConfigSection(BaseModel):
@@ -249,6 +260,7 @@ class DrakrunConfig(BaseSettings):
     drakrun: DrakrunConfigSection
     capa: CapaConfigSection = CapaConfigSection()
     classifier: ClassifierConfigSection = Field(default_factory=ClassifierConfigSection)
+    intel: IntelConfigSection = Field(default_factory=IntelConfigSection)
     static: StaticConfigSection = Field(default_factory=StaticConfigSection)
     memdump: MemdumpConfigSection = MemdumpConfigSection()
     screenshots: ScreenshotConfigSection = Field(default_factory=ScreenshotConfigSection)

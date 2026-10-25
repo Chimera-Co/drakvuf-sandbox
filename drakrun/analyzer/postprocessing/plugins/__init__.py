@@ -20,6 +20,7 @@ from .index_logs import index_logs
 from .karton_integration import analyze_in_karton
 from .plugin_base import PostprocessPlugin
 from .process_dumps import process_dumps, process_linux_dumps
+from .queue_memdump_scan import queue_memdump_scan
 from .screenshot_metadata import screenshot_metadata
 from .split_drakmon_log import split_drakmon_log
 
@@ -123,4 +124,5 @@ POSTPROCESS_PLUGINS = [
         function=index_logs, requires=["process_tree.json"], generates=["log_index"]
     ),
     PostprocessPlugin(function=build_log_stats, requires=[], generates=[]),
+    PostprocessPlugin(function=queue_memdump_scan, requires=[DUMPS_ZIP], generates=[]),
 ]
