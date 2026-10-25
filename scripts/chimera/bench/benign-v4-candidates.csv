@@ -1,0 +1,103 @@
+name,category,source,start_command,notes
+notepad++,installer-nsis,https://notepad-plus-plus.org/downloads/,"""{sample}"" /S",shell extension
+vlc,installer-nsis,https://www.videolan.org/vlc/,"""{sample}"" /S",
+gimp,installer-inno,https://www.gimp.org/downloads/,"""{sample}"" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART",large
+inkscape,installer-msi,https://inkscape.org/release/,"msiexec /i ""{sample}"" /qn",
+libreoffice,installer-msi,https://www.libreoffice.org/download/download-libreoffice/,"msiexec /i ""{sample}"" /qn",large
+thunderbird,browser-installer,https://www.thunderbird.net/,"""{sample}"" /S",
+vivaldi,browser-installer,https://vivaldi.com/download/,"""{sample}"" --vivaldi-silent --do-not-launch-chrome",
+opera,browser-installer,https://www.opera.com/download,"""{sample}"" /silent /launchopera=0",stub downloader
+git,installer-inno,https://git-scm.com/download/win,"""{sample}"" /VERYSILENT /NORESTART",
+nodejs,installer-msi,https://nodejs.org/en/download,"msiexec /i ""{sample}"" /qn",
+golang,installer-msi,https://go.dev/dl/,"msiexec /i ""{sample}"" /qn",
+cmake,installer-msi,https://cmake.org/download/,"msiexec /i ""{sample}"" /qn",
+temurin-jdk,installer-msi,https://adoptium.net/temurin/releases/,"msiexec /i ""{sample}"" /qn",
+strawberry-perl,installer-msi,https://strawberryperl.com/,"msiexec /i ""{sample}"" /qn",
+rubyinstaller,installer-inno,https://rubyinstaller.org/downloads/,"""{sample}"" /verysilent /tasks=nomodpath",
+winscp,installer-inno,https://winscp.net/eng/download.php,"""{sample}"" /VERYSILENT /NORESTART",remote file transfer
+filezilla,installer-nsis,https://filezilla-project.org/download.php?type=client,"""{sample}"" /S",
+putty-msi,installer-msi,https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html,"msiexec /i ""{sample}"" /qn",
+mremoteng,installer-msi,https://mremoteng.org/download,"msiexec /i ""{sample}"" /qn",remote access manager
+heidisql,installer-inno,https://www.heidisql.com/download.php,"""{sample}"" /VERYSILENT /NORESTART",
+dbeaver,installer-nsis,https://dbeaver.io/download/,"""{sample}"" /S",bundles a JRE
+postman,installer-squirrel,https://www.postman.com/downloads/,"""{sample}"" -s",per-user Squirrel install
+slack,installer-squirrel,https://slack.com/downloads/windows,"""{sample}"" -s",per-user Squirrel install
+discord,installer-squirrel,https://discord.com/download,"""{sample}"" -s",per-user Squirrel install
+signal,installer-nsis,https://signal.org/download/windows/,"""{sample}"" /S",
+element,installer-squirrel,https://element.io/download,"""{sample}"" -s",
+obsidian,installer-nsis,https://obsidian.md/download,"""{sample}"" /S",
+joplin,installer-nsis,https://joplinapp.org/download/,"""{sample}"" /S",
+calibre,installer-msi,https://calibre-ebook.com/download_windows,"msiexec /i ""{sample}"" /qn",large
+anki,installer-nsis,https://apps.ankiweb.net/,"""{sample}"" /S",
+krita,installer-nsis,https://krita.org/en/download/,"""{sample}"" /S",
+paint.net,installer-msi-wrapper,https://www.getpaint.net/download.html,"""{sample}"" /auto",
+irfanview,installer-nsis,https://www.irfanview.com/,"""{sample}"" /silent",
+sharex,installer-inno,https://getsharex.com/,"""{sample}"" /VERYSILENT /NORESTART",screen capture: looks like spyware behaviour
+flameshot,installer-msi,https://flameshot.org/,"msiexec /i ""{sample}"" /qn",screen capture
+handbrake,installer-nsis,https://handbrake.fr/downloads.php,"""{sample}"" /S",
+qbittorrent,installer-nsis,https://www.qbittorrent.org/download,"""{sample}"" /S",peer-to-peer networking
+transmission,installer-msi,https://transmissionbt.com/download,"msiexec /i ""{sample}"" /qn",peer-to-peer networking
+mpc-hc,installer-inno,https://github.com/clsid2/mpc-hc/releases,"""{sample}"" /VERYSILENT /NORESTART",
+foobar2000,installer-nsis,https://www.foobar2000.org/download,"""{sample}"" /S",
+sumatrapdf,installer-portable,https://www.sumatrapdfreader.org/download-free-pdf-viewer,"""{sample}"" -install -silent",
+wireshark,installer-nsis,https://www.wireshark.org/download.html,"""{sample}"" /S",packet capture
+npcap,driver-installer,https://npcap.com/#download,"""{sample}"" /S",kernel driver; free edition may refuse silent install
+openvpn,vpn-installer-msi,https://openvpn.net/community-downloads/,"msiexec /i ""{sample}"" /qn",TAP driver
+veracrypt,driver-installer,https://www.veracrypt.fr/en/Downloads.html,"""{sample}"" /S",disk encryption driver: looks like ransomware tooling
+gpg4win,crypto-installer,https://www.gpg4win.org/download.html,"""{sample}"" /S",
+bitwarden,installer-nsis,https://bitwarden.com/download/,"""{sample}"" /S",credential store
+system-informer,driver-tool-installer,https://systeminformer.sourceforge.io/,"""{sample}"" -install -silent",kernel driver; process manipulation like malware
+x64dbg,debugger-portable,https://x64dbg.com/,,debugger; run x64dbg.exe from the zip
+ilspy,dotnet-decompiler-portable,https://github.com/icsharpcode/ILSpy/releases,,.NET decompiler; run ILSpy.exe
+hxd,installer-inno,https://mh-nexus.de/en/hxd/,"""{sample}"" /VERYSILENT /NORESTART",hex editor
+autohotkey,installer,https://www.autohotkey.com/,"""{sample}"" /silent",keyboard hooks: looks like a keylogger
+powertoys,installer-burn,https://github.com/microsoft/PowerToys/releases,"""{sample}"" /quiet /norestart",keyboard hooks
+nssm,service-tool,https://nssm.cc/download,"""{sample}"" install chimera-demo C:\\Windows\\System32\\notepad.exe",creates a service: persistence-like
+rufus,disk-tool-portable,https://rufus.ie/,,raw disk access; run without a target
+crystaldiskinfo,installer-inno,https://crystalmark.info/en/software/crystaldiskinfo/,"""{sample}"" /VERYSILENT /NORESTART",SMART queries
+crystaldiskmark,installer-inno,https://crystalmark.info/en/software/crystaldiskmark/,"""{sample}"" /VERYSILENT /NORESTART",
+hwinfo,hardware-prober-installer,https://www.hwinfo.com/download/,"""{sample}"" /VERYSILENT /NORESTART",hardware probing: VM-detection-like
+gpu-z,hardware-prober,https://www.techpowerup.com/gpuz/,,hardware probing
+windirstat,installer-msi,https://windirstat.net/,"msiexec /i ""{sample}"" /qn",walks the whole disk
+bleachbit,cleaner-installer,https://www.bleachbit.org/download/windows,"""{sample}"" /S",deletes files and logs: anti-forensics-like
+revo-uninstaller,installer-inno,https://www.revouninstaller.com/revo-uninstaller-free-download/,"""{sample}"" /VERYSILENT /NORESTART",
+treesize-free,installer-inno,https://www.jam-software.com/treesize_free,"""{sample}"" /VERYSILENT /NORESTART",
+ventoy,disk-tool-portable,https://www.ventoy.net/en/download.html,,
+balena-etcher,installer-nsis,https://etcher.balena.io/,"""{sample}"" /S",
+aria2,network-cli,https://github.com/aria2/aria2/releases,"""{sample}"" --dry-run https://example.invalid/file",downloader
+wget,network-cli,https://eternallybored.org/misc/wget/,"""{sample}"" --spider http://example.invalid/",downloader
+ffmpeg,media-cli,https://www.gyan.dev/ffmpeg/builds/,"""{sample}"" -version",
+imagemagick,installer-inno,https://imagemagick.org/script/download.php#windows,"""{sample}"" /VERYSILENT /NORESTART",
+pandoc,installer-msi,https://pandoc.org/installing.html,"msiexec /i ""{sample}"" /qn",
+hugo,go-cli,https://github.com/gohugoio/hugo/releases,"""{sample}"" version",
+terraform,go-cli,https://developer.hashicorp.com/terraform/install,"""{sample}"" version",
+kubectl,go-cli,https://kubernetes.io/docs/tasks/tools/install-kubectl-windows/,"""{sample}"" version --client",
+helm,go-cli,https://github.com/helm/helm/releases,"""{sample}"" version",
+gh,go-cli,https://cli.github.com/,"""{sample}"" --version",
+awscli,installer-msi,https://aws.amazon.com/cli/,"msiexec /i ""{sample}"" /qn",
+azure-cli,installer-msi,https://learn.microsoft.com/cli/azure/install-azure-cli-windows,"msiexec /i ""{sample}"" /qn",
+jq,c-cli,https://jqlang.org/download/,"""{sample}"" --version",
+fzf,go-cli,https://github.com/junegunn/fzf/releases,"""{sample}"" --version",
+starship,rust-cli,https://starship.rs/,"""{sample}"" --version",
+nushell,rust-cli,https://www.nushell.sh/,"""{sample}"" -c ""ls C:/Windows | length""",shell
+neovim,installer-msi,https://neovim.io/,"msiexec /i ""{sample}"" /qn",
+vim,installer-nsis,https://www.vim.org/download.php,"""{sample}"" /S",
+sublime-text,installer-inno,https://www.sublimetext.com/download,"""{sample}"" /VERYSILENT /NORESTART",
+wezterm,installer-inno,https://wezterm.org/install/windows.html,"""{sample}"" /VERYSILENT /NORESTART",
+alacritty,installer-msi,https://alacritty.org/,"msiexec /i ""{sample}"" /qn",
+mkcert,go-cli,https://github.com/FiloSottile/mkcert/releases,"""{sample}"" -CAROOT",certificate tooling
+openssl-shining-light,installer-inno,https://slproweb.com/products/Win32OpenSSL.html,"""{sample}"" /VERYSILENT /NORESTART",
+tcpview,sysinternals-gui,https://learn.microsoft.com/sysinternals/downloads/tcpview,"""{sample}"" -accepteula",
+strings,sysinternals-cli,https://learn.microsoft.com/sysinternals/downloads/strings,"""{sample}"" -accepteula C:\\Windows\\notepad.exe",
+pskill,sysinternals-cli,https://learn.microsoft.com/sysinternals/downloads/pskill,"""{sample}"" -accepteula notepad",kills processes
+psloggedon,sysinternals-cli,https://learn.microsoft.com/sysinternals/downloads/psloggedon,"""{sample}"" -accepteula",session discovery
+coreinfo,sysinternals-cli,https://learn.microsoft.com/sysinternals/downloads/coreinfo,"""{sample}"" -accepteula",CPUID queries: VM-detection-like
+du,sysinternals-cli,https://learn.microsoft.com/sysinternals/downloads/du,"""{sample}"" -accepteula C:\\Users",
+autologon,sysinternals-gui,https://learn.microsoft.com/sysinternals/downloads/autologon,"""{sample}"" -accepteula",touches Winlogon credentials: credential-access-like
+user-audit,admin-script-powershell,team-written,"powershell.exe -ExecutionPolicy Bypass -File ""{sample}""",local users and groups report
+service-report,admin-script-powershell,team-written,"powershell.exe -ExecutionPolicy Bypass -File ""{sample}""",services and drivers report
+firewall-report,admin-script-powershell,team-written,"powershell.exe -ExecutionPolicy Bypass -File ""{sample}""",reads firewall rules
+eventlog-export,admin-script-powershell,team-written,"powershell.exe -ExecutionPolicy Bypass -File ""{sample}""",exports (does not clear) event logs
+cert-inventory,admin-script-powershell,team-written,"powershell.exe -ExecutionPolicy Bypass -File ""{sample}""",certificate stores
+registry-backup,admin-script-batch,team-written,"cmd.exe /c ""{sample}""",reg export of HKCU Software
+network-reset,admin-script-batch,team-written,"cmd.exe /c ""{sample}""",ipconfig and netsh show commands only

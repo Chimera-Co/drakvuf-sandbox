@@ -9,6 +9,11 @@ CHIMERA M5 sample shortlist and download from MalwareBazaar (abuse.ch).
              and its terms forbid high-volume harvesting, so do not loop this.
   linux-shortlist  the same for the Linux sandbox: up to three ELF candidates per
              Linux family (about 9 queries), added to shortlist.csv with guest_os linux
+  cohort     calibration cohort (classifier calibration and fitted fusion): about 100
+             Windows EXEs, at most --per-family per family, none from the Stage 1
+             shortlist/register, chosen from the cached family metadata (no new
+             query unless --extra-families names an uncached family; capped by
+             --max-queries). Writes cohort.csv and cohort-manifest.json.
   download   operator only, after the mentor's written sign-off and the team's
              review: fetch the reviewed shortlist as MalwareBazaar's
              password-protected ZIPs into a root-only directory and write the
@@ -34,6 +39,7 @@ import json
 import os
 import pathlib
 import sys
+import time
 
 API = "https://mb-api.abuse.ch/api/v1/"
 KEY_FILE = pathlib.Path("/etc/chimera/abusech-auth-key")
@@ -284,6 +290,93 @@ def unzip_head(path):
     return data[:64]
 
 
+COHORT_PER_FAMILY = 4
+
+
+def stage1_hashes(out):
+    """sha256 of every sample already in the Stage 1 shortlist or register (never reused for calibration)."""
+    taken = set()
+    for name in ("shortlist.csv", "register.csv"):
+        path = out / name
+        if path.exists():
+            with path.open(newline="") as f:
+                taken |= {r["sha256"].lower() for r in csv.DictReader(f) if r.get("sha256")}
+    return taken
+
+
+def cohort(fetch_family, families, count, per_family, since, exclude):
+    """Spread the cohort over families and over time: within a family, every k-th sample by first_seen."""
+    by_family = {}
+    for family in families:
+        for entry in fetch_family(family):
+            if not eligible(entry, since) or entry["sha256_hash"].lower() in exclude:
+                continue
+            by_family.setdefault(entry["signature"].strip().lower(), {})[entry["sha256_hash"]] = entry
+    rows = []
+    for family in sorted(by_family):
+        entries = sorted(by_family[family].values(), key=lambda e: e["first_seen"])
+        step = max(1, len(entries) // per_family)
+        rows += [_row(e, "calibration") for e in entries[::step][:per_family]]
+    rows.sort(key=lambda r: (r["family"].lower(), r["first_seen"]))
+    if len(rows) > count:  # trim the largest families first, keeping every family represented
+        while len(rows) > count:
+            counts = {}
+            for r in rows:
+                counts[r["family"].lower()] = counts.get(r["family"].lower(), 0) + 1
+            biggest = max(counts, key=lambda f: (counts[f], f))
+            drop = max(i for i, r in enumerate(rows) if r["family"].lower() == biggest)
+            rows.pop(drop)
+    return rows
+
+
+def cmd_cohort(args):
+    import requests
+
+    out = private_dir(pathlib.Path(args.out))
+    since = (datetime.date.today() - datetime.timedelta(days=args.since_days)).isoformat()
+    metadata = out / "metadata"
+    families = VM_AWARE_FAMILIES + CONTROL_FAMILIES + list(args.extra_families)
+    uncached = [f for f in families if not (metadata / f"{f.lower()}.json").exists()]
+    if len(uncached) > args.max_queries:
+        raise SystemExit(f"{len(uncached)} families need a MalwareBazaar query (limit {args.max_queries}): "
+                         + ", ".join(uncached))
+    cached = cached_fetch(requests.Session(), auth_key() if uncached else None, metadata)
+
+    def fetch(family):  # pause between new queries: abuse.ch restricts heavy accounts
+        if family in uncached:
+            time.sleep(args.query_delay)
+        return cached(family)
+
+    exclude = stage1_hashes(out)
+    rows = cohort(fetch, families, args.count, args.per_family, since, exclude)
+    with (out / "cohort.csv").open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=FIELDS)
+        writer.writeheader()
+        writer.writerows(rows)
+    stage1_families = set()
+    for name in ("shortlist.csv", "register.csv"):
+        path = out / name
+        if path.exists():
+            with path.open(newline="") as f:
+                stage1_families |= {r["family"].strip().lower() for r in csv.DictReader(f) if r.get("family")}
+    per_family = {}
+    for r in rows:
+        per_family[r["family"]] = per_family.get(r["family"], 0) + 1
+    manifest = {
+        "created": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+        "purpose": "classifier calibration and fitted fusion; never the Stage 1 holdout",
+        "samples": len(rows),
+        "families": per_family,
+        "stage1_hashes_excluded": len(exclude),
+        "families_shared_with_stage1": sorted(f for f in per_family if f.lower() in stage1_families),
+        "new_queries": len(uncached),
+        "since": since,
+    }
+    (out / "cohort-manifest.json").write_text(json.dumps(manifest, indent=2))
+    print(f"{len(rows)} calibration samples from {len(per_family)} families -> {out / 'cohort.csv'} "
+          f"(metadata only; {len(uncached)} new queries)")
+
+
 def cmd_download(args):
     import requests
 
@@ -292,7 +385,7 @@ def cmd_download(args):
     key, session = auth_key(), requests.Session()
     out = private_dir(pathlib.Path(args.out))
     zips = private_dir(out / "zips")
-    with (out / "shortlist.csv").open(newline="") as f:
+    with (out / args.list).open(newline="") as f:
         rows = list(csv.DictReader(f))
     register = []
     linux_taken = {}
@@ -334,11 +427,11 @@ def cmd_download(args):
                 "guest_os": guest_os,
             }
         )
-    with (out / "register.csv").open("w", newline="") as f:
+    with (out / args.register).open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(register[0].keys()))
         writer.writeheader()
         writer.writerows(register)
-    print(f"{len(register)} samples registered in {out / 'register.csv'}")
+    print(f"{len(register)} samples registered in {out / args.register}")
 
 
 def main(argv=None):
@@ -359,8 +452,19 @@ def main(argv=None):
     p.add_argument("--out", default="/var/lib/chimera-samples")
     p.add_argument("--since-days", type=int, default=180)
     p.set_defaults(func=cmd_add)
+    p = sub.add_parser("cohort", help="calibration cohort, disjoint from Stage 1 (metadata only)")
+    p.add_argument("--out", default="/var/lib/chimera-samples")
+    p.add_argument("--count", type=int, default=100)
+    p.add_argument("--per-family", type=int, default=COHORT_PER_FAMILY)
+    p.add_argument("--since-days", type=int, default=365)
+    p.add_argument("--extra-families", nargs="*", default=[])
+    p.add_argument("--max-queries", type=int, default=10)
+    p.add_argument("--query-delay", type=float, default=3.0, help="seconds before each new metadata query")
+    p.set_defaults(func=cmd_cohort)
     p = sub.add_parser("download")
     p.add_argument("--out", default="/var/lib/chimera-samples")
+    p.add_argument("--list", default="shortlist.csv", help="rows to fetch (cohort.csv for the calibration cohort)")
+    p.add_argument("--register", default="register.csv", help="register to write (register-cohort.csv)")
     p.add_argument("--i-have-the-mentor-signoff", action="store_true")
     p.set_defaults(func=cmd_download)
     args = parser.parse_args(argv)

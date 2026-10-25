@@ -14,6 +14,7 @@ verified from a primary source, **[S]** secondary, **[K]** background knowledge 
 | [`competitive-landscape.md`](competitive-landscape.md) | CERT-PL DRAKVUF Sandbox, CAPE, Cuckoo 3, ANY.RUN, Hybrid Analysis, VirusTotal, Intezer, IntelOwl, Triage, Joe Sandbox; comparison matrix with CHIMERA |
 | [`static-engine-design.md`](static-engine-design.md) | Static analyzer audit, tool and YARA ruleset choices (with licences), `chimera-static/2` evidence schema |
 | [`classifier-audit.md`](classifier-audit.md) | Data, leakage, the zero-call defect (fixed), score semantics, calibration limits, evaluation protocol |
+| [`calibration-cohort.md`](calibration-cohort.md) | Retraining with the usable-calls filter, calibration cohort (100 malware + 100 benign), Platt and fitted fusion with grouped CV |
 | [`report-intel-orchestration.md`](report-intel-orchestration.md) | Threat-intelligence design (hash-only, offline-first), `chimera-report/1` report schema, queue flow, analysis modes |
 | [`architecture.md`](architecture.md) | Components, data flow, trust boundaries and artifacts as they are today, and the deltas after the roadmap |
 | [`hardening-roadmap.md`](hardening-roadmap.md) | Measured evasion results, remaining detections and their causes, future VMI and PERDEDOR work, what never to do |
