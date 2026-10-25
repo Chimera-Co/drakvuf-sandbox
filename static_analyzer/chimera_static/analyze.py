@@ -13,7 +13,9 @@ from .safety import read_sample, write_output
 
 SEVERITY_POINTS = {"info": 0, "low": 4, "medium": 12, "high": 25}
 ML_FORMATS = {"pe", "elf", "pdf"}
-TYPE_PLUGINS = {"pe", "elf", "pdf", "ole", "ooxml", "zip", "apk"}
+TYPE_PLUGINS = {"pe", "elf", "pdf", "ole", "ooxml", "zip", "apk", "lnk", "rtf", "script"}
+# Formats analyzed by rules only (no ML model, run-time behaviour unknown): never full coverage.
+RULE_ONLY = {"lnk", "rtf", "script"}
 EMBER_MAX_BYTES = 128 * 1024 * 1024
 
 
@@ -126,6 +128,17 @@ def analyze(path: str, out_dir: str | None = None, file_name: str = "", timeout_
         if got:
             result["pe"], f = got
             result["findings"] += f
+        if t.get("dotnet"):
+            import pefile
+
+            from .plugins.dotnet import analyze_dotnet
+            dn = stage("dotnet", lambda: analyze_dotnet(pefile.PE(data=data, fast_load=True)), heavy=True)
+            if dn:
+                result["dotnet"] = dn
+                strs_dn = dn["user_strings"]
+                dn_iocs = U.iocs(strs_dn)
+                result["dotnet"]["iocs"] = {k: v for k, v in dn_iocs.items() if v and k != "base64_blobs"}
+                result["findings"] += U.keyword_findings(strs_dn)
     elif fmt == "elf":
         from .plugins.elf import analyze_elf
         got = stage("elf", lambda: analyze_elf(data), heavy=True)
@@ -154,6 +167,24 @@ def analyze(path: str, out_dir: str | None = None, file_name: str = "", timeout_
         # parsed, not cryptographically verified.
         result["errors"].append({"stage": "archive-contents",
                                  "error": "DEX code is not decompiled or analyzed; signatures are not verified"})
+    elif fmt == "lnk":
+        from .plugins.lnk import analyze_lnk
+        got = stage("lnk", lambda: analyze_lnk(data), heavy=True)
+        if got:
+            result["lnk"], f = got
+            result["findings"] += f
+    elif fmt == "rtf":
+        from .plugins.rtf import analyze_rtf
+        got = stage("rtf", lambda: analyze_rtf(data), heavy=True)
+        if got:
+            result["rtf"], f = got
+            result["findings"] += f
+    elif fmt.startswith("script:"):
+        from .plugins.script import analyze_script
+        got = stage("script", lambda: analyze_script(data, t, U.iocs), heavy=True)
+        if got:
+            result["script"], result["source"], f = got
+            result["findings"] += f
     elif fmt == "zip":
         from .plugins.archive import analyze_zip
         got = stage("zip", lambda: analyze_zip(data), heavy=True)
@@ -187,11 +218,17 @@ def analyze(path: str, out_dir: str | None = None, file_name: str = "", timeout_
     # ---- coverage: a low score only means "nothing found" if the layers that look for things ran.
     # The classifier takes benign evidence only from a complete run (YARA is reported, not required).
     failed = sorted({e["stage"] for e in result["errors"]} - {"plugins"})
-    supported = fmt in TYPE_PLUGINS
+    family = "script" if fmt.startswith("script:") else fmt
+    supported = family in TYPE_PLUGINS
+    if family in RULE_ONLY and family in result:
+        result["errors"].append({"stage": "rule-only",
+                                 "error": f"{family}: rules only, no trained model; run-time behaviour comes from "
+                                          "the dynamic run"})
+        failed = sorted({e["stage"] for e in result["errors"]} - {"plugins"})
     wants_ml = ember and fmt in ML_FORMATS
-    complete = (supported and fmt in result and (not wants_ml or "ml" in result)
-                and not {"identify", "hashes", "strings", "archive-contents"} & set(failed))
-    result["coverage"] = {"complete": bool(complete), "type_plugin": fmt if supported else None,
+    complete = (supported and family in result and (not wants_ml or "ml" in result)
+                and not {"identify", "hashes", "strings", "archive-contents", "rule-only"} & set(failed))
+    result["coverage"] = {"complete": bool(complete), "type_plugin": family if supported else None,
                           "failed_stages": failed}
     result["duration_s"] = round(time.monotonic() - t0, 3)
     if out_dir:

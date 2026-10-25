@@ -25,6 +25,7 @@ from .safety import SampleError, harden_process, write_output  # noqa: E402
 # Import every parser *before* hardening (imports may start threads or read many files).
 from . import analyze as _analyze  # noqa: E402
 from .plugins import archive as _archive, elf as _elf, office as _office, pdf as _pdf, pe as _pe  # noqa: E402,F401,E501
+from .plugins import dotnet as _dotnet, lnk as _lnk, rtf as _rtf, script as _script  # noqa: E402,F401
 
 try:
     from .plugins import apk as _apk  # noqa: E402,F401  (androguard is large: load before hardening)

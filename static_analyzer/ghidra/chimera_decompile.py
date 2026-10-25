@@ -2,6 +2,7 @@
 # @runtime Jython
 #
 # Args: <targets.json> <out.json> <max functions> <decompile budget seconds>
+# Each function also gets up to MAX_ASM instructions and its callee/caller entry addresses (for the call graph).
 # Order: entry points, exported functions, functions containing capa match addresses (targets.json), then the
 # largest remaining functions until <max>. Each function gets a decompile timeout; output is capped per function.
 import io
@@ -14,6 +15,8 @@ from ghidra.util.task import ConsoleTaskMonitor
 
 PER_FUNCTION_S = 20
 MAX_C_CHARS = 20000
+MAX_ASM = 300
+MAX_EDGES = 50
 
 args = getScriptArgs()
 targets_path, out_path = args[0], args[1]
@@ -69,6 +72,26 @@ for function in remaining:
         break
     pick(function, "largest")
 
+code_listing = program.getListing()
+
+
+def disassembly(function):
+    out = []
+    for insn in code_listing.getInstructions(function.getBody(), True):
+        if len(out) >= MAX_ASM:
+            break
+        try:
+            raw = " ".join("%02x" % (b & 0xff) for b in insn.getBytes())
+        except Exception:
+            raw = ""
+        out.append({"a": "0x%x" % insn.getAddress().getOffset(), "b": raw, "t": str(insn)[:200]})
+    return out
+
+
+def edges(functions):
+    return sorted("0x%x" % f.getEntryPoint().getOffset() for f in functions if not f.isExternal())[:MAX_EDGES]
+
+
 decompiler = DecompInterface()
 decompiler.setOptions(DecompileOptions())
 decompiler.openProgram(program)
@@ -77,7 +100,13 @@ deadline = time.time() + budget
 for function, reasons, rules in chosen:
     entry = {"name": function.getName(), "address": "0x%x" % function.getEntryPoint().getOffset(),
              "size": int(function.getBody().getNumAddresses()), "reasons": reasons, "capa": rules,
-             "c": None, "truncated": False, "error": None}
+             "c": None, "truncated": False, "error": None, "asm": [], "calls": [], "callers": []}
+    try:
+        entry["asm"] = disassembly(function)
+        entry["calls"] = edges(function.getCalledFunctions(monitor))
+        entry["callers"] = edges(function.getCallingFunctions(monitor))
+    except Exception as exc:  # listing data is extra; the decompile below still runs
+        entry["error"] = ("listing: " + str(exc))[:300]
     left = deadline - time.time()
     if left < 1:
         entry["error"] = "skipped: decompile time budget"

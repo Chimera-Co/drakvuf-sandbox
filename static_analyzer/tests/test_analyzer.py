@@ -128,7 +128,11 @@ def test_oversized_sample_is_refused_not_truncated(tmp_path):
 
 def test_coverage_marks_what_was_not_analysed(tmp_path):
     script = analyze(str(write(tmp_path, "s.ps1", b"Write-Host 'hello'\n")), ember=False)
-    assert script["coverage"]["complete"] is False and script["coverage"]["type_plugin"] is None
+    # Scripts are parsed by the rule-only script plugin: never full coverage (no model, run time unknown).
+    assert script["coverage"]["complete"] is False and script["coverage"]["type_plugin"] == "script"
+    assert "rule-only" in script["coverage"]["failed_stages"]
+    unknown = analyze(str(write(tmp_path, "u.bin", bytes(range(256)) * 8)), ember=False)
+    assert unknown["coverage"]["complete"] is False and unknown["coverage"]["type_plugin"] is None
     pdf = analyze(str(write(tmp_path, "d.pdf", BENIGN_PDF)), ember=False)
     assert pdf["coverage"]["type_plugin"] == "pdf"
     assert pdf["coverage"]["complete"] is ("pdf" in pdf and not {"identify", "hashes", "strings"}
