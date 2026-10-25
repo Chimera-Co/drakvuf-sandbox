@@ -280,12 +280,14 @@ it.each([
         render(<StaticAnalysisTab analysisId={ID} />);
         expect(await screen.findByText(expected)).toBeTruthy();
         expect(
-            within(screen.getByText("Coverage").closest("tr")).getByText(
+            within(screen.getByRole("region", { name: "Coverage" })).getByText(
                 expected,
             ),
         ).toBeTruthy();
         expect(
-            within(screen.getByText("YARA").closest("tr")).getByText(yara),
+            within(
+                screen.getByRole("region", { name: "YARA ruleset" }),
+            ).getByText(yara),
         ).toBeTruthy();
     },
 );

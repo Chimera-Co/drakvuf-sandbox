@@ -1,0 +1,127 @@
+.static-shell {
+    min-height: 36rem;
+}
+.static-workspace {
+    font-size: 0.875rem;
+}
+.static-workspace h6 {
+    margin-top: 1rem;
+}
+.static-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+    gap: 0.6rem;
+}
+.static-facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 0.5rem 1rem;
+}
+.static-facts > div {
+    border-bottom: 1px solid var(--bs-border-color);
+    padding: 0.4rem 0;
+    min-width: 0;
+}
+.static-facts dt {
+    color: var(--bs-secondary-color);
+    font-size: 0.75rem;
+    text-transform: capitalize;
+}
+.static-facts dd {
+    margin: 0.2rem 0;
+}
+.static-table {
+    table-layout: fixed;
+    min-width: 550px;
+}
+.static-entropy {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+}
+.static-entropy meter {
+    width: 5rem;
+}
+.static-chart {
+    height: 200px;
+    width: 100%;
+    min-width: 0;
+}
+.static-workspace details {
+    border-bottom: 1px solid var(--bs-border-color);
+    padding: 0.55rem;
+}
+.static-workspace summary {
+    cursor: pointer;
+    overflow-wrap: anywhere;
+}
+.static-string-list {
+    max-height: 32rem;
+    overflow: auto;
+}
+.static-string-list li {
+    padding: 0.35rem;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+.static-matrix {
+    display: flex;
+    overflow-x: auto;
+    gap: 0.5rem;
+    padding-bottom: 0.75rem;
+}
+.static-matrix > div {
+    flex: 0 0 180px;
+}
+.static-code-layout {
+    display: grid;
+    grid-template-columns: minmax(210px, 28%) minmax(0, 1fr);
+    gap: 1rem;
+}
+.static-code-layout aside {
+    max-height: 44rem;
+    overflow-y: auto;
+}
+.static-source {
+    min-width: 0;
+}
+.static-code {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    background: var(--bs-tertiary-bg);
+    padding: 1rem 0.5rem;
+    border: 1px solid var(--bs-border-color);
+    font-size: 0.8rem;
+    tab-size: 4;
+}
+.static-line {
+    display: inline-block;
+    width: 3rem;
+    padding-right: 0.8rem;
+    text-align: right;
+    color: var(--bs-secondary-color);
+    user-select: none;
+}
+.syntax-keyword {
+    color: var(--chimera-violet);
+}
+.syntax-type {
+    color: var(--chimera-blue);
+}
+.syntax-number {
+    color: var(--chimera-cyan);
+}
+.syntax-string {
+    color: var(--chimera-green);
+}
+.syntax-comment {
+    color: var(--bs-secondary-color);
+}
+@media (max-width: 800px) {
+    .static-code-layout {
+        grid-template-columns: 1fr;
+    }
+    .static-code-layout aside {
+        max-height: 16rem;
+    }
+}

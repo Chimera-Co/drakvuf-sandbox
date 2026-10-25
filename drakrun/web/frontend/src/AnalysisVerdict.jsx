@@ -1,5 +1,6 @@
+import StaticWorkspace from "./static/StaticWorkspace.jsx";
 import { useEffect, useState } from "react";
-import { getClassification, getDeepStatic, getStaticReport } from "./api.js";
+import { getClassification, getDeepStatic } from "./api.js";
 
 const LABEL_CLASS = {
     malicious: "bg-danger",
@@ -8,7 +9,7 @@ const LABEL_CLASS = {
     unknown: "bg-secondary",
 };
 
-const SEVERITY_CLASS = {
+export const SEVERITY_CLASS = {
     critical: "bg-danger",
     high: "bg-danger",
     medium: "bg-warning text-dark",
@@ -17,7 +18,7 @@ const SEVERITY_CLASS = {
 };
 
 // A 404 means the worker has not finished; retry for up to 15 minutes.
-function useOptionalJson(loader, analysisId) {
+export function useOptionalJson(loader, analysisId) {
     const [state, setState] = useState({ loading: true });
     useEffect(() => {
         let active = true;
@@ -375,29 +376,10 @@ export function DeepSection({ analysisId }) {
 }
 
 export function StaticAnalysisTab({ analysisId }) {
-    const { loading, data, missing, polling, error } = useOptionalJson(
-        getStaticReport,
-        analysisId,
-    );
-    if (loading) return <div className="py-2">Loading static analysis...</div>;
-    if (missing)
-        return (
-            <div className="py-2 text-muted">
-                {polling
-                    ? "No static analysis yet: waiting for static analysis (this updates by itself)."
-                    : "No static analysis for this analysis (static analysis was off, or it has not finished)."}
-            </div>
-        );
-    if (error)
-        return (
-            <div className="py-2 text-danger">Error: {error.toString()}</div>
-        );
-    if (data.error)
-        return (
-            <div className="py-2 text-danger">
-                Static analysis failed: {data.error}
-            </div>
-        );
+    return <StaticWorkspace analysisId={analysisId} />;
+}
+
+export function StaticOverview({ data }) {
     const type = data.type || {};
     const file = data.file || {};
     const findings = data.findings || [];
@@ -415,117 +397,122 @@ export function StaticAnalysisTab({ analysisId }) {
             ? `${ruleset.rules} rules${ruleset.sources?.length ? ` (${ruleset.sources.map((source) => `${source.name} @ ${source.commit?.slice(0, 7) || "unknown"}`).join(", ")})` : ""}`
             : ruleset?.note || "no rules";
     return (
-        <div className="py-2">
-            <table className="datatable-table mb-3">
-                <tbody>
-                    <tr>
-                        <th>Level</th>
-                        <td>
-                            {data.level} (score {data.score})
-                        </td>
-                    </tr>
-                    <tr>
-                        <th>Format</th>
-                        <td>
+        <div className="py-2 text-break">
+            <div className="static-metrics mb-3">
+                <section aria-label="Format" className="card">
+                    <div className="card-body p-3">
+                        <h6 className="mt-0">Format</h6>
+                        <div className="fw-semibold text-break">
                             {[type.format, type.platform, type.arch]
                                 .filter(Boolean)
                                 .join(" / ")}
-                            {type.magic ? (
-                                <div className="small text-muted">
-                                    {type.magic}
-                                </div>
-                            ) : null}
-                        </td>
-                    </tr>
-                    <tr>
-                        <th>Coverage</th>
-                        <td>
+                        </div>
+                        <div className="small text-muted text-break">
+                            {type.magic}
+                        </div>
+                    </div>
+                </section>
+                <section aria-label="Coverage" className="card">
+                    <div className="card-body p-3">
+                        <h6 className="mt-0">Coverage</h6>
+                        <div
+                            className={
+                                coverage?.complete
+                                    ? "text-success"
+                                    : "text-warning-emphasis"
+                            }
+                        >
                             {!coverage
                                 ? "not reported (older analyzer)"
                                 : coverage.complete
                                   ? "complete"
                                   : `partial${reasons.length ? `: ${reasons.join("; ")}` : ""}`}
-                        </td>
-                    </tr>
-                    <tr>
-                        <th>YARA</th>
-                        <td>
+                        </div>
+                    </div>
+                </section>
+                <section aria-label="YARA ruleset" className="card">
+                    <div className="card-body p-3">
+                        <h6 className="mt-0">YARA</h6>
+                        <div className="small text-break">
                             {yara}
                             {failed.includes("yara")
                                 ? " - scan did not run"
                                 : ""}
-                        </td>
-                    </tr>
-                    <tr>
-                        <th>Size</th>
-                        <td>{file.size} bytes</td>
-                    </tr>
-                    <tr>
-                        <th>MD5 / SHA1</th>
-                        <td className="small">
-                            {file.md5}
-                            <br />
-                            {file.sha1}
-                        </td>
-                    </tr>
-                    <tr>
-                        <th>Analyzer</th>
-                        <td className="small">
-                            {data.analyzer_version} in {data.container?.engine}{" "}
-                            ({data.duration_s}s)
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+                        </div>
+                    </div>
+                </section>
+            </div>
+            <p className="small text-muted text-break">
+                Analyzer {data.analyzer_version || "unknown"} ·{" "}
+                {data.container?.engine || "engine not reported"} ·{" "}
+                {data.duration_s ?? "–"}s
+            </p>
             <section aria-label="Hashes" className="mb-3">
                 <h6>Hashes</h6>
+                {file.md5 && <HashValue label="MD5" value={file.md5} />}
+                {file.sha1 && <HashValue label="SHA-1" value={file.sha1} />}
                 <HashValue label="SHA-256" value={file.sha256} />
                 <HashValue label="ssdeep" value={file.ssdeep} />
                 <HashValue label="TLSH" value={file.tlsh} />
                 <HashValue label="imphash" value={data.pe?.imphash} />
             </section>
-            <h6>Findings ({findings.length})</h6>
-            {findings.length ? (
-                <table className="table table-sm">
-                    <thead>
-                        <tr>
-                            <th>Severity</th>
-                            <th>Finding</th>
-                            <th>Evidence</th>
-                            <th>ATT&amp;CK</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {findings.map((finding, idx) => (
-                            <tr key={`${finding.id}-${idx}`}>
-                                <td>
-                                    <span
-                                        className={`badge ${SEVERITY_CLASS[finding.severity] || "bg-secondary"}`}
-                                    >
-                                        {finding.severity}
-                                    </span>
-                                </td>
-                                <td>{finding.title}</td>
-                                <td className="small text-break">
-                                    {finding.evidence}
-                                </td>
-                                <td className="small">
-                                    {(finding.attack || []).join(", ")}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            ) : (
-                <div className="text-muted">No findings.</div>
-            )}
-            {["pe", "elf"].includes(type.format) ? (
-                <DeepSection analysisId={analysisId} />
-            ) : null}
+            <section aria-label="Findings">
+                <h6>Findings ({findings.length})</h6>
+                {findings.length ? (
+                    <div className="table-responsive">
+                        <table
+                            aria-label="Findings"
+                            className="table table-sm static-table"
+                        >
+                            <thead>
+                                <tr>
+                                    <th scope="col">Severity</th>
+                                    <th scope="col">Finding</th>
+                                    <th scope="col">Evidence</th>
+                                    <th scope="col">ATT&amp;CK</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {findings.map((finding, idx) => (
+                                    <tr key={`${finding.id}-${idx}`}>
+                                        <td>
+                                            <span
+                                                className={`badge ${SEVERITY_CLASS[finding.severity] || "bg-secondary"}`}
+                                            >
+                                                {finding.severity}
+                                            </span>
+                                        </td>
+                                        <td className="text-break">
+                                            {finding.title}
+                                        </td>
+                                        <td className="small text-break">
+                                            {finding.evidence}
+                                        </td>
+                                        <td className="small">
+                                            {(finding.attack || []).map(
+                                                (entry, i) => (
+                                                    <span
+                                                        key={i}
+                                                        className="badge bg-secondary me-1 text-wrap"
+                                                    >
+                                                        {entry.id || entry}
+                                                    </span>
+                                                ),
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <div className="text-muted">No findings.</div>
+                )}
+            </section>
             {data.errors?.length ? (
                 <>
                     <h6>Analyzer errors</h6>
-                    <ul className="small">
+                    <ul className="small text-break">
                         {data.errors.map((entry, idx) => (
                             <li key={idx}>
                                 {entry.stage}: {entry.error}
