@@ -67,3 +67,8 @@ def test_unexpected_output_is_recorded_not_raised():
     result = post_restore.set_guest_clock(FakeDrakshell(stdout=b"garbage"))
 
     assert result["set"] is False
+
+
+def test_shipped_post_restore_script_fits_drakshell_command_line():
+    for net in (True, False):
+        assert len(" ".join(post_restore.get_post_restore_command(net))) <= 2048

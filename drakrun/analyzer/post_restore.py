@@ -21,6 +21,10 @@ def prepare_ps_command(script: str):
     return ["powershell.exe", "-EncodedCommand", encoded_cmd]
 
 
+# vm-post-restore.ps1 travels base64-encoded (UTF-16) on drakshell's command line, which is capped at
+# 2048 characters: keep the script short and put explanations here. It suppresses the "Networks:
+# allow your PC to be discoverable?" flyout (NewNetworkWindowOff), which a restored snapshot would
+# otherwise show after the DHCP renew, over a third of the sample's desktop and every screenshot.
 def get_post_restore_command(net_enable: bool):
     post_restore_script_path = ETC_DIR / "vm-post-restore.ps1"
     if not post_restore_script_path.exists():
