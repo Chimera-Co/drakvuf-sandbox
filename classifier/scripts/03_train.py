@@ -101,7 +101,8 @@ def load_winmet(files: list[Path], cache_dir: Path, allowed=None):
     """Featurize every WinMET record once; cache as sparse matrix + metadata."""
     key = hashlib.sha256(json.dumps([[str(f), f.stat().st_size, f.stat().st_mtime] for f in files]
                                     + [fz.FEATURIZE_VERSION, list(fz.ALL_FEATURE_NAMES)[:5],
-                                       len(fz.ALL_FEATURE_NAMES), sorted(allowed) if allowed else None]
+                                       len(fz.ALL_FEATURE_NAMES), sorted(allowed) if allowed else None,
+                                       "calls=usable"]
                                     ).encode()).hexdigest()[:16]
     cache = cache_dir / f"winmet_{key}.npz"
     meta_cache = cache_dir / f"winmet_{key}.meta.json"
@@ -122,7 +123,9 @@ def load_winmet(files: list[Path], cache_dir: Path, allowed=None):
                     meta["id"].append(r["id"])
                     meta["family"].append(r["label"].get("family"))
                     meta["avclass"].append(r["label"].get("avclass"))
-                    meta["calls"].append(fz.hooked_call_count(feats))
+                    # usable calls (inside the vocabulary), the count the deployed gate uses: a run whose calls
+                    # are all outside it has an empty vector and must not be learned from
+                    meta["calls"].append(fz.hooked_call_count(feats, allowed))
                     meta["file_type"].append(feats["sample"].get("file_type", ""))
                     meta["volume"].append(r.get("volume"))
         except (EOFError, OSError):
@@ -150,7 +153,7 @@ def load_chimera(path: Path | None, allowed=None):
         rows.append(_sparse_row(r["features"], allowed))
         meta["id"].append(r["id"])
         meta["group"].append(r["group"])
-        meta["calls"].append(fz.hooked_call_count(r["features"]))
+        meta["calls"].append(fz.hooked_call_count(r["features"], allowed))
         meta["program"].append(r["aux"].get("program"))
         meta["arm"].append(r["aux"].get("arm"))
     return _csr(rows), meta
