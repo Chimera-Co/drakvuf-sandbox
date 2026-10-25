@@ -18,6 +18,11 @@ function Shell() {
         <>
             <AppHeader sidebar={sidebar} />
             <output aria-label="mode">{sidebar.mode}</output>
+            <output aria-label="peek">{String(sidebar.peek)}</output>
+            <button onClick={() => sidebar.setMode("open")}>Pin open</button>
+            <button onClick={() => sidebar.setMode("rail")}>
+                Fold to icons
+            </button>
         </>
     );
 }
@@ -34,7 +39,7 @@ afterEach(cleanup);
 it("folds the sidebar on reports by default and remembers the choice per page kind", () => {
     at("/analysis/123");
     expect(screen.getByLabelText("mode").textContent).toBe("rail");
-    fireEvent.click(screen.getByRole("button", { name: "Keep sidebar open" }));
+    fireEvent.click(screen.getByRole("button", { name: "Pin open" }));
     expect(screen.getByLabelText("mode").textContent).toBe("open");
     expect(JSON.parse(localStorage.getItem("chimera-sidebar")).report).toBe(
         "open",
@@ -42,8 +47,15 @@ it("folds the sidebar on reports by default and remembers the choice per page ki
     cleanup();
     at("/");
     expect(screen.getByLabelText("mode").textContent).toBe("open");
-    fireEvent.click(
-        screen.getByRole("button", { name: "Fold sidebar to icons" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Fold to icons" }));
+    expect(screen.getByLabelText("mode").textContent).toBe("rail");
+});
+
+it("opens and closes the phone menu without changing the pinned preference", () => {
+    at("/analysis/123");
+    fireEvent.click(screen.getByRole("button", { name: "Open menu" }));
+    expect(screen.getByLabelText("peek").textContent).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Close menu" }));
+    expect(screen.getByLabelText("peek").textContent).toBe("false");
     expect(screen.getByLabelText("mode").textContent).toBe("rail");
 });

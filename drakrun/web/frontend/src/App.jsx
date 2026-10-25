@@ -1,3 +1,4 @@
+/* global __APP_VERSION__ */
 import React, { useEffect, useRef, useState } from "react";
 import { Routes, Route, Link, NavLink, useLocation } from "react-router-dom";
 
@@ -70,14 +71,7 @@ export function useSidebar() {
 }
 
 export function AppHeader({ sidebar }) {
-    const phone = isPhone();
-    const label = phone
-        ? sidebar?.peek
-            ? "Close menu"
-            : "Open menu"
-        : sidebar?.mode === "open"
-          ? "Fold sidebar to icons"
-          : "Keep sidebar open";
+    const label = sidebar?.peek ? "Close menu" : "Open menu";
     return (
         <nav className="sb-topnav navbar navbar-expand navbar-dark bg-dark">
             {sidebar ? (
@@ -88,16 +82,8 @@ export function AppHeader({ sidebar }) {
                     aria-label={label}
                     title={label}
                     aria-controls="layoutSidenav_nav"
-                    aria-expanded={
-                        phone ? sidebar.peek : sidebar.mode === "open"
-                    }
-                    onClick={() =>
-                        phone
-                            ? sidebar.setPeek(!sidebar.peek)
-                            : sidebar.setMode(
-                                  sidebar.mode === "open" ? "rail" : "open",
-                              )
-                    }
+                    aria-expanded={sidebar.peek}
+                    onClick={() => sidebar.setPeek(!sidebar.peek)}
                 >
                     <FontAwesomeIcon icon={faBars} />
                 </button>

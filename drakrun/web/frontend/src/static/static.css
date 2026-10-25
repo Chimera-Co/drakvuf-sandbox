@@ -85,7 +85,7 @@
 .static-code {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
-    background: var(--bs-tertiary-bg);
+    background: var(--chimera-surface-2);
     padding: 1rem 0.5rem;
     border: 1px solid var(--bs-border-color);
     font-size: 0.8rem;
@@ -100,19 +100,20 @@
     user-select: none;
 }
 .syntax-keyword {
-    color: var(--chimera-violet-ink);
+    color: var(--chimera-syntax-keyword);
 }
 .syntax-type {
-    color: var(--chimera-blue-ink);
+    color: var(--chimera-syntax-type);
 }
 .syntax-number {
-    color: var(--chimera-cyan-ink);
+    color: var(--chimera-syntax-number);
 }
 .syntax-string {
-    color: var(--chimera-green-ink);
+    color: var(--chimera-syntax-string);
 }
 .syntax-comment {
-    color: var(--bs-secondary-color);
+    color: var(--chimera-syntax-comment);
+    font-style: italic;
 }
 @media (max-width: 800px) {
     .static-code-layout {

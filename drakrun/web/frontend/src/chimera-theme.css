@@ -954,8 +954,8 @@ li.selected {
 
 /* ============================================================================
    15. Landing / intro experience
-   Fixed overlay in front of the app: static logo splash, then the landing
-   video, then it unmounts. Runs once per page load (see ChimeraIntro.jsx).
+   Fixed overlay in front of the app: static logo splash, then a fade
+   into the app. Runs once per page load (see ChimeraIntro.jsx).
    The overlay is purely visual — it never touches the router, so the user
    stays on whatever route they loaded.
    ========================================================================== */
@@ -992,83 +992,6 @@ li.selected {
     justify-content: center;
     gap: 1.25rem;
     transition: opacity 320ms ease;
-}
-
-/* Phase 2 — cross-fade the splash away as the video comes up. */
-.chimera-intro--video .chimera-intro__splash {
-    opacity: 0;
-    pointer-events: none;
-}
-
-/* The landing video — full-bleed, cinematic. `cover` fills the whole viewport
-   with no bars/letterboxing/pillarboxing; the video keeps its natural
-   proportions (some cropping when the viewport aspect differs from 16:9, which
-   is acceptable — distortion is not). The base03 fill only shows for the
-   instant before the first frame paints. */
-.chimera-intro__video {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center center;
-    background-color: var(--chimera-shell);
-    opacity: 0;
-    transition: opacity 380ms ease;
-}
-
-.chimera-intro--video .chimera-intro__video {
-    opacity: 1;
-}
-
-/* Over the clip: the theme's accent washes through it and the frame fades to the
-   theme's shell at the edges, so the clip sits in the same colours as the console. */
-.chimera-intro__tint {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 380ms ease;
-    background:
-        radial-gradient(
-            ellipse at 50% 50%,
-            transparent 48%,
-            color-mix(in srgb, var(--chimera-shell) 88%, transparent) 100%
-        ),
-        linear-gradient(
-            to top,
-            color-mix(in srgb, var(--chimera-shell) 80%, transparent) 0,
-            transparent 22%
-        );
-}
-
-.chimera-intro__tint::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: var(--chimera-accent);
-    mix-blend-mode: color;
-    opacity: 0.28;
-}
-
-.chimera-intro__tint::after {
-    content: "";
-    position: absolute;
-    left: 50%;
-    bottom: 7vh;
-    width: 180px;
-    height: 2px;
-    transform: translateX(-50%);
-    background: linear-gradient(
-        90deg,
-        transparent,
-        var(--chimera-accent),
-        transparent
-    );
-}
-
-.chimera-intro--video .chimera-intro__tint {
-    opacity: 1;
 }
 
 .chimera-intro__mark {
@@ -1160,14 +1083,13 @@ li.selected {
         scroll-behavior: auto !important;
     }
 
-    /* Reduced motion: the video is never mounted by ChimeraIntro; hold the
+    /* Reduced motion: hold the
        identity static for a brief moment, then transition into the app. */
     .chimera-intro,
     .chimera-intro__splash,
     .chimera-intro__mark,
     .chimera-intro__wordmark,
-    .chimera-intro__rule,
-    .chimera-intro__video {
+    .chimera-intro__rule {
         animation: none !important;
         opacity: 1;
     }

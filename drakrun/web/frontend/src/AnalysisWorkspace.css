@@ -321,18 +321,24 @@
     background-color: var(--chimera-surface-2);
 }
 
-.syntax-function,
-.syntax-label {
-    color: var(--chimera-blue-ink);
+.syntax-function {
+    color: var(--chimera-syntax-function);
 }
 
-.syntax-variable,
+.syntax-label {
+    color: var(--chimera-syntax-label);
+}
+
+.syntax-variable {
+    color: var(--chimera-syntax-variable);
+}
+
 .syntax-preprocessor {
-    color: var(--chimera-violet-ink);
+    color: var(--chimera-syntax-preprocessor);
 }
 
 .syntax-char {
-    color: var(--chimera-cyan-ink);
+    color: var(--chimera-syntax-char);
 }
 
 .memdump-table {

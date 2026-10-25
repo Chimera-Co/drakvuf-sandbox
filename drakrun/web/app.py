@@ -1,7 +1,7 @@
 import os
 
 import rq_dashboard
-from flask import jsonify, send_file
+from flask import jsonify, send_file, send_from_directory
 from flask_openapi3 import Info, OpenAPI
 
 from drakrun.lib.config import load_config
@@ -47,4 +47,13 @@ def index():
 
 @app.route("/<path:path>")
 def catchall(path):
+    dist = os.path.join(app.root_path, "frontend", "dist")
+    if (
+        path not in (".", "..")
+        and "/" not in path
+        and "\\" not in path
+        and os.path.isfile(os.path.join(dist, path))
+    ):
+        mimetype = "application/manifest+json" if path.endswith(".webmanifest") else None
+        return send_from_directory(dist, path, mimetype=mimetype)
     return send_file("frontend/dist/index.html")

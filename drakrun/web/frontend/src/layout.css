@@ -4,7 +4,7 @@
 
 :root {
     --chimera-topbar-h: 56px;
-    --chimera-nav-w: 225px;
+    --chimera-nav-w: 260px;
     --chimera-rail-w: 3.75rem;
 }
 
@@ -19,7 +19,7 @@
 }
 
 .chimera-nav-toggle {
-    display: inline-flex;
+    display: none;
     align-items: center;
     justify-content: center;
     width: 2.5rem;
@@ -116,40 +116,48 @@
     width: var(--chimera-rail-w);
 }
 
-.chimera-shell.is-rail:not(.is-peek) .chimera-nav-label,
-.chimera-shell.is-rail:not(.is-peek) .sb-sidenav-footer,
-.chimera-shell.is-rail:not(.is-peek) .chimera-nav-tools {
-    position: absolute;
-    width: 1px;
-    height: 1px;
+/* Keep the rail's geometry while its labels are clipped during peek. */
+.chimera-shell .sb-sidenav {
     overflow: hidden;
-    clip: rect(0, 0, 0, 0);
+}
+
+.chimera-shell .sb-sidenav .sb-sidenav-menu .nav-link {
+    height: 48px;
+    flex-wrap: nowrap;
+    overflow: hidden;
+    padding-inline: 1rem;
+}
+
+.chimera-shell .sb-nav-link-icon {
+    flex: 0 0 28px;
+    margin-right: 0;
+    font-size: 1rem;
+}
+
+.chimera-nav-label {
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.chimera-nav-tools,
+.chimera-shell .sb-sidenav-menu-heading,
+.chimera-shell .sb-sidenav-footer {
+    width: var(--chimera-nav-w);
     white-space: nowrap;
 }
 
-.chimera-shell.is-rail:not(.is-peek)
-    .sb-sidenav
-    .sb-sidenav-menu
-    .sb-sidenav-menu-heading {
-    height: 0;
-    margin: 0.6rem 0.9rem;
-    padding: 0;
-    overflow: hidden;
-    border-top: 1px solid rgba(var(--chimera-shell-line-rgb), 0.18);
+.chimera-nav-tools button {
+    height: 30px;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
-.chimera-shell.is-rail:not(.is-peek) .sb-sidenav .sb-sidenav-menu .nav-link {
-    justify-content: center;
-    padding-inline: 0;
-}
-
-.chimera-shell.is-rail:not(.is-peek)
-    .sb-sidenav
-    .sb-sidenav-menu
-    .nav-link
-    .sb-nav-link-icon {
-    margin-right: 0;
-    font-size: 1rem;
+.chimera-shell.is-rail:not(.is-peek) .chimera-nav-label,
+.chimera-shell.is-rail:not(.is-peek) .sb-sidenav-footer,
+.chimera-shell.is-rail:not(.is-peek) .chimera-nav-tools,
+.chimera-shell.is-rail:not(.is-peek) .sb-sidenav-menu-heading {
+    opacity: 0;
+    pointer-events: none;
 }
 
 .chimera-shell.is-rail.is-peek .sb-sidenav {
@@ -160,6 +168,9 @@
 }
 
 @media (max-width: 767.98px) {
+    .chimera-nav-toggle {
+        display: inline-flex;
+    }
     /* Phones: the rail would take a fifth of the screen, so the sidebar hides
        completely and the menu button opens it over the page. */
     #layoutSidenav.chimera-shell.is-rail #layoutSidenav_nav,

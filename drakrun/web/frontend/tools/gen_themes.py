@@ -10,6 +10,7 @@ the canvas and on cards, secondary text and every status "ink" (coloured words, 
 4.5:1, and button text 4.5:1. src/themes.js lists the same scheme names for the picker.
 """
 
+import colorsys
 import sys
 from pathlib import Path
 
@@ -260,9 +261,34 @@ def contrast(a, b):
     return (hi + 0.05) / (lo + 0.05)
 
 
+def syntax_colors(p):
+    """Saturated code colours, fitted to AA on the code surface in either mode."""
+    dark = luminance(p["surface2"]) < 0.3
+    kinds = dict(keyword=285, type=205, function=40, string=115, number=175,
+                 variable=330, preprocessor=255, char=85, label=15)
+    out = {}
+    for kind, hue in kinds.items():
+        lightness = 0.62 if dark else 0.34
+        for _ in range(100):
+            channels = colorsys.hls_to_rgb(hue / 360, lightness, 0.65)
+            color = "#" + "".join(f"{round(c * 255):02x}" for c in channels)
+            if contrast(color, p["surface2"]) >= 4.6:
+                break
+            lightness += 0.005 if dark else -0.005
+        out[kind] = color
+    # Neutral comments stay quieter than plain text without losing readability.
+    for step in range(101):
+        color = mix(p["text"], p["surface2"], step / 100)
+        if contrast(color, p["surface2"]) >= 4.6:
+            out["comment"] = color
+            break
+    return out
+
+
 def checks(p):
     """(label, foreground, background, minimum ratio) for one palette."""
-    out = []
+    out = [(f"syntax-{kind}/surface2", color, p["surface2"], 4.5)
+           for kind, color in syntax_colors(p).items()]
     for bg in ("canvas", "surface"):
         out += [
             (f"text/{bg}", p["text"], p[bg], 7),
@@ -323,6 +349,7 @@ def tokens(p, mode):
         "shadow-alpha": "0.35" if dark else "0.06",
         "magenta": p["magenta"],
     }
+    t.update({f"syntax-{kind}": color for kind, color in syntax_colors(p).items()})
     for hue in HUES:
         t[hue] = p[hue]
         t[f"{hue}-ink"] = p[f"{hue}_ink"]
