@@ -160,3 +160,18 @@ def test_identify_formats():
     assert identify(b"{\\rtf1\\ansi")["format"] == "rtf"
     assert identify(b"\xcf\xfa\xed\xfe\x0c\x00\x00\x01" + b"\x00" * 32)["format"] == "macho"
     assert identify(b"L\x00\x00\x00\x01\x14\x02\x00" + b"\x00" * 100)["format"] == "lnk"
+
+
+def test_ssdeep_matches_the_reference_and_is_fast_on_padding():
+    import hashlib
+    import time
+
+    from chimera_static.universal import hashes
+
+    data = b"".join(hashlib.sha256(i.to_bytes(4, "little")).digest() for i in range(8192)) + bytes(65536)
+    # Reference value from the earlier pure-Python implementation (ppdeep 20200505): same algorithm, same output.
+    assert hashes(data)["ssdeep"] == "6144:QLHKI0nmTf57Zq5C7xKxq1npBgWJo0F2ZxD6CSUTXo:u3uCdJUsHaOoI2WGTXo"
+    padded = ((os.urandom(4096) + bytes(60000)) * 520)[: 32 * 1024 * 1024]
+    started = time.monotonic()
+    assert hashes(padded)["ssdeep"]
+    assert time.monotonic() - started < 10  # ppdeep needed about 90 s here

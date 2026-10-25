@@ -16,9 +16,11 @@ try:
 except Exception:  # pragma: no cover - optional
     tlsh = None
 try:
-    import ppdeep  # pure-Python ssdeep
+    # libfuzzy binding: one pass for every block size. The pure-Python ppdeep re-hashed repetitive input
+    # (about 90 s for 30 MiB), so padding alone could spend the static budget.
+    import ssdeep
 except Exception:  # pragma: no cover - optional
-    ppdeep = None
+    ssdeep = None
 try:
     import yara
 except Exception:  # pragma: no cover - optional
@@ -98,9 +100,9 @@ def hashes(data: bytes) -> dict:
             out["tlsh"] = value if value and value != "TNULL" else None
         except Exception:
             pass
-    if ppdeep is not None and len(data) <= 32 * 1024 * 1024:
+    if ssdeep is not None:
         try:
-            out["ssdeep"] = ppdeep.hash(data)
+            out["ssdeep"] = ssdeep.hash(data)
         except Exception:
             pass
     return out

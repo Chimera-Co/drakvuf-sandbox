@@ -8,7 +8,7 @@
 # ---- build stage: compilers live here only
 FROM docker.io/library/python:3.11-slim-bookworm AS build
 ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
-RUN apt-get update && apt-get install -y --no-install-recommends build-essential git && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential git libfuzzy-dev && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 COPY requirements.txt pyproject.toml ./
 COPY chimera_static ./chimera_static
@@ -21,7 +21,7 @@ FROM docker.io/library/python:3.11-slim-bookworm AS test
 ENV PYTHONDONTWRITEBYTECODE=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 \
     CHIMERA_STATIC_YARA=/opt/chimera-static/rules.yarc \
     OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
-RUN apt-get update && apt-get install -y --no-install-recommends libmagic1 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends libmagic1 libfuzzy2 && rm -rf /var/lib/apt/lists/*
 COPY --from=build /wheels /tmp/wheels
 RUN pip install --no-index --find-links /tmp/wheels /tmp/wheels/*.whl && pip install pytest==8.3.5
 COPY rules /opt/chimera-static/rules
@@ -40,7 +40,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     CHIMERA_STATIC_YARA=/opt/chimera-static/rules.yarc \
     OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libmagic1 \
+ && apt-get install -y --no-install-recommends libmagic1 libfuzzy2 \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=build /wheels /tmp/wheels
 RUN pip install --no-index --find-links /tmp/wheels /tmp/wheels/*.whl \
