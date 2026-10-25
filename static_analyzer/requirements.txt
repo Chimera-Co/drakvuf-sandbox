@@ -9,4 +9,5 @@ yara-python==4.5.4
 py-tlsh==4.7.2
 ssdeep==3.4            # built against Debian's libfuzzy (build stage); libfuzzy2 at runtime
 numpy==2.4.6            # thrember features
+oletools==0.60.2       # olevba macro indicators (no deobfuscation pass)
 scikit-learn==1.9.1     # thrember's FeatureHasher (same version as the classifier)

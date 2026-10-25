@@ -13,7 +13,7 @@ from .safety import read_sample, write_output
 
 SEVERITY_POINTS = {"info": 0, "low": 4, "medium": 12, "high": 25}
 ML_FORMATS = {"pe", "elf", "pdf"}
-TYPE_PLUGINS = {"pe", "elf", "pdf"}
+TYPE_PLUGINS = {"pe", "elf", "pdf", "ole", "ooxml", "zip"}
 EMBER_MAX_BYTES = 128 * 1024 * 1024
 
 
@@ -138,6 +138,21 @@ def analyze(path: str, out_dir: str | None = None, file_name: str = "", timeout_
         if got:
             result["pdf"], f = got
             result["findings"] += f
+    elif fmt in ("ole", "ooxml"):
+        from .plugins.office import analyze_office
+        got = stage("office", lambda: analyze_office(data, fmt), heavy=True)
+        if got:
+            result[fmt], f = got
+            result["findings"] += f
+    elif fmt == "zip":
+        from .plugins.archive import analyze_zip
+        got = stage("zip", lambda: analyze_zip(data), heavy=True)
+        if got:
+            result["zip"], f = got
+            result["findings"] += f
+        # Members are listed, never unpacked: nothing inside was analyzed, so this is never full coverage.
+        result["errors"].append({"stage": "archive-contents",
+                                 "error": "archive members are listed, not unpacked or analyzed"})
     else:
         result["errors"].append({"stage": "plugins", "error": f"no type plugin for {fmt} yet (layers 0-1 only)"})
 
@@ -165,7 +180,7 @@ def analyze(path: str, out_dir: str | None = None, file_name: str = "", timeout_
     supported = fmt in TYPE_PLUGINS
     wants_ml = ember and fmt in ML_FORMATS
     complete = (supported and fmt in result and (not wants_ml or "ml" in result)
-                and not {"identify", "hashes", "strings"} & set(failed))
+                and not {"identify", "hashes", "strings", "archive-contents"} & set(failed))
     result["coverage"] = {"complete": bool(complete), "type_plugin": fmt if supported else None,
                           "failed_stages": failed}
     result["duration_s"] = round(time.monotonic() - t0, 3)
