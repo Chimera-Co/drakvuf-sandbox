@@ -1,8 +1,12 @@
 .analysis-workspace {
     display: grid;
-    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+    grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
     gap: 1rem;
     align-items: start;
+}
+/* A collapsed process tree leaves the width to the tabs. */
+.analysis-workspace:has(.analysis-process-column details:not([open])) {
+    grid-template-columns: 9rem minmax(0, 1fr);
 }
 .analysis-static-only {
     grid-template-columns: minmax(0, 1fr);
@@ -119,6 +123,19 @@
 .decision-component {
     background: var(--chimera-base1);
 }
-.analysis-event-table td.text-break {
-    min-width: 14rem;
+.analysis-event-table th:nth-child(1) {
+    width: 5.75rem;
+}
+.analysis-event-table th:nth-child(2) {
+    width: 9rem;
+}
+.analysis-event-table th:nth-child(3) {
+    width: 8.5rem;
+}
+.analysis-event-table th:last-child {
+    width: 2.75rem;
+}
+.analysis-event-table td.text-nowrap {
+    overflow: hidden;
+    text-overflow: ellipsis;
 }

@@ -191,7 +191,7 @@ export function StructuredTable({
                                     </button>
                                 </th>
                             ))}
-                            <th scope="col">Details</th>
+                            <th scope="col" aria-label="Details" />
                         </tr>
                     </thead>
                     <tbody>
@@ -269,10 +269,12 @@ export function StructuredTable({
                                     })}
                                     <td>
                                         <button
-                                            className="btn btn-sm btn-outline-secondary"
+                                            className="btn btn-sm btn-outline-secondary px-2 py-0"
+                                            aria-label="Inspect"
+                                            title="Inspect event"
                                             onClick={() => setDetail(row)}
                                         >
-                                            Inspect
+                                            ⋯
                                         </button>
                                     </td>
                                 </tr>
