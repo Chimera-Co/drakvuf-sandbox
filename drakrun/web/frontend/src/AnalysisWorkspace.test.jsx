@@ -203,7 +203,7 @@ it("shows score meters, disagreement and calibration note", async () => {
     expect(screen.getAllByRole("meter")).toHaveLength(3);
     expect(
         screen.getByText(
-            "Scores are not probabilities until the model is calibrated",
+            "Scores are not probabilities until the model is calibrated; 0.50 is the malicious threshold.",
         ),
     ).toBeTruthy();
     expect(screen.getByText("Dynamic and static disagree")).toBeTruthy();

@@ -71,6 +71,29 @@ const fields = {
         ["Status", "Status"],
     ],
 };
+const LOG_ORDER = [
+    "procmon",
+    "apimon",
+    "filetracer",
+    "regmon",
+    "socketmon",
+    "tlsmon",
+    "memdump",
+    "inject",
+    "exmon",
+    "cpuidmon",
+    "drakrun",
+    "drakvuf_stderr",
+    "parse_errors",
+];
+export const orderLogTypes = (list) =>
+    [...list].sort(
+        (a, b) =>
+            (LOG_ORDER.indexOf(a) + 1 || 99) -
+                (LOG_ORDER.indexOf(b) + 1 || 99) || a.localeCompare(b),
+    );
+const NOWRAP = new Set(["Time", "Process", "Method"]);
+const eventTime = (row) => Number(row.TimeStamp ?? row.timestamp);
 export function StructuredTable({
     rows = [],
     logType,
@@ -110,6 +133,8 @@ export function StructuredTable({
                     { numeric: true },
                 ) * sort.direction,
         );
+    const times = rows.map(eventTime).filter(Number.isFinite);
+    const startTs = times.length ? Math.min(...times.slice(0, 5000)) : null;
     const options = [
         ...new Set(rows.map((r) => r.Method || r.Event || "unknown")),
     ]
@@ -192,13 +217,32 @@ export function StructuredTable({
                                         return (
                                             <td
                                                 key={label}
-                                                className="text-break font-monospace small"
+                                                className={`font-monospace small ${NOWRAP.has(label) ? "text-nowrap" : "text-break"}`}
+                                                title={
+                                                    label === "Time" &&
+                                                    Number.isFinite(
+                                                        eventTime(row),
+                                                    )
+                                                        ? new Date(
+                                                              eventTime(row) *
+                                                                  1000,
+                                                          ).toISOString()
+                                                        : label === "Process"
+                                                          ? displayValue(value)
+                                                          : undefined
+                                                }
                                             >
-                                                {label === "Process" &&
-                                                seqid != null &&
-                                                onProcessSelect ? (
+                                                {label === "Time" &&
+                                                startTs != null &&
+                                                Number.isFinite(
+                                                    eventTime(row),
+                                                ) ? (
+                                                    `+${(eventTime(row) - startTs).toFixed(3)} s`
+                                                ) : label === "Process" &&
+                                                  seqid != null &&
+                                                  onProcessSelect ? (
                                                     <button
-                                                        className="btn btn-sm btn-outline-secondary text-break"
+                                                        className="btn btn-sm btn-outline-secondary text-nowrap"
                                                         onClick={() =>
                                                             onProcessSelect(
                                                                 seqid,
@@ -210,6 +254,10 @@ export function StructuredTable({
                                                             .pop()}{" "}
                                                         ({row.PID})
                                                     </button>
+                                                ) : label === "Process" ? (
+                                                    displayValue(value)
+                                                        .split(/[/\\]/)
+                                                        .pop()
                                                 ) : (
                                                     displayValue(value).slice(
                                                         0,
@@ -297,6 +345,9 @@ export function Timeline({ stats, label = "Activity timeline" }) {
                     <LineChart data={data}>
                         <XAxis
                             dataKey="seconds"
+                            tickFormatter={(v) => `${Math.round(v)}`}
+                            interval="preserveStartEnd"
+                            minTickGap={24}
                             label={{
                                 value: "Seconds from first event",
                                 position: "insideBottom",
@@ -575,9 +626,11 @@ export function LogWorkspace({
             .get(`/logs/${analysisId}`)
             .then((r) => {
                 if (!active) return;
-                const list = r.data
-                    .filter((v) => v.endsWith(".log"))
-                    .map((v) => v.slice(0, -4));
+                const list = orderLogTypes(
+                    r.data
+                        .filter((v) => v.endsWith(".log"))
+                        .map((v) => v.slice(0, -4)),
+                );
                 setTypes(list);
                 setType(list[0] || "");
             })

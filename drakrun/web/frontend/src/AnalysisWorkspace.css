@@ -119,3 +119,6 @@
 .decision-component {
     background: var(--chimera-base1);
 }
+.analysis-event-table td.text-break {
+    min-width: 14rem;
+}

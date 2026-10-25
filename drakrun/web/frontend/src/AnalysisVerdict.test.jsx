@@ -52,7 +52,7 @@ describe("VerdictCard", () => {
         ).toBeTruthy();
         expect(
             screen.getByText(
-                "Decision score: 0.50 is the malicious threshold. It is not a probability.",
+                "Scores are not probabilities until the model is calibrated; 0.50 is the malicious threshold.",
             ),
         ).toBeTruthy();
         expect(screen.getByText("decision score 0.60")).toBeTruthy();

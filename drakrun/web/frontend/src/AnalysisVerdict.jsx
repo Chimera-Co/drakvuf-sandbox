@@ -248,11 +248,7 @@ export function VerdictCard({ analysisId }) {
                         <ScoreBar score={data.score} />
                         <div className="small text-muted mb-2">
                             Scores are not probabilities until the model is
-                            calibrated
-                        </div>
-                        <div className="small text-muted mb-2">
-                            Decision score: 0.50 is the malicious threshold. It
-                            is not a probability.
+                            calibrated; 0.50 is the malicious threshold.
                         </div>
                     </>
                 )}
