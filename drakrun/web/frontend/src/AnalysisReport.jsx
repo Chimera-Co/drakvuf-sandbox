@@ -244,6 +244,19 @@ function AnalysisReportTabs({
         },
         [analysisSummary, selectedProcess],
     );
+    if (analysis.options?.mode === "static-only") {
+        return (
+            <div className="card">
+                <div className="card-body">
+                    <TabSwitcher activeTab="Static analysis">
+                        <PaddedTab tab="Static analysis">
+                            <StaticAnalysisTab analysisId={analysis.id} />
+                        </PaddedTab>
+                    </TabSwitcher>
+                </div>
+            </div>
+        );
+    }
     return (
         <div className="card">
             <div className="card-body">
@@ -305,6 +318,7 @@ export function AnalysisReport() {
         getAnalysisSummary,
         isOffline,
     } = useAnalysisReport();
+    const isStatic = analysis.options?.mode === "static-only";
     const plugins = analysis.options?.plugins;
     const baseUrl = axios.defaults.baseURL;
     const analysisId = analysis.id;
@@ -323,8 +337,8 @@ export function AnalysisReport() {
     }, [analysisId, getAnalysisSummary]);
 
     useEffect(() => {
-        fetchSummary();
-    }, [analysisId, fetchSummary]);
+        if (!isStatic) fetchSummary();
+    }, [analysisId, fetchSummary, isStatic]);
 
     const onSelectProcess = useCallback(
         (processId) => {
@@ -337,15 +351,17 @@ export function AnalysisReport() {
     return (
         <>
             <div className="row">
-                <div className="col-6">
-                    <ProcessTreeView
-                        analysisId={analysis.id}
-                        sampleName={analysis.options?.sample_filename}
-                        selectedProcess={selectedProcess}
-                        onProcessSelect={onSelectProcess}
-                    />
-                </div>
-                <div className="col-6">
+                {!isStatic && (
+                    <div className="col-6">
+                        <ProcessTreeView
+                            analysisId={analysis.id}
+                            sampleName={analysis.options?.sample_filename}
+                            selectedProcess={selectedProcess}
+                            onProcessSelect={onSelectProcess}
+                        />
+                    </div>
+                )}
+                <div className={isStatic ? "col-12" : "col-6"}>
                     {!isOffline ? (
                         <VerdictCard analysisId={analysis.id} />
                     ) : null}
@@ -392,7 +408,7 @@ export function AnalysisReport() {
                                 ) : (
                                     []
                                 )}
-                                {analysis["html_report"] ? (
+                                {!isStatic && analysis["html_report"] ? (
                                     <a href={`${baseUrl}/html/${analysis.id}`}>
                                         <button className="btn btn-primary m-1">
                                             <FontAwesomeIcon

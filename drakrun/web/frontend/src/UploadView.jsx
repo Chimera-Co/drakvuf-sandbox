@@ -74,6 +74,8 @@ function UploadForm() {
     const [analysisTime, setAnalysisTime] = useState(10);
     const [extractArchive, setExtractArchive] = useState(false);
     const [guestOs, setGuestOs] = useState("windows");
+    const [mode, setMode] = useState("combined");
+    const isStatic = mode === "static-only";
     const isLinux = guestOs === "linux";
     const [extraOptionsCollapsed, setExtraOptionsCollapsed] = useState(true);
     const navigate = useNavigate();
@@ -88,7 +90,10 @@ function UploadForm() {
         let isValid = true;
         let formErrors = {};
 
-        if (form.getAll("plugins").length === 0) {
+        if (
+            form.get("mode") !== "static-only" &&
+            form.getAll("plugins").length === 0
+        ) {
             formErrors["plugins"] = "You need to pick at least one plugin";
             isValid = false;
         }
@@ -121,7 +126,8 @@ function UploadForm() {
             setSubmitted(true);
             const form = new FormData(ev.target);
             try {
-                const jobData = await uploadSample({
+                const payload = {
+                    mode: form.get("mode"),
                     file: form.get("file"),
                     guest_os: form.get("guest_os"),
                     timeout: form.get("timeout") * 60,
@@ -136,7 +142,12 @@ function UploadForm() {
                     extract_archive: form.get("extract_archive"),
                     archive_password: form.get("archive_password"),
                     archive_entry_path: form.get("archive_entry_path"),
-                });
+                };
+                const jobData = await uploadSample(
+                    payload.mode === "static-only"
+                        ? { file: payload.file, mode: payload.mode }
+                        : payload,
+                );
                 const jobId = jobData["task_uid"];
                 navigate(`/analysis/${jobId}`);
             } catch (e) {
@@ -149,26 +160,32 @@ function UploadForm() {
     );
     return (
         <form onSubmit={submitForm} ref={formRef}>
-            <div className="mb-3">
-                <label htmlFor="guest-os" className="form-label">
-                    Guest OS
-                </label>
-                <select
-                    className="form-select"
-                    id="guest-os"
-                    name="guest_os"
-                    value={guestOs}
-                    onChange={(ev) => {
-                        setGuestOs(ev.target.value);
-                        setExtractArchive(false);
-                        setFormErrors({});
-                        setValid(true);
-                    }}
-                >
-                    <option value="windows">Windows 10</option>
-                    <option value="linux">Linux (Debian 12 desktop)</option>
-                </select>
-            </div>
+            {!isStatic && (
+                <>
+                    <div className="mb-3">
+                        <label htmlFor="guest-os" className="form-label">
+                            Guest OS
+                        </label>
+                        <select
+                            className="form-select"
+                            id="guest-os"
+                            name="guest_os"
+                            value={guestOs}
+                            onChange={(ev) => {
+                                setGuestOs(ev.target.value);
+                                setExtractArchive(false);
+                                setFormErrors({});
+                                setValid(true);
+                            }}
+                        >
+                            <option value="windows">Windows 10</option>
+                            <option value="linux">
+                                Linux (Debian 12 desktop)
+                            </option>
+                        </select>
+                    </div>
+                </>
+            )}
             <div className="mb-3">
                 <input
                     className="form-control"
@@ -180,265 +197,320 @@ function UploadForm() {
                 />
                 <FormError errors={formErrors} field="form-file" />
             </div>
-            <div className="mb-3">
-                <label htmlFor="form-timeout" className="form-label">
-                    Analysis time: {analysisTime} minute
-                    {analysisTime > 1 ? "s" : ""}
-                </label>
-                <input
-                    type="range"
-                    className="form-range"
-                    min="1"
-                    max="15"
-                    value={analysisTime}
-                    onChange={(ev) => setAnalysisTime(+ev.target.value)}
-                    id="form-timeout"
-                    name="timeout"
-                />
-            </div>
-            {!isLinux && (
-                <div className="mb-3 form-check">
-                    <input
-                        className="form-check-input"
-                        id="extract-archive"
-                        type="checkbox"
-                        name="extract_archive"
-                        checked={extractArchive}
-                        onChange={(ev) => {
-                            setExtractArchive(ev.target.checked);
-                            validateForm();
-                        }}
-                    />
-                    <label
-                        className="form-check-label"
-                        htmlFor="extract-archive"
-                    >
-                        Extract archive on the VM
-                    </label>
-                </div>
-            )}
-            {extractArchive ? (
-                <div className="mb-3">
-                    <label htmlFor="archive-entry-path" className="form-label">
-                        Path inside archive to execute
-                        <InfoPopover>
-                            Relative path of the file to execute after
-                            extracting the archive
-                        </InfoPopover>
-                    </label>
-                    <input
-                        type="text"
-                        className="form-control"
-                        id="archive-entry-path"
-                        name="archive_entry_path"
-                        onChange={validateForm}
-                    />
-                    <FormError errors={formErrors} field="archive-entry-path" />
-                </div>
-            ) : (
-                []
-            )}
-            {extractArchive ? (
-                <div className="mb-3">
-                    <label htmlFor="archive-password" className="form-label">
-                        Archive password (optional)
-                    </label>
-                    <input
-                        type="text"
-                        className="form-control"
-                        id="archive-password"
-                        name="archive_password"
-                    />
-                </div>
-            ) : (
-                []
-            )}
-            <Collapse
-                header="Extra options"
-                collapsed={extraOptionsCollapsed}
-                onToggle={() => setExtraOptionsCollapsed((state) => !state)}
-            >
-                <div className="mb-3">
-                    <label className="form-label">Plugins:</label>
-                    <PluginPicker
-                        key={guestOs}
-                        guestOs={guestOs}
-                        name="plugins"
-                        onChange={validateForm}
-                    />
-                    <FormError errors={formErrors} field="plugins" />
-                </div>
-                <div className="mb-3">
-                    <label htmlFor="target-file-name" className="form-label">
-                        Target file name
-                        <InfoPopover>
-                            Specify the name to assign to the file when it is
-                            uploaded to the VM. By default, the file keeps the
-                            same name as the one you uploaded. Use this if the
-                            malware requires a specific name or if the uploaded
-                            file doesn’t have the correct extension.
-                        </InfoPopover>
-                    </label>
-                    <input
-                        type="text"
-                        className="form-control"
-                        id="target-file-name"
-                        name="file_name"
-                        onChange={validateForm}
-                        placeholder="(pick automatically)"
-                    />
-                    <FormError errors={formErrors} field="target-file-name" />
-                </div>
-                {!isLinux && (
+            {!isStatic && (
+                <>
                     <div className="mb-3">
-                        <label
-                            htmlFor="target-file-path"
-                            className="form-label"
-                        >
-                            Target file path
-                            <InfoPopover>
-                                Choose the location on the VM where the file
-                                will be uploaded. By default, files go to the
-                                Desktop. You can use environment variables here
-                                (e.g., %USERPROFILE%).
-                            </InfoPopover>
+                        <label htmlFor="form-timeout" className="form-label">
+                            Analysis time: {analysisTime} minute
+                            {analysisTime > 1 ? "s" : ""}
                         </label>
                         <input
-                            type="text"
-                            className="form-control"
-                            id="target-file-path"
-                            name="file_path"
-                            placeholder="(pick automatically)"
+                            type="range"
+                            className="form-range"
+                            min="1"
+                            max="15"
+                            value={analysisTime}
+                            onChange={(ev) => setAnalysisTime(+ev.target.value)}
+                            id="form-timeout"
+                            name="timeout"
                         />
                     </div>
-                )}
-                <div className="mb-3">
-                    <label
-                        htmlFor="custom-start-command"
-                        className="form-label"
-                    >
-                        Start command
-                        <InfoPopover>
-                            {isLinux ? (
-                                <>
-                                    Enter a shell command to execute in the
-                                    Linux guest.
-                                </>
-                            ) : (
-                                <>
-                                    Enter a custom command line to execute the
-                                    sample on the VM. This is passed directly to
-                                    CreateProcess/ShellExecute, so include the
-                                    correct file name. Note that environment
-                                    variables are not expanded in this field.
-                                </>
-                            )}
-                        </InfoPopover>
-                    </label>
-                    <input
-                        type="text"
-                        className="form-control"
-                        id="custom-start-command"
-                        name="start_command"
-                        onChange={validateForm}
-                        placeholder="(pick automatically)"
-                    />
-                    <FormError
-                        errors={formErrors}
-                        field="custom-start-command"
-                    />
-                </div>
-                {!isLinux && (
-                    <div className="mb-3">
-                        <label htmlFor="start-method" className="form-label">
-                            Start method
-                            <InfoPopover>
-                                Select the method used to launch the sample on
-                                the VM. CreateProcess requires a Windows
-                                executable (not a script). "ShellExecute with
-                                runas verb" can be used to force elevation if
-                                the sample needs higher privileges and does not
-                                self-elevate.
-                            </InfoPopover>
-                        </label>
-                        <select
-                            className="form-select"
-                            id="start-method"
-                            name="start_method"
-                        >
-                            <option value="" selected>
-                                default
-                            </option>
-                            <option value="createproc">CreateProcess</option>
-                            <option value="shellexec">ShellExecute</option>
-                            <option value="runas">
-                                ShellExecute with runas verb (force elevate)
-                            </option>
-                        </select>
-                    </div>
-                )}
-                {!isLinux && (
-                    <div className="mb-3">
-                        <label htmlFor="start-method" className="form-label">
-                            Start working directory
-                            <InfoPopover>
-                                Define the working directory for the sample
-                                during execution. By default, it is set to the
-                                "Target file path". Environment variables are
-                                not expanded here.
-                            </InfoPopover>
-                        </label>
-                        <input
-                            type="text"
-                            className="form-control"
-                            id="custom-start-working-dir"
-                            name="start_working_dir"
-                            onChange={validateForm}
-                            placeholder="(pick automatically)"
-                        />
-                        <FormError
-                            errors={formErrors}
-                            field="custom-start-working-dir"
-                        />
-                    </div>
-                )}
-                <div className="row mb-3">
-                    <div className="col-md-6">
-                        <div className="form-check">
+                    {!isLinux && (
+                        <div className="mb-3 form-check">
                             <input
                                 className="form-check-input"
-                                id="no-internet"
+                                id="extract-archive"
                                 type="checkbox"
-                                name="no_internet"
+                                name="extract_archive"
+                                checked={extractArchive}
+                                onChange={(ev) => {
+                                    setExtractArchive(ev.target.checked);
+                                    validateForm();
+                                }}
                             />
                             <label
                                 className="form-check-label"
-                                htmlFor="no-internet"
+                                htmlFor="extract-archive"
                             >
-                                Disable Internet access
+                                Extract archive on the VM
                             </label>
                         </div>
-                    </div>
-                    <div className="col-md-6">
-                        <div className="form-check">
-                            <input
-                                className="form-check-input"
-                                id="no-screenshots"
-                                type="checkbox"
-                                name="no_screenshots"
-                            />
+                    )}
+                    {extractArchive ? (
+                        <div className="mb-3">
                             <label
-                                className="form-check-label"
-                                htmlFor="no-screenshots"
+                                htmlFor="archive-entry-path"
+                                className="form-label"
                             >
-                                Disable screenshots
+                                Path inside archive to execute
+                                <InfoPopover>
+                                    Relative path of the file to execute after
+                                    extracting the archive
+                                </InfoPopover>
                             </label>
+                            <input
+                                type="text"
+                                className="form-control"
+                                id="archive-entry-path"
+                                name="archive_entry_path"
+                                onChange={validateForm}
+                            />
+                            <FormError
+                                errors={formErrors}
+                                field="archive-entry-path"
+                            />
                         </div>
-                    </div>
-                </div>
-            </Collapse>
-
+                    ) : (
+                        []
+                    )}
+                    {extractArchive ? (
+                        <div className="mb-3">
+                            <label
+                                htmlFor="archive-password"
+                                className="form-label"
+                            >
+                                Archive password (optional)
+                            </label>
+                            <input
+                                type="text"
+                                className="form-control"
+                                id="archive-password"
+                                name="archive_password"
+                            />
+                        </div>
+                    ) : (
+                        []
+                    )}
+                    <Collapse
+                        header="Extra options"
+                        collapsed={extraOptionsCollapsed}
+                        onToggle={() =>
+                            setExtraOptionsCollapsed((state) => !state)
+                        }
+                    >
+                        <div className="mb-3">
+                            <label className="form-label">Plugins:</label>
+                            <PluginPicker
+                                key={guestOs}
+                                guestOs={guestOs}
+                                name="plugins"
+                                onChange={validateForm}
+                            />
+                            <FormError errors={formErrors} field="plugins" />
+                        </div>
+                        <div className="mb-3">
+                            <label
+                                htmlFor="target-file-name"
+                                className="form-label"
+                            >
+                                Target file name
+                                <InfoPopover>
+                                    Specify the name to assign to the file when
+                                    it is uploaded to the VM. By default, the
+                                    file keeps the same name as the one you
+                                    uploaded. Use this if the malware requires a
+                                    specific name or if the uploaded file
+                                    doesn’t have the correct extension.
+                                </InfoPopover>
+                            </label>
+                            <input
+                                type="text"
+                                className="form-control"
+                                id="target-file-name"
+                                name="file_name"
+                                onChange={validateForm}
+                                placeholder="(pick automatically)"
+                            />
+                            <FormError
+                                errors={formErrors}
+                                field="target-file-name"
+                            />
+                        </div>
+                        {!isLinux && (
+                            <div className="mb-3">
+                                <label
+                                    htmlFor="target-file-path"
+                                    className="form-label"
+                                >
+                                    Target file path
+                                    <InfoPopover>
+                                        Choose the location on the VM where the
+                                        file will be uploaded. By default, files
+                                        go to the Desktop. You can use
+                                        environment variables here (e.g.,
+                                        %USERPROFILE%).
+                                    </InfoPopover>
+                                </label>
+                                <input
+                                    type="text"
+                                    className="form-control"
+                                    id="target-file-path"
+                                    name="file_path"
+                                    placeholder="(pick automatically)"
+                                />
+                            </div>
+                        )}
+                        <div className="mb-3">
+                            <label
+                                htmlFor="custom-start-command"
+                                className="form-label"
+                            >
+                                Start command
+                                <InfoPopover>
+                                    {isLinux ? (
+                                        <>
+                                            Enter a shell command to execute in
+                                            the Linux guest.
+                                        </>
+                                    ) : (
+                                        <>
+                                            Enter a custom command line to
+                                            execute the sample on the VM. This
+                                            is passed directly to
+                                            CreateProcess/ShellExecute, so
+                                            include the correct file name. Note
+                                            that environment variables are not
+                                            expanded in this field.
+                                        </>
+                                    )}
+                                </InfoPopover>
+                            </label>
+                            <input
+                                type="text"
+                                className="form-control"
+                                id="custom-start-command"
+                                name="start_command"
+                                onChange={validateForm}
+                                placeholder="(pick automatically)"
+                            />
+                            <FormError
+                                errors={formErrors}
+                                field="custom-start-command"
+                            />
+                        </div>
+                        {!isLinux && (
+                            <div className="mb-3">
+                                <label
+                                    htmlFor="start-method"
+                                    className="form-label"
+                                >
+                                    Start method
+                                    <InfoPopover>
+                                        Select the method used to launch the
+                                        sample on the VM. CreateProcess requires
+                                        a Windows executable (not a script).
+                                        "ShellExecute with runas verb" can be
+                                        used to force elevation if the sample
+                                        needs higher privileges and does not
+                                        self-elevate.
+                                    </InfoPopover>
+                                </label>
+                                <select
+                                    className="form-select"
+                                    id="start-method"
+                                    name="start_method"
+                                >
+                                    <option value="" selected>
+                                        default
+                                    </option>
+                                    <option value="createproc">
+                                        CreateProcess
+                                    </option>
+                                    <option value="shellexec">
+                                        ShellExecute
+                                    </option>
+                                    <option value="runas">
+                                        ShellExecute with runas verb (force
+                                        elevate)
+                                    </option>
+                                </select>
+                            </div>
+                        )}
+                        {!isLinux && (
+                            <div className="mb-3">
+                                <label
+                                    htmlFor="start-method"
+                                    className="form-label"
+                                >
+                                    Start working directory
+                                    <InfoPopover>
+                                        Define the working directory for the
+                                        sample during execution. By default, it
+                                        is set to the "Target file path".
+                                        Environment variables are not expanded
+                                        here.
+                                    </InfoPopover>
+                                </label>
+                                <input
+                                    type="text"
+                                    className="form-control"
+                                    id="custom-start-working-dir"
+                                    name="start_working_dir"
+                                    onChange={validateForm}
+                                    placeholder="(pick automatically)"
+                                />
+                                <FormError
+                                    errors={formErrors}
+                                    field="custom-start-working-dir"
+                                />
+                            </div>
+                        )}
+                        <div className="row mb-3">
+                            <div className="col-md-6">
+                                <div className="form-check">
+                                    <input
+                                        className="form-check-input"
+                                        id="no-internet"
+                                        type="checkbox"
+                                        name="no_internet"
+                                    />
+                                    <label
+                                        className="form-check-label"
+                                        htmlFor="no-internet"
+                                    >
+                                        Disable Internet access
+                                    </label>
+                                </div>
+                            </div>
+                            <div className="col-md-6">
+                                <div className="form-check">
+                                    <input
+                                        className="form-check-input"
+                                        id="no-screenshots"
+                                        type="checkbox"
+                                        name="no_screenshots"
+                                    />
+                                    <label
+                                        className="form-check-label"
+                                        htmlFor="no-screenshots"
+                                    >
+                                        Disable screenshots
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </Collapse>
+                </>
+            )}
             <div className="d-flex align-items-center">
+                <label htmlFor="analysis-mode" className="me-2">
+                    Mode
+                </label>
+                <select
+                    id="analysis-mode"
+                    name="mode"
+                    className="form-select w-auto me-3"
+                    value={mode}
+                    onChange={(ev) => {
+                        setMode(ev.target.value);
+                        setFormErrors({});
+                        setValid(true);
+                    }}
+                >
+                    <option value="combined">Combined</option>
+                    <option value="dynamic-only">Dynamic only</option>
+                    <option value="static-only">Static only</option>
+                </select>
                 <button
                     className="btn btn-primary"
                     disabled={submitted || !valid}

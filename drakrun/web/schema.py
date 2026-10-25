@@ -1,5 +1,5 @@
 import uuid
-from typing import Annotated, Any, List, Optional
+from typing import Annotated, Any, List, Literal, Optional
 
 from flask_openapi3 import FileStorage
 from pydantic import AfterValidator, BaseModel, Field, RootModel
@@ -12,6 +12,7 @@ class APIErrorResponse(BaseModel):
 
 
 class UploadFileForm(BaseModel):
+    mode: Literal["combined", "dynamic-only", "static-only"] = "combined"
     file: FileStorage
     guest_os: GuestOS = Field(default="windows", description="Guest operating system")
     timeout: Optional[int] = Field(default=None, description="Analysis timeout")

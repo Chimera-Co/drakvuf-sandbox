@@ -23,10 +23,13 @@ from .analysis_metadata import AnalysisMetadata, FileMetadata
 from .analysis_options import AnalysisOptions
 from .analyzer import AnalysisSubstatus, analyze_file
 from .linux_analyzer import analyze_linux_file
+from .static.worker import STATIC_ONLY_QUEUE_NAME
 
 ANALYSIS_QUEUE_NAME = "drakrun-analysis"
 LINUX_ANALYSIS_QUEUE_NAME = "drakrun-analysis-linux"
 ANALYSIS_QUEUE_NAMES = (ANALYSIS_QUEUE_NAME, LINUX_ANALYSIS_QUEUE_NAME)
+
+LISTED_QUEUE_NAMES = ANALYSIS_QUEUE_NAMES + (STATIC_ONLY_QUEUE_NAME,)
 _WORKER_VM_ID: Optional[int] = None
 _WORKER_GUEST_OS: WorkerGuestOS = "any"
 
@@ -247,7 +250,7 @@ def enqueue_analysis(
 
 def get_analyses_list(connection: Redis) -> List[Job]:
     jobs = {}
-    for queue_name in ANALYSIS_QUEUE_NAMES:
+    for queue_name in LISTED_QUEUE_NAMES:
         queue = Queue(name=queue_name, connection=connection)
         for job in queue.get_jobs():
             jobs[job.id] = job

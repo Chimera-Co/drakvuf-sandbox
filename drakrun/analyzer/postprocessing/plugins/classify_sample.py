@@ -13,7 +13,9 @@ def classify_sample(context: PostprocessContext) -> None:
         return
     try:
         features = extract_features(context.analysis_dir)
-        if context.config.static.enabled:
+        if context.metadata.options.mode == "dynamic-only":
+            features["static"] = None
+        elif context.config.static.enabled:
             # Static analysis started at upload and has normally finished long before the
             # detonation did; wait a bounded time, then classify with whatever is there.
             try:

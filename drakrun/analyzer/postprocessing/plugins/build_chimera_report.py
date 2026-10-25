@@ -180,7 +180,9 @@ def build_report(analysis_dir: pathlib.Path) -> dict:
     verdict = loaded["classification.json"][0]
     ev = _Evidence(hashes)
     options = meta.get("options") or {}
-    guest_os = options.get("guest_os") or "windows"
+    mode = options.get("mode", "combined")
+    # A static-only run has no guest; its options still carry the model's default OS.
+    guest_os = None if mode == "static-only" else options.get("guest_os") or "windows"
     info_file = (report.get("info") or {}).get("file") or meta.get("file") or {}
     sample_meta = features.get("sample") or {}
 
@@ -210,7 +212,7 @@ def build_report(analysis_dir: pathlib.Path) -> dict:
         claims.append(c)
 
     # ---- dynamic: what the sample's own process tree did
-    if report:
+    if report and mode != "static-only":
         start_eid = ev.add("report.json", "/startup", "drakrun")
         if startup.get("status") != "Success":
             claim(
@@ -528,6 +530,21 @@ def build_report(analysis_dir: pathlib.Path) -> dict:
         "started_at": meta.get("time_execution_started"),
         "finished_at": meta.get("time_finished"),
     }
+
+    def not_requested(reason):
+        return {
+            "status": "not_requested",
+            "reason": reason,
+            "producer": {},
+            "payload": None,
+            "evidence_ids": [],
+        }
+
+    if mode == "static-only":
+        dynamic_stage = not_requested("static-only analysis")
+    elif mode == "dynamic-only":
+        static_stage = not_requested("dynamic-only analysis")
+
     stages = {
         "static": static_stage,
         "dynamic": dynamic_stage,
@@ -542,31 +559,32 @@ def build_report(analysis_dir: pathlib.Path) -> dict:
     }
 
     # ---- limitations that always apply, then the ones this run triggered
-    limitations.insert(
-        0,
-        "The guest has no internet access: DNS, HTTP and HTTPS are answered by a simulator "
-        "(INetSim), so network activity shows what the sample tried, not what a real server returned.",
-    )
-    if options.get("timeout"):
-        limitations.append(
-            f"The sample ran for at most {options.get('timeout')} s; later behaviour is not observed."
+    if mode != "static-only":
+        limitations.insert(
+            0,
+            "The guest has no internet access: DNS, HTTP and HTTPS are answered by a simulator "
+            "(INetSim), so network activity shows what the sample tried, not what a real server returned.",
         )
-    missing = sorted(
-        k
-        for k, v in (telemetry.get("plugins") or {}).items()
-        if v.get("status") != "produced"
-    )
-    if missing:
-        limitations.append(
-            "Monitors with no output in this run: "
-            + ", ".join(missing)
-            + " (often nothing to report; a missing log is not proof of absence)."
+        if options.get("timeout"):
+            limitations.append(
+                f"The sample ran for at most {options.get('timeout')} s; later behaviour is not observed."
+            )
+        missing = sorted(
+            k
+            for k, v in (telemetry.get("plugins") or {}).items()
+            if v.get("status") != "produced"
         )
-    if static_stage["status"] != "ok":
+        if missing:
+            limitations.append(
+                "Monitors with no output in this run: "
+                + ", ".join(missing)
+                + " (often nothing to report; a missing log is not proof of absence)."
+            )
+    if static_stage["status"] not in ("ok", "not_requested"):
         limitations.append(
             f"Static analysis {static_stage['status']}: {static_stage['reason']}."
         )
-    if guest_os == "linux":
+    if guest_os == "linux" and mode != "static-only":
         limitations.append(
             "The behaviour model is trained on Windows only; Linux verdicts rest on static analysis."
         )
@@ -580,7 +598,11 @@ def build_report(analysis_dir: pathlib.Path) -> dict:
         if meta.get("status") == "failed"
         else (
             "complete"
-            if all(s["status"] == "ok" for k, s in stages.items() if k != "intel")
+            if all(
+                s["status"] in ("ok", "not_requested")
+                for k, s in stages.items()
+                if k != "intel"
+            )
             else "partial"
         )
     )
@@ -591,9 +613,7 @@ def build_report(analysis_dir: pathlib.Path) -> dict:
         "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(
             timespec="seconds"
         ),
-        "mode": (
-            "combined" if isinstance(features.get("static"), dict) else "dynamic-only"
-        ),
+        "mode": mode,
         "status": status,
         "sample": {
             "sha256": info_file.get("sha256") or sample_meta.get("sha256") or "0" * 64,
@@ -664,6 +684,8 @@ def _refs(ids) -> str:
 
 
 def _status(s: str) -> str:
+    if s == "not_requested":
+        return '<span class="muted">not requested</span>'
     cls = (
         "ok"
         if s in ("ok", "complete")

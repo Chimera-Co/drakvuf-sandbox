@@ -133,7 +133,7 @@ def test_every_reference_resolves_to_hashed_evidence(tmp_path):
 
 def test_missing_parts_are_reported_not_invented(tmp_path):
     r = build_report(write_analysis(tmp_path / "a3", startup="Failed"))
-    assert r["status"] == "partial" and r["mode"] == "dynamic-only"
+    assert r["status"] == "partial" and r["mode"] == "combined"
     assert r["stages"]["static"]["status"] == "unavailable"
     assert r["stages"]["classifier"]["status"] == "unavailable"
     assert r["assessment"]["confidence"] == "unknown"

@@ -47,6 +47,7 @@ const GUEST_OS_LABELS = { windows: "Windows 10", linux: "Debian 12 (Linux)" };
  * @returns {String}
  */
 export function formatSandbox(analysis) {
+    if (analysis.options?.mode === "static-only") return "static only";
     const os = analysis.options?.guest_os || "windows";
     const label = GUEST_OS_LABELS[os] || os;
     return analysis.vm_id != null ? `${label} · vm-${analysis.vm_id}` : label;

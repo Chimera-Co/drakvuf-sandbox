@@ -22,7 +22,7 @@ from drakrun.analyzer.worker import (
     get_redis_connection,
     truncate_analysis_list,
 )
-from drakrun.analyzer.static.worker import stage_and_enqueue
+from drakrun.analyzer.static.worker import enqueue_static_only, stage_and_enqueue
 from drakrun.lib.config import load_config
 from drakrun.lib.paths import STATIC_DIR, UPLOADS_DIR
 from drakrun.lib.s3_storage import get_s3_client, is_s3_enabled, upload_sample_to_s3
@@ -61,6 +61,23 @@ logger = logging.getLogger(__name__)
 
 @api.post("/upload", responses={200: UploadAnalysisResponse})
 def upload_sample(form: UploadFileForm):
+    if form.mode == "static-only":
+        if not config.static.enabled:
+            return jsonify({"error": "static analysis is disabled on this server"}), 400
+        for field in (
+            "extract_archive",
+            "start_command",
+            "file_path",
+            "start_working_dir",
+        ):
+            if getattr(form, field):
+                return (
+                    jsonify(
+                        {"error": f"{field} is not supported for static-only analysis"}
+                    ),
+                    400,
+                )
+
     request_file = form.file
     job_id = str(uuid.uuid4())
 
@@ -90,11 +107,26 @@ def upload_sample(form: UploadFileForm):
         # Static analysis starts now, beside the detonation (stages its own copy before
         # the upload may be moved to S3 and deleted below). Never blocks the upload.
         try:
-            stage_and_enqueue(
-                job_id, tmp_upload_path, sample_filename, redis, config.static
-            )
+            if form.mode == "combined":
+                stage_and_enqueue(
+                    job_id, tmp_upload_path, sample_filename, redis, config.static
+                )
         except Exception:
             logger.exception("Static analysis could not be queued for %s", job_id)
+
+        if form.mode == "static-only":
+            analysis_options = AnalysisOptions(
+                mode=form.mode,
+                plugins=[],
+                net_enable=False,
+                sample_filename=sample_filename,
+            )
+            enqueue_static_only(
+                job_id, tmp_upload_path, file_metadata, analysis_options, redis, config
+            )
+            tmp_upload_path.unlink()
+            truncate_analysis_list(connection=redis, limit=ANALYSES_LIST_MAX_LENGTH)
+            return jsonify({"task_uid": job_id})
 
         if is_s3_enabled(config.s3):
             s3_client = get_s3_client(config.s3)
@@ -109,6 +141,7 @@ def upload_sample(form: UploadFileForm):
         analysis_options = AnalysisOptions.with_config_defaults(
             config=config,
             guest_os=form.guest_os,
+            mode=form.mode,
             preset=preset,
             host_sample_path=pathlib.Path(sample_path) if sample_path else None,
             sample_filename=sample_filename,
