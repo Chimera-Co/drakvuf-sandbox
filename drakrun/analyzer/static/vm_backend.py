@@ -90,14 +90,49 @@ def restart_vm(settings) -> Optional[int]:
 
 
 @contextlib.contextmanager
-def _vm_lock():
+def _vm_lock(blocking: bool = True):
+    """Serialises jobs and the idle shutdown. Non-blocking: yields False when a job holds it."""
     RUN_DIR.mkdir(parents=True, exist_ok=True)
     with (RUN_DIR / "static-vm.lock").open("a") as fh:
-        fcntl.flock(fh, fcntl.LOCK_EX)
         try:
-            yield
+            fcntl.flock(fh, fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB))
+        except BlockingIOError:
+            yield False
+            return
+        try:
+            yield True
         finally:
             fcntl.flock(fh, fcntl.LOCK_UN)
+
+
+LAST_JOB = "static-vm.last"
+
+
+def _mark_used() -> None:
+    (RUN_DIR / LAST_JOB).touch()
+
+
+def stop_if_idle(settings, now: Optional[float] = None) -> str:
+    """Shut the VM down when no job has used it for vm_idle_shutdown_s; never while a job holds the lock.
+    The next job boots it again (vm_autostart)."""
+    if settings.vm_idle_shutdown_s <= 0:
+        return "idle shutdown off"
+    with _vm_lock(blocking=False) as locked:
+        if not locked:
+            return "busy"
+        if domid(settings.vm_name) is None:
+            return "not running"
+        last = RUN_DIR / LAST_JOB
+        try:
+            idle = (now or time.time()) - last.stat().st_mtime
+        except FileNotFoundError:
+            _mark_used()  # running but never used since this mechanism started: start the clock now
+            return "idle clock started"
+        if idle < settings.vm_idle_shutdown_s:
+            return f"in use ({idle:.0f}s idle)"
+        logger.info("Stopping static-analysis VM %s after %.0fs idle", settings.vm_name, idle)
+        subprocess.run(["systemctl", "stop", "chimera-static-vm.service"], capture_output=True, timeout=180)
+        return "stopped"
 
 
 def _count_job(settings) -> bool:
@@ -177,6 +212,7 @@ def run_job(settings, steps: list[dict], sample: Path, uid: Optional[int] = None
             "uid": settings.container_uid if uid is None else uid, "gid": settings.container_gid, "steps": steps}
     wall = sum(float(step["timeout_s"]) for step in steps) + JOB_SLACK_S
     with _vm_lock():
+        _mark_used()
         dom = ready(settings)
         if dom is None and settings.vm_autostart:
             dom = restart_vm(settings)
@@ -218,6 +254,7 @@ def run_job(settings, steps: list[dict], sample: Path, uid: Optional[int] = None
                 job_dir.rmdir()
             if not healthy or _count_job(settings):
                 restart_vm(settings)
+            _mark_used()
 
 
 def _step_status(envelope: dict, name: str) -> tuple[dict, Optional[str], Optional[str]]:

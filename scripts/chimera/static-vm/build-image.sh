@@ -104,5 +104,7 @@ fi
 [ -f "$OUT/scratch.img" ] || truncate -s 8G "$OUT/scratch.img"
 install -D -m 0644 "$HERE/chimera-static-vm.cfg" /etc/chimera/static-vm.cfg
 install -m 0644 "$HERE/chimera-static-vm.service" /etc/systemd/system/chimera-static-vm.service
+# On demand: static jobs boot the VM; the idle timer stops it again (see [static] vm_idle_shutdown_s).
+install -m 0644 "$HERE/chimera-static-vm-idle.service" "$HERE/chimera-static-vm-idle.timer" /etc/systemd/system/
 systemctl daemon-reload
 echo "built $ROOT"

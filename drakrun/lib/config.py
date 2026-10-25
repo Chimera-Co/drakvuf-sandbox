@@ -172,6 +172,9 @@ class StaticConfigSection(BaseModel):
     vm_autostart: bool = True
     vm_boot_timeout_s: float = Field(default=120, gt=0, allow_inf_nan=False)
     vm_restart_every: int = Field(default=100, ge=1)
+    # On demand: jobs boot the VM (vm_autostart); chimera-static-vm-idle.timer shuts it down after this many
+    # idle seconds so its memory goes back to the dynamic VMs. 0 keeps it running.
+    vm_idle_shutdown_s: float = Field(default=600, ge=0, allow_inf_nan=False)
     vm_result_disk_mb: int = Field(default=128, ge=16)
     # Static analysis of the run's memory dumps (dumps.zip) on the deep queue after the analysis:
     # unpacked payloads show their YARA matches and PE structure there. Never feeds the classifier.

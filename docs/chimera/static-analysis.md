@@ -52,6 +52,16 @@ insight indicators of severity 2+ (for example injection imports in unpacked cod
 IOCs. Results go to `memdumps.json` (schema `chimera-memdumps/1`) and the
 "Memory dumps" tab. They are **not** classifier features: they never change the verdict.
 
+## Static VM lifecycle (on demand)
+
+The static-analysis VM is not started at boot. The first static job (fast pass, deep pass, Ghidra, memory-dump
+scan or MobSF) boots it (`vm_autostart`; measured: boot plus a trivial job in about 5 s), jobs run one at a time
+under a lock, and `chimera-static-vm-idle.timer` (every 2 minutes) shuts it down once no job has used it for
+`[static] vm_idle_shutdown_s` (600 s by default; 0 keeps it running). The idle check takes the same lock without
+waiting, so it never stops the VM during a job. While it is down its 3584 MB go back to Xen, which is what lets a
+Windows (5120 MB) and a Linux (4096 MB) detonation run at the same time on this 16 GB host. It is still restarted
+after every 100 jobs and after any unhealthy job.
+
 ## Mobile apps: Android APK and iOS IPA (MobSF)
 
 Choose **Android APK** or **iOS IPA** as the platform on the upload page (or send `guest_os=android|ios` with

@@ -18,6 +18,7 @@ from .postinstall import postinstall
 from .postprocess import postprocess
 from .s3_storage import s3_storage
 from .snapshot import snapshot
+from .static_vm_idle import static_vm_idle
 from .static_worker import static_worker
 from .version import version
 from .vm_start import vm_start
@@ -46,6 +47,7 @@ main.add_command(vm_stop)
 main.add_command(worker)
 main.add_command(evasion_worker)
 main.add_command(static_worker)
+main.add_command(static_vm_idle)
 main.add_command(evasion_smoke_test)
 main.add_command(modify_vm0)
 main.add_command(injector)

@@ -1,0 +1,10 @@
+[Unit]
+Description=CHIMERA: check every 2 minutes whether the static-analysis VM is idle
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=2min
+AccuracySec=15s
+
+[Install]
+WantedBy=timers.target
