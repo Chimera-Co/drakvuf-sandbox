@@ -1,14 +1,10 @@
 """Run chimera_static on one sample inside a locked-down container.
 
-Why a container, not a VM: the analyzer only *reads* the file, needs no hypervisor features,
-and finishes in seconds. A dedicated Xen domU would compete with the analysis VMs for memory
-(see worker memory admission), add a file-transfer channel to secure, and slow every upload.
-A container with the flags below gives the isolation that matters for a parser bug: no
-network, no capabilities, no privilege gain, unprivileged uid, read-only root filesystem,
-noexec everywhere, and memory/CPU/PID/time limits. CHIMERA's dom0 already parses hostile
-data at a similar level (capa on memory dumps, pcap parsing), so this keeps the risk where
-it is instead of adding a new class. A gVisor runtime or a VM is the upgrade path
-(docs/chimera/static-analysis.md).
+The container runs either in dom0 (backend "container") or inside the static-analysis Xen VM (backend "vm",
+vm_backend.py): a domU with no network device that receives the sample on a read-only raw disk and returns
+JSON on another, so a parser exploit lands in a throwaway VM instead of dom0. Both use the command lines
+built here, with every isolation flag: no network, no capabilities, no privilege gain, unprivileged uid,
+read-only root filesystem, noexec everywhere, and memory/CPU/PID/time limits.
 
 Inside the container chimera_static additionally limits itself (rlimits, no new threads or
 processes, no core dumps; chimera_static/safety.py). Nothing in this path executes the sample.
@@ -102,6 +98,14 @@ def _prepare_out(job_dir: Path, settings) -> Path:
 def run_in_container(settings, analysis_id: str, job_dir: Path, file_name: str, deep: bool = False) -> dict:
     """Run the analyzer; return the parsed, validated static.json, or deep.json with deep=True (or an error
     document)."""
+    if getattr(settings, "backend", "container") == "vm":
+        from .vm_backend import VmUnavailable, analyze_in_vm
+        try:
+            return analyze_in_vm(settings, analysis_id, job_dir, file_name, deep)
+        except VmUnavailable as exc:
+            if not settings.vm_fallback_container:
+                return {"schema": DEEP_SCHEMA if deep else SCHEMA, "error": str(exc)}
+            logger.warning("%s; running in the dom0 container", exc)
     schema, output = (DEEP_SCHEMA, "deep.json") if deep else (SCHEMA, "static.json")
     staged = job_dir / "in" / "sample"
     out = _prepare_out(job_dir, settings)
@@ -130,7 +134,7 @@ def run_in_container(settings, analysis_id: str, job_dir: Path, file_name: str, 
             raise ValueError(f"{output} has the wrong schema")
     except (OSError, ValueError) as exc:
         return {"schema": schema, "error": f"{exc}", "container": status}
-    result["container"] = {"engine": settings.engine, "image": settings.image, **status}
+    result["container"] = {"engine": settings.engine, "image": settings.image, "backend": "container", **status}
     return result
 
 
@@ -172,6 +176,16 @@ def build_ghidra_command(settings, analysis_id: str, sample: Path, work: Path, o
 
 def run_ghidra(settings, analysis_id: str, job_dir: Path, targets: list[dict]) -> dict:
     """Decompile the staged sample; return ghidra.json's content, or {"error": ...}. Never raises."""
+    if getattr(settings, "backend", "container") == "vm":
+        from .vm_backend import VmUnavailable, ghidra_in_vm
+        try:
+            return ghidra_in_vm(settings, analysis_id, job_dir, targets)
+        except VmUnavailable as exc:
+            if not settings.vm_fallback_container:
+                return {"error": str(exc)}
+            logger.warning("%s; decompiling in the dom0 container", exc)
+        except Exception as exc:  # never raises, like the container path
+            return {"error": str(exc)[:300]}
     staged = job_dir / "in" / "sample"
     work, out = job_dir / "ghidra-work", job_dir / "ghidra-out"
     for directory in (work, out):

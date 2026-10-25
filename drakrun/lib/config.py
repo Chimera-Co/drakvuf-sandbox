@@ -131,6 +131,16 @@ class StaticConfigSection(BaseModel):
     ghidra_decompile_budget_s: int = Field(default=120, ge=10)
     ghidra_memory_mb: int = Field(default=2048, ge=1024)
     ghidra_max_functions: int = Field(default=40, ge=1, le=200)
+    # Where the analyzer containers run: "container" = in dom0; "vm" = inside the static-analysis Xen VM
+    # (no network device; scripts/chimera/static-vm/, drakrun/analyzer/static/vm_backend.py).
+    backend: Literal["container", "vm"] = "container"
+    vm_name: str = "chimera-static"
+    # With the VM down, run in dom0 instead of failing (the result records which backend ran).
+    vm_fallback_container: bool = True
+    vm_autostart: bool = True
+    vm_boot_timeout_s: float = Field(default=120, gt=0, allow_inf_nan=False)
+    vm_restart_every: int = Field(default=100, ge=1)
+    vm_result_disk_mb: int = Field(default=128, ge=16)
 
 
 class ScreenshotConfigSection(BaseModel):

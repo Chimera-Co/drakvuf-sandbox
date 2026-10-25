@@ -1,0 +1,15 @@
+[Unit]
+Description=CHIMERA static-analysis VM (Xen domU, no network)
+After=xen-init-dom0.service xenstored.service xenconsoled.service
+Requires=xenstored.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/xl create /etc/chimera/static-vm.cfg
+ExecStop=-/usr/local/sbin/xl shutdown -w -F chimera-static
+ExecStop=-/usr/local/sbin/xl destroy chimera-static
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target
