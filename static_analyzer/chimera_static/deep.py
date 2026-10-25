@@ -82,8 +82,10 @@ def _capa(path: str, fmt: str) -> dict:
         rules.append({
             "name": name,
             "namespace": meta.get("namespace"),
-            "attack": sorted({a.get("id") for a in meta.get("attack") or [] if a.get("id")}),
-            "mbc": sorted({m.get("id") for m in meta.get("mbc") or [] if m.get("id")}),
+            # tactic/technique names come from the rule, so the dashboard can draw an ATT&CK matrix
+            "attack": [{k: a.get(k) for k in ("id", "tactic", "technique", "subtechnique")}
+                       for a in meta.get("attack") or [] if a.get("id")],
+            "mbc": [{k: m.get(k) for k in ("id", "objective", "behavior")} for m in meta.get("mbc") or [] if m.get("id")],
             "matches": len(match.get("matches") or []),
         })
     rules.sort(key=lambda r: (r["namespace"] or "", r["name"]))

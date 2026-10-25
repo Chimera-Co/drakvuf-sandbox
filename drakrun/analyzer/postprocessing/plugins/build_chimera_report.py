@@ -208,7 +208,8 @@ def _stage_deep(deep, ev: "_Evidence", claim, attack: list) -> dict:
             ),
         )
         for i, r in enumerate(rules):
-            for tech in r.get("attack") or []:
+            for entry in r.get("attack") or []:
+                tech = entry.get("id") if isinstance(entry, dict) else entry
                 attack.append(
                     {
                         "technique": tech,

@@ -1,0 +1,117 @@
+{
+ "schema": "chimera-deep/1",
+ "analyzer_version": "0.1.0",
+ "errors": [],
+ "timings_s": {
+  "capa": 1.895,
+  "floss": 6.147
+ },
+ "started": "2026-10-25T00:50:16Z",
+ "format": "pe",
+ "capa": {
+  "version": "7.4.0",
+  "rules_total": 6,
+  "rules": [
+   {
+    "name": "contain a thread local storage (.tls) section",
+    "namespace": "executable/pe/section/tls",
+    "attack": [],
+    "mbc": [],
+    "matches": 1
+   },
+   {
+    "name": "write file on Windows",
+    "namespace": "host-interaction/file-system/write",
+    "attack": [],
+    "mbc": [
+     {
+      "id": "C0052",
+      "objective": null,
+      "behavior": null
+     }
+    ],
+    "matches": 2
+   },
+   {
+    "name": "allocate or change RWX memory",
+    "namespace": "host-interaction/process/inject",
+    "attack": [],
+    "mbc": [
+     {
+      "id": "C0007",
+      "objective": null,
+      "behavior": null
+     }
+    ],
+    "matches": 1
+   },
+   {
+    "name": "terminate process",
+    "namespace": "host-interaction/process/terminate",
+    "attack": [],
+    "mbc": [
+     {
+      "id": "C0018",
+      "objective": null,
+      "behavior": null
+     }
+    ],
+    "matches": 2
+   },
+   {
+    "name": "enumerate PE sections",
+    "namespace": "load-code/pe",
+    "attack": [],
+    "mbc": [
+     {
+      "id": "B0046.001",
+      "objective": null,
+      "behavior": null
+     }
+    ],
+    "matches": 3
+   },
+   {
+    "name": "parse PE header",
+    "namespace": "load-code/pe",
+    "attack": [
+     {
+      "id": "T1129",
+      "tactic": "Execution",
+      "technique": "Shared Modules",
+      "subtechnique": ""
+     }
+    ],
+    "mbc": [],
+    "matches": 9
+   }
+  ],
+  "library_signatures": false
+ },
+ "floss": {
+  "version": "3.2.0",
+  "stack": {
+   "count": 0,
+   "sample": []
+  },
+  "tight": {
+   "count": 0,
+   "sample": []
+  },
+  "decoded": {
+   "count": 0,
+   "sample": []
+  }
+ },
+ "duration_s": 8.045,
+ "container": {
+  "engine": "podman",
+  "image": "localhost/chimera-static:0.1.0",
+  "exit_code": 0,
+  "stderr": "FIXME - invalid homedir, playing along... ([Errno 30] Read-only file system: '/nonexistent')\n"
+ },
+ "job": {
+  "analysis_id": "50f3fd77-77b9-4c33-af8c-517a615ad52b",
+  "wall_s": 9.92
+ }
+}

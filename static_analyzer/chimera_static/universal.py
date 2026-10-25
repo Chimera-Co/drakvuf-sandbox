@@ -87,8 +87,12 @@ def entropy_profile(data: bytes, block: int = 4096) -> dict:
         return {"blocks": 0}
     values = [entropy(data[i:i + block]) for i in range(0, min(len(data), 64 * 1024 * 1024), block)]
     high = sum(v > 7.2 for v in values)
+    # at most 256 points for the dashboard chart: each point is the highest block entropy in its stretch
+    step = max(1, -(-len(values) // 256))
+    series = [round(max(values[i:i + step]), 3) for i in range(0, len(values), step)]
     return {"blocks": len(values), "mean": round(sum(values) / len(values), 3), "max": round(max(values), 3),
-            "high_entropy_ratio": round(high / len(values), 4)}
+            "high_entropy_ratio": round(high / len(values), 4), "block_bytes": block, "series": series,
+            "series_step_blocks": step}
 
 
 def hashes(data: bytes) -> dict:

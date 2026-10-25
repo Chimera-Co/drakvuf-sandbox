@@ -355,8 +355,8 @@ describe("deep pass", () => {
                     {
                         name: "inject thread",
                         namespace: "host-interaction/process/inject",
-                        attack: ["T1055"],
-                        mbc: ["E1055"],
+                        attack: [{ id: "T1055", tactic: "Defense Evasion" }],
+                        mbc: [{ id: "E1055" }],
                     },
                 ],
             },

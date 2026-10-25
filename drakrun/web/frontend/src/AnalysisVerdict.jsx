@@ -309,10 +309,20 @@ export function DeepSection({ analysisId }) {
                                                 {rule.namespace}
                                             </td>
                                             <td className="small">
-                                                {(rule.attack || []).join(", ")}
+                                                {(rule.attack || [])
+                                                    .map(
+                                                        (entry) =>
+                                                            entry.id || entry,
+                                                    )
+                                                    .join(", ")}
                                             </td>
                                             <td className="small">
-                                                {(rule.mbc || []).join(", ")}
+                                                {(rule.mbc || [])
+                                                    .map(
+                                                        (entry) =>
+                                                            entry.id || entry,
+                                                    )
+                                                    .join(", ")}
                                             </td>
                                         </tr>
                                     ))}
