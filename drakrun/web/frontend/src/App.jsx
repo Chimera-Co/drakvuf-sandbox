@@ -190,7 +190,9 @@ function AppSidenav({ sidebar }) {
                                     title="Keep the sidebar open on this kind of page"
                                 >
                                     <FontAwesomeIcon icon={faThumbtack} />
-                                    Pin open
+                                    <span className="chimera-nav-label">
+                                        Pin open
+                                    </span>
                                 </button>
                             ) : (
                                 <button
@@ -199,7 +201,9 @@ function AppSidenav({ sidebar }) {
                                     title="Fold the sidebar to icons; hover it to peek"
                                 >
                                     <FontAwesomeIcon icon={faAnglesLeft} />
-                                    Fold to icons
+                                    <span className="chimera-nav-label">
+                                        Fold to icons
+                                    </span>
                                 </button>
                             )}
                         </div>

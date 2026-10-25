@@ -85,9 +85,10 @@
 
 .chimera-nav-tools {
     display: flex;
-    justify-content: flex-end;
+    justify-content: flex-start;
     gap: 0.25rem;
-    padding: 0.5rem 0.5rem 0;
+    /* the pin icon sits on the same column as the nav icons, so the rail shows it in place */
+    padding: 0.75rem 0.5rem 0 0.85rem;
 }
 
 .chimera-nav-tools button {
@@ -152,12 +153,51 @@
     white-space: nowrap;
 }
 
+.chimera-shell .chimera-nav-label,
+.chimera-shell .sb-sidenav-footer,
+.chimera-nav-tools button {
+    transition:
+        opacity 160ms ease,
+        border-color 160ms ease,
+        background-color 160ms ease;
+}
+
 .chimera-shell.is-rail:not(.is-peek) .chimera-nav-label,
-.chimera-shell.is-rail:not(.is-peek) .sb-sidenav-footer,
-.chimera-shell.is-rail:not(.is-peek) .chimera-nav-tools,
-.chimera-shell.is-rail:not(.is-peek) .sb-sidenav-menu-heading {
+.chimera-shell.is-rail:not(.is-peek) .sb-sidenav-footer {
     opacity: 0;
     pointer-events: none;
+}
+
+/* Rail: the pin button shrinks to its icon (same place, same height). */
+.chimera-shell.is-rail:not(.is-peek) .chimera-nav-tools button {
+    border-color: transparent;
+    color: var(--chimera-shell-muted);
+}
+
+/* Rail: section headings keep their height (no shift on peek) and show a short divider instead of text. */
+.chimera-shell .sb-sidenav .sb-sidenav-menu .sb-sidenav-menu-heading {
+    position: relative;
+    padding: 1.1rem 1.25rem 0.45rem;
+    transition: color 160ms ease;
+}
+
+.chimera-shell .sb-sidenav .sb-sidenav-menu .sb-sidenav-menu-heading::after {
+    content: "";
+    position: absolute;
+    left: calc((var(--chimera-rail-w) - 1.5rem) / 2);
+    top: 55%;
+    width: 1.5rem;
+    border-top: 1px solid rgba(var(--chimera-shell-line-rgb), 0.28);
+    opacity: 0;
+    transition: opacity 160ms ease;
+}
+
+.chimera-shell.is-rail:not(.is-peek) .sb-sidenav .sb-sidenav-menu .sb-sidenav-menu-heading {
+    color: transparent;
+}
+
+.chimera-shell.is-rail:not(.is-peek) .sb-sidenav .sb-sidenav-menu .sb-sidenav-menu-heading::after {
+    opacity: 1;
 }
 
 .chimera-shell.is-rail.is-peek .sb-sidenav {
