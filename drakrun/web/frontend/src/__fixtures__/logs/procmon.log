@@ -1,0 +1,6 @@
+{"Plugin": "procmon", "TimeStamp": "1792885325.504432", "PID": 4, "PPID": 0, "RunningProcess": "System", "Bitness": 64}
+{"Plugin": "procmon", "TimeStamp": "1792885325.504502", "PID": 108, "PPID": 4, "RunningProcess": "Registry", "Bitness": 64}
+{"Plugin": "procmon", "TimeStamp": "1792885325.504564", "PID": 388, "PPID": 4, "RunningProcess": "\\Device\\HarddiskVolume2\\Windows\\System32\\smss.exe", "Bitness": 64}
+{"Plugin": "procmon", "TimeStamp": "1792885325.504621", "PID": 488, "PPID": 476, "RunningProcess": "\\Device\\HarddiskVolume2\\Windows\\System32\\csrss.exe", "Bitness": 64}
+{"Plugin": "procmon", "TimeStamp": "1792885325.504678", "PID": 564, "PPID": 476, "RunningProcess": "\\Device\\HarddiskVolume2\\Windows\\System32\\wininit.exe", "Bitness": 64}
+{"Plugin": "procmon", "TimeStamp": "1792885325.504683", "PID": 572, "PPID": 556, "RunningProcess": "\\Device\\HarddiskVolume2\\Windows\\System32\\csrss.exe", "Bitness": 64}
