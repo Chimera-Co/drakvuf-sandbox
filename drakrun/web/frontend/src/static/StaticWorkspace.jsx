@@ -978,7 +978,12 @@ function Workspace({ data, analysisId }) {
             {tab === "Strings" && <Strings data={data} deep={deep} />}
             {tab === "Capabilities" && <Capabilities data={data} deep={deep} />}
             {tab === "Code" && (
-                <Code deep={deep} format={fmt} source={data.source} />
+                <Code
+                    deep={deep}
+                    format={fmt}
+                    source={data.source}
+                    filename={data.file?.name}
+                />
             )}
             {tab === "Format details" && (
                 <>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { FileTree, buildFileTree, buildFunctionTree } from "./FileTree.jsx";
 import { tokenize } from "./highlight.js";
 
 export function SourceCode({
@@ -90,7 +91,7 @@ export function GenericBlock({ value, depth = 0 }) {
         </div>
     );
 }
-export function SourceViewer({ source }) {
+export function SourceViewer({ source, filename }) {
     const [layer, setLayer] = useState(0);
     if (!source) return null;
     const layers = [
@@ -99,29 +100,54 @@ export function SourceViewer({ source }) {
     ];
     const current = layers[layer] || layers[0];
     return (
-        <section aria-label="Script source">
-            <nav className="nav nav-tabs" aria-label="Decoded source layers">
-                {layers.map((entry, i) => (
-                    <button
-                        key={i}
-                        className={`nav-link ${i === layer ? "active" : ""}`}
-                        onClick={() => setLayer(i)}
-                    >
-                        {entry.method || `Layer ${i}`}
-                    </button>
-                ))}
-            </nav>
-            <p className="small">
-                {current.language}
-                {current.truncated || source.truncated
-                    ? " · Truncated source"
-                    : ""}
-            </p>
-            <SourceCode
-                code={current.text}
-                language={current.language}
-                label="Script source text"
-            />
+        <section aria-label="Script source" className="code-ide is-sources">
+            <aside className="code-pane code-functions">
+                <FileTree
+                    nodes={buildFileTree([
+                        {
+                            path:
+                                filename ||
+                                source.name ||
+                                source.filename ||
+                                `source.${source.language || "txt"}`,
+                        },
+                    ])}
+                    selected={
+                        filename ||
+                        source.name ||
+                        source.filename ||
+                        `source.${source.language || "txt"}`
+                    }
+                    onOpen={() => {}}
+                />
+            </aside>
+            <div className="code-pane code-main">
+                <nav
+                    className="nav nav-tabs"
+                    aria-label="Decoded source layers"
+                >
+                    {layers.map((entry, i) => (
+                        <button
+                            key={i}
+                            className={`nav-link ${i === layer ? "active" : ""}`}
+                            onClick={() => setLayer(i)}
+                        >
+                            {entry.method || `Layer ${i}`}
+                        </button>
+                    ))}
+                </nav>
+                <p className="small">
+                    {current.language}
+                    {current.truncated || source.truncated
+                        ? " · Truncated source"
+                        : ""}
+                </p>
+                <SourceCode
+                    code={current.text}
+                    language={current.language}
+                    label="Script source text"
+                />
+            </div>
         </section>
     );
 }
@@ -216,7 +242,6 @@ const SORTS = {
     name: (a, b) => String(a.name).localeCompare(String(b.name)),
 };
 const MAX_TABS = 12;
-const LIST_LIMIT = 400;
 
 function Disassembly({ rows = [] }) {
     if (!rows.length)
@@ -250,7 +275,7 @@ function Disassembly({ rows = [] }) {
     );
 }
 
-export function CodeExplorer({ deep, format, source }) {
+export function CodeExplorer({ deep, format, source, filename }) {
     const [query, setQuery] = useState(""),
         [sortBy, setSortBy] = useState("interest"),
         [pinned, setPinned] = useState(null),
@@ -260,7 +285,7 @@ export function CodeExplorer({ deep, format, source }) {
     const ghidra = deep?.ghidra,
         all = ghidra?.functions || [];
     const byAddress = new Map(all.map((f) => [f.address, f]));
-    if (source) return <SourceViewer source={source} />;
+    if (source) return <SourceViewer source={source} filename={filename} />;
     if (!all.length)
         return (
             <section aria-label="Code">
@@ -350,14 +375,6 @@ export function CodeExplorer({ deep, format, source }) {
                     aria-label="Functions"
                 >
                     <div className="code-pane-head">
-                        <label className="w-100 small">
-                            Search functions
-                            <input
-                                className="form-control form-control-sm"
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                            />
-                        </label>
                         <label className="w-100 small mt-1">
                             Sort
                             <select
@@ -374,53 +391,22 @@ export function CodeExplorer({ deep, format, source }) {
                             </select>
                         </label>
                     </div>
-                    <ul className="code-function-list">
-                        {funcs.slice(0, LIST_LIMIT).map((f) => (
-                            <li key={f.address}>
-                                <button
-                                    type="button"
-                                    aria-pressed={current === f}
-                                    className={
-                                        current === f ? "is-current" : ""
-                                    }
-                                    onClick={() => open(f)}
-                                    title={(f.reasons || []).join(" · ")}
-                                >
-                                    <span className="code-fn-name">
-                                        {f.name}
-                                    </span>
-                                    <span className="code-fn-meta">
-                                        {f.address} · {f.size ?? "?"} B
-                                        {(f.reasons || []).some((r) =>
-                                            /entry|export/i.test(r),
-                                        ) ? (
-                                            <span className="code-tag">
-                                                entry
-                                            </span>
-                                        ) : null}
-                                        {f.capa?.length ? (
-                                            <span className="code-tag is-capa">
-                                                capa {f.capa.length}
-                                            </span>
-                                        ) : null}
-                                        {f.error ? (
-                                            <span className="code-tag is-error">
-                                                error
-                                            </span>
-                                        ) : null}
-                                    </span>
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                    {funcs.length > LIST_LIMIT ? (
-                        <p className="small text-muted px-2">
-                            {funcs.length - LIST_LIMIT} more: refine the search.
-                        </p>
-                    ) : null}
-                    {!funcs.length ? (
-                        <p className="small px-2">No functions match.</p>
-                    ) : null}
+                    <FileTree
+                        nodes={buildFunctionTree(
+                            [...all].sort(SORTS[sortBy]),
+                            filename ||
+                                deep?.name ||
+                                deep?.filename ||
+                                "binary",
+                        )}
+                        label="Logical function tree"
+                        filterLabel="Search functions"
+                        query={query}
+                        onQueryChange={setQuery}
+                        selected={current?.address}
+                        defaultExpanded={["program", "entry"]}
+                        onOpen={(node) => open(node.function)}
+                    />
                 </aside>
                 <div className="code-pane code-main">
                     <div

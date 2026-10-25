@@ -8,9 +8,9 @@ import {
 } from "../api.js";
 import { useOptionalJson } from "../AnalysisVerdict.jsx";
 import "./static.css";
+import { FileTree, buildFileTree } from "./FileTree.jsx";
 
 const noDeep = () => Promise.resolve(null);
-const LIST_LIMIT = 400;
 
 const formatSize = (n) =>
     n >= 1024 ? `${(n / 1024).toFixed(n >= 10240 ? 0 : 1)} KiB` : `${n} B`;
@@ -18,26 +18,60 @@ const formatSize = (n) =>
 // JADX's Java/Kotlin output for an APK, kept by the MobSF scan; one file is fetched at a time.
 export function MobileSources({ analysisId }) {
     const state = useOptionalJson(getMobsf, analysisId);
-    const [query, setQuery] = useState("");
-    const [scope, setScope] = useState("app");
+    const [tabs, setTabs] = useState(null);
+    const [reveal, setReveal] = useState(null);
     const [path, setPath] = useState(null);
     const [file, setFile] = useState({});
     const [message, setMessage] = useState("");
     const sources = state.data?.sources;
     const all = useMemo(() => sources?.files || [], [sources]);
-    const hasApp = all.some((f) => f.app);
-    const shown = all.filter(
-        (f) =>
-            (scope === "all" || !hasApp || f.app) &&
-            f.path.toLowerCase().includes(query.toLowerCase()),
-    );
-    const current = path ?? shown[0]?.path ?? null;
+    const current =
+        path ??
+        (tabs?.length === 0
+            ? null
+            : (all.find((f) => f.app) || all[0])?.path) ??
+        null;
+    const openTabs = tabs ?? (current ? [current] : []);
+    const open = (next) => {
+        setPath(next);
+        setTabs((old) => [...new Set([...(old ?? openTabs), next])].slice(-12));
+    };
+    const tree = useMemo(() => {
+        const nodes = buildFileTree(
+            all.map((f) => ({ ...f, meta: formatSize(f.size) })),
+        );
+        const packagePath = sources?.package?.replaceAll(".", "/");
+        const mark = (items) =>
+            items.forEach((node) => {
+                if (node.id === packagePath)
+                    node.badges = <span className="code-tag">App code</span>;
+                if (node.children) mark(node.children);
+            });
+        mark(nodes);
+        return nodes;
+    }, [all, sources?.package]);
+    const appFolders = all
+        .filter((f) => f.app)
+        .flatMap((f) =>
+            f.path
+                .split("/")
+                .slice(0, -1)
+                .map((_, i) =>
+                    f.path
+                        .split("/")
+                        .slice(0, i + 1)
+                        .join("/"),
+                ),
+        );
     useEffect(() => {
         if (!current) return undefined;
         const controller = new AbortController();
         setFile({ path: current, loading: true });
         getMobsfSource({ analysisId, path: current, signal: controller.signal })
-            .then((text) => setFile({ path: current, text }))
+            .then((text) => {
+                if (!controller.signal.aborted)
+                    setFile({ path: current, text });
+            })
             .catch((error) => {
                 if (!controller.signal.aborted)
                     setFile({ path: current, error: String(error) });
@@ -95,76 +129,68 @@ export function MobileSources({ analysisId }) {
                     className="code-pane code-functions"
                     aria-label="Source files"
                 >
-                    <div className="code-pane-head">
-                        <label className="w-100 small">
-                            Search files
-                            <input
-                                className="form-control form-control-sm"
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                            />
-                        </label>
-                        {hasApp ? (
-                            <label className="w-100 small mt-1">
-                                Show
-                                <select
-                                    className="form-select form-select-sm"
-                                    value={scope}
-                                    onChange={(e) => setScope(e.target.value)}
-                                >
-                                    <option value="app">App's own code</option>
-                                    <option value="all">
-                                        All, with libraries
-                                    </option>
-                                </select>
-                            </label>
-                        ) : null}
-                    </div>
-                    <ul className="code-function-list">
-                        {shown.slice(0, LIST_LIMIT).map((f) => {
-                            const cut = f.path.lastIndexOf("/");
-                            return (
-                                <li key={f.path}>
-                                    <button
-                                        type="button"
-                                        aria-pressed={current === f.path}
-                                        className={
-                                            current === f.path
-                                                ? "is-current"
-                                                : ""
-                                        }
-                                        onClick={() => setPath(f.path)}
-                                        title={f.path}
-                                    >
-                                        <span className="code-fn-name">
-                                            {f.path.slice(cut + 1)}
-                                        </span>
-                                        <span className="code-fn-meta">
-                                            {cut > 0
-                                                ? f.path
-                                                      .slice(0, cut)
-                                                      .replaceAll("/", ".")
-                                                : "(default package)"}{" "}
-                                            · {formatSize(f.size)}
-                                        </span>
-                                    </button>
-                                </li>
-                            );
-                        })}
-                    </ul>
-                    {shown.length > LIST_LIMIT ? (
-                        <p className="small text-muted px-2">
-                            {shown.length - LIST_LIMIT} more: refine the search.
-                        </p>
-                    ) : null}
-                    {!shown.length ? (
-                        <p className="small px-2">No files match.</p>
-                    ) : null}
+                    <FileTree
+                        nodes={tree}
+                        label="Explorer"
+                        filterLabel="Search files"
+                        selected={current}
+                        defaultExpanded={appFolders}
+                        reveal={reveal}
+                        onOpen={(node) => open(node.path)}
+                    />
                 </aside>
                 <div className="code-pane code-main">
+                    <div
+                        className="code-tabs"
+                        role="tablist"
+                        aria-label="Open files"
+                    >
+                        {openTabs.map((tab) => (
+                            <div className="code-tab" key={tab}>
+                                <button
+                                    role="tab"
+                                    aria-selected={tab === current}
+                                    onClick={() => open(tab)}
+                                >
+                                    {tab.split("/").at(-1)}
+                                </button>
+                                <button
+                                    aria-label={`Close ${tab}`}
+                                    onClick={() => {
+                                        const rest = openTabs.filter(
+                                            (p) => p !== tab,
+                                        );
+                                        setTabs(rest);
+                                        if (current === tab)
+                                            setPath(rest.at(-1) || null);
+                                    }}
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        ))}
+                    </div>
                     <div className="code-pane-head d-flex align-items-center gap-2">
                         <span className="font-monospace small text-break flex-grow-1">
-                            {current || "No file selected"}
+                            {current
+                                ? current.split("/").map((part, i, parts) => (
+                                      <span key={i}>
+                                          {i > 0 && " / "}
+                                          <button
+                                              className="btn btn-link btn-sm p-0"
+                                              onClick={() =>
+                                                  setReveal({
+                                                      path: parts
+                                                          .slice(0, i + 1)
+                                                          .join("/"),
+                                                  })
+                                              }
+                                          >
+                                              {part}
+                                          </button>
+                                      </span>
+                                  ))
+                                : "No file selected"}
                         </span>
                         <span className="code-tag">
                             {language === "kotlin" ? "Kotlin" : "Java"}
@@ -173,7 +199,7 @@ export function MobileSources({ analysisId }) {
                             type="button"
                             className="btn btn-sm btn-outline-secondary"
                             onClick={copy}
-                            disabled={!file.text}
+                            disabled={!current || !file.text}
                         >
                             Copy
                         </button>
@@ -182,7 +208,9 @@ export function MobileSources({ analysisId }) {
                         {message}
                     </span>
                     <div className="code-view">
-                        {file.loading ? (
+                        {!current ? (
+                            <p className="p-2">No file selected.</p>
+                        ) : file.loading ? (
                             <div role="status" className="p-2 small">
                                 Loading {file.path}…
                             </div>
@@ -234,6 +262,7 @@ function NativeCode({ data, analysisId, format }) {
             deep={deepState.data}
             format={format}
             source={data.source}
+            filename={data.file?.name}
         />
     );
 }

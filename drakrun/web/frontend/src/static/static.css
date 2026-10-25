@@ -287,7 +287,7 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Code workspace (function list | pseudocode / disassembly | cross-references)
+   Code workspace (Explorer tree | pseudocode / disassembly | cross-references)
    ------------------------------------------------------------------------- */
 .code-ide {
     display: grid;
@@ -541,4 +541,92 @@
     .code-functions {
         height: 18rem;
     }
+}
+
+.file-explorer {
+    font-size: 0.8rem;
+    min-width: 0;
+    overflow: auto;
+    flex: 1;
+}
+.file-tree-head {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 8px;
+    background: var(--bs-tertiary-bg);
+    border-bottom: 1px solid var(--bs-border-color);
+}
+.file-tree-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    cursor: pointer;
+    position: relative;
+    background-image: repeating-linear-gradient(
+        to right,
+        transparent 0,
+        transparent 15px,
+        var(--bs-border-color) 15px,
+        var(--bs-border-color) 16px
+    );
+    background-size: max(0px, calc((var(--tree-level, 1) - 1) * 16px)) 100%;
+    background-repeat: no-repeat;
+}
+.file-tree-row:hover {
+    background-color: var(--bs-tertiary-bg);
+}
+.file-tree-chevron {
+    width: 10px;
+    flex-shrink: 0;
+}
+.file-icon {
+    color: var(--bs-secondary-color);
+}
+.ext-java,
+.ext-kt {
+    color: var(--bs-warning-text-emphasis);
+}
+/* The name wins the width: the address/size text shrinks first and is dropped in a narrow explorer
+   (it stays in the row's tooltip). */
+.file-explorer {
+    container-type: inline-size;
+}
+.file-tree-name {
+    flex: 0 1 auto;
+    min-width: 6ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.file-tree-meta {
+    flex: 0 100 auto;
+    min-width: 0;
+    margin-left: auto;
+    padding-right: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--bs-secondary-color);
+    white-space: nowrap;
+    font-size: 0.7rem;
+}
+@container (max-width: 300px) {
+    .file-tree-meta {
+        display: none;
+    }
+}
+.file-explorer [role="treeitem"][aria-selected="true"] > .file-tree-row {
+    background-color: var(--bs-primary-bg-subtle);
+    color: var(--bs-primary-text-emphasis);
+}
+.file-explorer [role="treeitem"]:focus-visible {
+    outline: none;
+}
+.file-explorer [role="treeitem"]:focus-visible > .file-tree-row {
+    outline: 1px solid var(--bs-primary);
+    outline-offset: -1px;
+}
+.ext-kt {
+    color: var(--bs-info-text-emphasis);
 }

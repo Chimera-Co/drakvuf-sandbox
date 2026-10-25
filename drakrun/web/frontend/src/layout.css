@@ -88,7 +88,7 @@
     justify-content: flex-start;
     gap: 0.25rem;
     /* the pin icon sits on the same column as the nav icons, so the rail shows it in place */
-    padding: 0.75rem 0.5rem 0 0.85rem;
+    padding: 0.75rem 0.5rem 0 16px; /* 16px + border + padding puts the pin's centre on the 30px icon column */
 }
 
 .chimera-nav-tools button {
@@ -122,16 +122,21 @@
     overflow: hidden;
 }
 
+/* Icon column: link margin 8px + padding 8px + a 28px icon box puts every icon's centre at 30px, the middle of
+   the 60px rail; the pin and the heading dividers use the same centre. */
 .chimera-shell .sb-sidenav .sb-sidenav-menu .nav-link {
     height: 48px;
     flex-wrap: nowrap;
     overflow: hidden;
-    padding-inline: 1rem;
+    margin-inline: 8px;
+    padding-inline: 8px;
 }
 
 .chimera-shell .sb-nav-link-icon {
     flex: 0 0 28px;
-    margin-right: 0;
+    width: 28px;
+    margin-right: 0.75rem;
+    text-align: center;
     font-size: 1rem;
 }
 

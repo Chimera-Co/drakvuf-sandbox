@@ -279,10 +279,12 @@ it("opens functions in tabs that can be closed", () => {
     ];
     render(<CodeExplorer format="pe" deep={{ ghidra: { functions } }} />);
     const list = screen.getByRole("complementary", { name: "Functions" });
-    fireEvent.click(within(list).getByText("worker"));
+    fireEvent.click(
+        within(list).getByRole("treeitem", { name: "Other functions" }),
+    );
+    fireEvent.click(within(list).getByRole("treeitem", { name: "worker" }));
     fireEvent.click(within(list).getByText("helper"));
-    const tabs = () =>
-        screen.getAllByRole("tab").map((tab) => tab.textContent);
+    const tabs = () => screen.getAllByRole("tab").map((tab) => tab.textContent);
     expect(tabs()).toEqual(["entry", "worker", "helper"]);
     fireEvent.click(screen.getByRole("button", { name: "Close helper" }));
     expect(tabs()).toEqual(["entry", "worker"]);

@@ -65,13 +65,39 @@ describe("decompiled code tab", () => {
         expect(container.querySelector(".syntax-keyword").textContent).toBe(
             "public",
         );
-        fireEvent.change(screen.getByLabelText("Show"), {
-            target: { value: "all" },
-        });
-        fireEvent.click(screen.getByText("Call.kt"));
+        fireEvent.click(screen.getByRole("treeitem", { name: "Main.java" }));
+        expect(
+            screen.getByRole("treeitem", { name: "Main.java" }),
+        ).toHaveAttribute("aria-selected", "true");
+        fireEvent.click(screen.getByRole("button", { name: "Collapse all" }));
+        expect(
+            screen.queryByRole("treeitem", { name: "Main.java" }),
+        ).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "light" }));
+        expect(
+            screen.getByRole("treeitem", { name: "Main.java" }),
+        ).toBeVisible();
+        fireEvent.click(screen.getByRole("treeitem", { name: "okhttp3" }));
+        fireEvent.click(screen.getByRole("treeitem", { name: "Call.kt" }));
         expect(
             await screen.findByLabelText("Decompiled okhttp3/Call.kt"),
         ).toBeInTheDocument();
         expect(screen.getByText("Kotlin")).toBeInTheDocument();
+        expect(screen.getAllByRole("tab")).toHaveLength(2);
+        fireEvent.click(screen.getByRole("tab", { name: "Main.java" }));
+        expect(
+            await screen.findByLabelText(
+                "Decompiled com/example/light/Main.java",
+            ),
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: "Close com/example/light/Main.java",
+            }),
+        );
+        expect(screen.getByRole("tab", { name: "Call.kt" })).toHaveAttribute(
+            "aria-selected",
+            "true",
+        );
     });
 });
