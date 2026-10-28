@@ -1,10 +1,14 @@
 #!/bin/bash
-# usage: scan.sh <label> <runs>  DRAKVUF-attached PERDEDOR + al-khaser scans; one summary line + per-check JSONL per run.
+# usage: [TOOLS=perdedor,alkhaser,pafish,vmaware] [TOOL_OPTIONS='{"vmaware":{...}}'] scan.sh <label> <runs>
+# DRAKVUF-attached scans (default PERDEDOR + al-khaser; TOOL_OPTIONS makes it a custom-profile scan); one summary
+# line + per-check JSONL per run.
 API=http://127.0.0.1:5000/api/evasion
 EV=${EV:-/var/lib/chimera-evidence/m4-2026-10-19}; sudo -n mkdir -p $EV
+TOOL_OPTIONS=${TOOL_OPTIONS:-}; PROFILE=custom; [[ -z "$TOOL_OPTIONS" ]] && { TOOL_OPTIONS='{}'; PROFILE=full; }
+TOOLS_JSON=$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1].split(",")))' "${TOOLS:-perdedor,alkhaser}")
 for n in $(seq 1 $2); do
   ID=$(curl -s -X POST $API/scans -H 'Content-Type: application/json' \
-    -d '{"sandbox_id":"default","tools":["perdedor","alkhaser"],"profile":"full","with_drakvuf":true}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["scan_id"])')
+    -d '{"sandbox_id":"default","tools":'"$TOOLS_JSON"',"profile":"'"$PROFILE"'","tool_options":'"$TOOL_OPTIONS"',"with_drakvuf":true}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["scan_id"])')
   start=$(date +%s); outcome=ok
   while true; do
     S=$(curl -s $API/scans/$ID/status | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status"))')
@@ -29,6 +33,6 @@ with open(f"{ev}/checks.jsonl", "a") as f:
     for t in tl:
         for c in t.get("checks", []):
             f.write(json.dumps({"arm": label, "run": int(n), "scan": sid, "tool": t["tool"], "id": c.get("id") or c.get("check_id") or c.get("name"),
-                                "status": c["status"], "attached": att}) + "\n")
+                                "status": c["status"], "attached": att, "measured": c.get("measured_value")}) + "\n")
 PY
 done

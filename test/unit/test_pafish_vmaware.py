@@ -179,8 +179,27 @@ def test_registered_for_windows_with_no_options():
     }
     for adapter in (PafishAdapter(), VMAwareAdapter()):
         assert adapter.validate_options({}) == {}
-        assert adapter.options_schema()["full_suite_only"]
         with pytest.raises(VerifierError):
             adapter.validate_options({"checks": ["x"]})
+    assert PafishAdapter().options_schema()["full_suite_only"]
     assert EvasionConfigSection().pafish.host_binary_path is None
     assert {"pafish", "vmaware"} <= set(SandboxDefinitionSection().verifiers)
+
+
+def test_vmaware_disable_option_is_validated_and_passed_last(binary, tmp_path):
+    adapter = VMAwareAdapter()
+    assert adapter.validate_options({"disable": ["GPU_CAPABILITIES"]}) == {
+        "disable": ["GPU_CAPABILITIES"]
+    }
+    for bad in ({"disable": ["eip; del"]}, {"disable": "GPU_CAPABILITIES"}, {"checks": []}):
+        with pytest.raises(VerifierError):
+            adapter.validate_options(bad)
+    session = FakeGuestSession(
+        files={
+            r"C:\Users\Public\vmaware\vmaware.json": json.dumps(VMAWARE_JSON).encode()
+        }
+    )
+    options = {"host_binary_path": str(binary), "disable": ["GPU_CAPABILITIES", "TIMER"]}
+    result = adapter.run(session, options, tmp_path / "scan", time.time() + 60)
+    assert result.status == ToolStatus.ok
+    assert "--disable GPU_CAPABILITIES,TIMER < NUL >" in session.run_calls[0][0][2]

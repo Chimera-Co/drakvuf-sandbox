@@ -67,8 +67,8 @@ class SingleBinaryAdapter(VerifierAdapter):
             )
         return {}
 
-    def args(self) -> List[str]:
-        """Command-line arguments after the binary path."""
+    def args(self, options: Dict[str, Any]) -> List[str]:
+        """Command-line arguments after the binary path (options already validated)."""
         return []
 
     @abc.abstractmethod
@@ -99,7 +99,7 @@ class SingleBinaryAdapter(VerifierAdapter):
 
         guest_binary_path = f"{self.guest_dir}\\{self.binary_name}"
         argv = build_argv(
-            guest_binary_path, self.args(), f"{self.guest_dir}\\{STDOUT_NAME}"
+            guest_binary_path, self.args(options), f"{self.guest_dir}\\{STDOUT_NAME}"
         )
         command = " ".join(argv)
         (raw_dir / "command.txt").write_text(command, encoding="utf-8")

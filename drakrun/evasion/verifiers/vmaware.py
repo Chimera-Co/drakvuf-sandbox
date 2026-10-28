@@ -12,15 +12,18 @@ the verdict check carries the overall result and the percentage.
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Dict, List
 
 from drakrun.evasion.constants import Category, CheckStatus, Severity
 from drakrun.evasion.models import NormalizedCheck
+from drakrun.evasion.verifiers.base import VerifierError
 from drakrun.evasion.verifiers.single_binary import SingleBinaryAdapter
 
 TOOL_ID = "vmaware"
 REPORT_NAME = "vmaware.json"
 _TIMING_WORDS = ("TIMER", "RDTSC", "TIMING", "CLOCK")
+_TECHNIQUE_NAME = re.compile(r"^[A-Z][A-Z0-9_]{1,63}$")
 
 
 def _load(text: str) -> Dict[str, Any]:
@@ -80,8 +83,43 @@ class VMAwareAdapter(SingleBinaryAdapter):
     binary_name = "vmaware.exe"
     output_files = (REPORT_NAME,)
 
-    def args(self) -> List[str]:
-        return ["--json", "--output", f"{self.guest_dir}\\{REPORT_NAME}"]
+    def options_schema(self) -> Dict[str, Any]:
+        return {
+            "full_suite_only": False,
+            "options": [
+                {
+                    "name": "disable",
+                    "type": "list[str]",
+                    "description": "Technique names passed to --disable (e.g. TIMER).",
+                }
+            ],
+        }
+
+    def validate_options(self, tool_options: Dict[str, Any]) -> Dict[str, Any]:
+        unknown = set(tool_options) - {"disable"}
+        if unknown:
+            field = sorted(unknown)[0]
+            raise VerifierError(
+                f"VMAware accepts only 'disable' (got '{field}').", field=field
+            )
+        disable = tool_options.get("disable") or []
+        if not isinstance(disable, list) or len(disable) > 32:
+            raise VerifierError(
+                "disable must be a list of at most 32 technique names.", field="disable"
+            )
+        for name in disable:
+            if not isinstance(name, str) or not _TECHNIQUE_NAME.match(name):
+                raise VerifierError(
+                    f"Not a VMAware technique name: {name!r}", field="disable"
+                )
+        return {"disable": disable} if disable else {}
+
+    def args(self, options: Dict[str, Any]) -> List[str]:
+        args = ["--json", "--output", f"{self.guest_dir}\\{REPORT_NAME}"]
+        if options.get("disable"):
+            # --disable takes the following tokens until the next option, so it goes last
+            args += ["--disable", ",".join(options["disable"])]
+        return args
 
     def parse(self, outputs: Dict[str, str]) -> List[NormalizedCheck]:
         if REPORT_NAME not in outputs:
