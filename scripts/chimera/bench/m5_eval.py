@@ -289,12 +289,51 @@ def mcnemar_exact(only_a, only_b):
     return min(1.0, 2 * tail)
 
 
-def sample_outcome(runs):
-    """Majority over complete runs; a tie counts as observed. None if no complete run."""
-    complete = [r for r in runs if r.get("telemetry_complete")]
-    if not complete:
+# Protocol Amendment 1 (section 8): network intent is the primary outcome of the paired test. The secondary
+# outcomes are exploratory, each with its own discordant counts; "behaviours" is the 0-3 count of distinct
+# behaviours (persistence, file drop, network intent), paired as higher on one arm vs the other (sign test).
+PRIMARY_OUTCOME = "network_intent"
+SECONDARY_OUTCOMES = ("persistence", "payload_behaviour", "file_drops", "children", "behaviours")
+OUTCOME_NAMES = {
+    "network_intent": "network intent",
+    "persistence": "persistence",
+    "payload_behaviour": "payload behaviour (persistence, file drop or network intent; as registered)",
+    "file_drops": "file drops",
+    "children": "child processes",
+    "behaviours": "distinct behaviours (0-3)",
+}
+
+
+def run_value(run, outcome):
+    """One run's value of an outcome: observed or not, or 0-3 for the distinct-behaviour count."""
+    if outcome == "behaviours":
+        return sum(bool(run.get(k)) for k in ("persistence", "file_drops", "network_intent"))
+    return bool(run.get(outcome))
+
+
+def sample_outcome(runs, outcome=PRIMARY_OUTCOME):
+    """Majority over complete runs; a tie counts as observed (the upper median, which is also how the 0-3
+    count is aggregated). None if no complete run."""
+    values = sorted(run_value(r, outcome) for r in runs if r.get("telemetry_complete"))
+    if not values:
         return None
-    return 2 * sum(1 for r in complete if r.get("payload_behaviour")) >= len(complete)
+    return values[len(values) // 2]
+
+
+def paired_counts(paired, arm_a, arm_b, outcome):
+    """Concordant and discordant samples for one outcome; for the 0-3 count, discordant = higher on one arm."""
+    values = [(r[f"{arm_a}_outcomes"][outcome], r[f"{arm_b}_outcomes"][outcome]) for r in paired]
+    only_a = sum(1 for a, b in values if a > b)
+    only_b = sum(1 for a, b in values if b > a)
+    both = sum(1 for a, b in values if a == b and a)
+    return {
+        "outcome": outcome,
+        "both": both,
+        "neither": len(values) - only_a - only_b - both,
+        f"only_{arm_a}": only_a,
+        f"only_{arm_b}": only_b,
+        "mcnemar_p": mcnemar_exact(only_a, only_b),
+    }
 
 
 def summarise(results, register, arm_a, arm_b):
@@ -306,7 +345,8 @@ def summarise(results, register, arm_a, arm_b):
             runs = [r for r in results if r["sha256"] == sha and r["arm"] == arm]
             row[f"{arm}_runs"] = len(runs)
             row[f"{arm}_complete"] = sum(1 for r in runs if r.get("telemetry_complete"))
-            row[f"{arm}_observed"] = sample_outcome(runs)
+            row[f"{arm}_outcomes"] = {o: sample_outcome(runs, o) for o in (PRIMARY_OUTCOME, *SECONDARY_OUTCOMES)}
+            row[f"{arm}_observed"] = row[f"{arm}_outcomes"][PRIMARY_OUTCOME]
             complete = [r for r in runs if r.get("telemetry_complete")] or [{}]
             row[f"{arm}_children"] = max(r.get("children", 0) for r in complete)
             row[f"{arm}_network"] = any(r.get("network_intent") for r in complete)
@@ -314,19 +354,12 @@ def summarise(results, register, arm_a, arm_b):
             excluded.append(sha)
         per_sample.append(row)
     paired = [r for r in per_sample if r["role"] == "test" and r["sha256"] not in excluded]
-    only_a = sum(1 for r in paired if r[f"{arm_a}_observed"] and not r[f"{arm_b}_observed"])
-    only_b = sum(1 for r in paired if r[f"{arm_b}_observed"] and not r[f"{arm_a}_observed"])
-    both = sum(1 for r in paired if r[f"{arm_a}_observed"] and r[f"{arm_b}_observed"])
-    neither = len(paired) - only_a - only_b - both
     return {
         "per_sample": per_sample,
         "excluded": excluded,
         "paired": len(paired),
-        "both": both,
-        "neither": neither,
-        f"only_{arm_a}": only_a,
-        f"only_{arm_b}": only_b,
-        "mcnemar_p": mcnemar_exact(only_a, only_b),
+        **paired_counts(paired, arm_a, arm_b, PRIMARY_OUTCOME),
+        "secondary": {o: paired_counts(paired, arm_a, arm_b, o) for o in SECONDARY_OUTCOMES},
     }
 
 
@@ -571,7 +604,7 @@ class Lane:
                     with ctx["results"].open("a") as f:
                         f.write(json.dumps(record) + "\n")
                 save_to_dataset(ctx["dataset"], sample, record, ANALYSES_DIR / task_uid, ctx["lock"])
-                print(json.dumps({k: record.get(k) for k in ("key", "os", "task_uid", "status", "payload_behaviour")}), flush=True)
+                print(json.dumps({k: record.get(k) for k in ("key", "os", "task_uid", "status", "network_intent", "payload_behaviour")}), flush=True)
                 if record["egress_drops"] > 0:
                     ctx["stop"].set()
                     raise RuntimeError(f"CHIMERA-EGRESS-DROP during {task_uid}; batch stopped")
@@ -709,7 +742,7 @@ def other_tables(results, register):
             complete = [r for r in runs if r.get("telemetry_complete")] or [{}]
             lines.append(
                 f"| `{sample['sha256'][:12]}` | {sample['role']} | {sample.get('family', '')} | {len(runs)}"
-                f" | {sum(1 for r in runs if r.get('telemetry_complete'))} | {_fmt(sample_outcome(runs))}"
+                f" | {sum(1 for r in runs if r.get('telemetry_complete'))} | {_fmt(sample_outcome(runs, 'payload_behaviour'))}"
                 f" | {max(r.get('children', 0) for r in complete)} | {_fmt(any(r.get('network_intent') for r in complete))} |"
             )
     benign = [s for s in register if s["role"] == "benign"]
@@ -724,7 +757,7 @@ def other_tables(results, register):
             complete = [r for r in runs if r.get("telemetry_complete")]
             lines.append(
                 f"| {sample['guest_os']} | {sample.get('family') or sample.get('file_name', '')} | `{sample['sha256'][:12]}`"
-                f" | {len(runs)} | {len(complete)} | {_fmt(sample_outcome(runs))}"
+                f" | {len(runs)} | {len(complete)} | {_fmt(sample_outcome(runs, 'payload_behaviour'))}"
                 f" | {sum(1 for r in complete if r.get('persistence'))} | {sum(1 for r in complete if r.get('file_drops'))}"
                 f" | {sum(1 for r in complete if r.get('network_intent'))} | {_verdicts(runs)} |"
             )
@@ -762,7 +795,7 @@ def cmd_report(args):
         f" executed hash differs from register: {len(mismatched)};"
         f" egress drops: {sum(r.get('egress_drops', 0) for r in results)}.",
         "",
-        "## Paired outcome (test samples, payload behaviour observed)",
+        f"## Primary outcome: {OUTCOME_NAMES[PRIMARY_OUTCOME]} (test samples, protocol Amendment 1)",
         "",
         f"| | {arm_b} observed | {arm_b} not observed |",
         "|---|---|---|",
@@ -774,10 +807,22 @@ def cmd_report(args):
         f" {summary[f'only_{arm_b}']} {arm_b}-only): p = {summary['mcnemar_p']:.3f}."
         " Exploratory: the sample is small.",
         "",
+        "## Secondary outcomes (exploratory)",
+        "",
+        "Same paired samples. For the 0-3 count, discordant means a higher count on one arm (sign test).",
+        "",
+        f"| Outcome | Both | Neither | {arm_a} only | {arm_b} only | Exact p |",
+        "|---|---|---|---|---|---|",
+        *(
+            f"| {OUTCOME_NAMES[o]} | {c['both']} | {c['neither']} | {c[f'only_{arm_a}']} | {c[f'only_{arm_b}']}"
+            f" | {c['mcnemar_p']:.3f} |"
+            for o, c in summary["secondary"].items()
+        ),
+        "",
         "## Per sample",
         "",
-        f"| SHA-256 | Role | Family | {arm_a} observed | {arm_b} observed | {arm_a} children | {arm_b} children"
-        f" | {arm_a} network | {arm_b} network | Complete runs ({arm_a}/{arm_b}) |",
+        f"| SHA-256 | Role | Family | {arm_a} network intent | {arm_b} network intent | {arm_a} children | {arm_b} children"
+        f" | {arm_a} network (any run) | {arm_b} network (any run) | Complete runs ({arm_a}/{arm_b}) |",
         "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for row in sorted(summary["per_sample"], key=lambda r: (r["role"], r["family"], r["sha256"])):

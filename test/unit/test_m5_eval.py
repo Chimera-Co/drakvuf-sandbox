@@ -132,7 +132,7 @@ def test_summary_pairs_tests_and_excludes_incomplete_samples():
     ]
 
     def run(sha, arm, observed, complete=True):
-        return {"sha256": sha, "arm": arm, "payload_behaviour": observed, "telemetry_complete": complete}
+        return {"sha256": sha, "arm": arm, "network_intent": observed, "telemetry_complete": complete}
 
     results = [
         run(SHA[0], "A0", False), run(SHA[0], "H3", True), run(SHA[0], "H3", False),  # tie -> observed
@@ -144,6 +144,44 @@ def test_summary_pairs_tests_and_excludes_incomplete_samples():
     assert summary["excluded"] == [SHA[2]]
     assert summary["paired"] == 2  # the control is reported but not paired
     assert (summary["only_H3"], summary["only_A0"], summary["both"]) == (1, 0, 1)
+
+
+def test_network_intent_is_the_primary_outcome_and_the_rest_are_secondary():
+    # Amendment 1: payload behaviour fires for installers, so the pair is decided on network intent
+    register = [{"sha256": s, "role": "test"} for s in SHA[:3]]
+
+    def run(sha, arm, network=False, persistence=False, drops=0, children=0):
+        return {"sha256": sha, "arm": arm, "telemetry_complete": True, "network_intent": network,
+                "persistence": persistence, "file_drops": drops, "children": children,
+                "payload_behaviour": bool(network or persistence or drops)}
+
+    results = [
+        run(SHA[0], "A0", drops=2), run(SHA[0], "H3", network=True, drops=2),  # H3-only network
+        run(SHA[1], "A0", drops=1, children=1), run(SHA[1], "H3", drops=1, children=1),  # payload on both
+        run(SHA[2], "A0"), run(SHA[2], "H3", persistence=True, network=True, drops=1),  # 0 vs 3 behaviours
+    ]
+    summary = m5.summarise(results, register, "A0", "H3")
+    assert summary["outcome"] == "network_intent"
+    assert (summary["only_H3"], summary["only_A0"], summary["both"], summary["neither"]) == (2, 0, 0, 1)
+    secondary = summary["secondary"]
+    assert set(secondary) == {"persistence", "payload_behaviour", "file_drops", "children", "behaviours"}
+    assert (secondary["payload_behaviour"]["only_H3"], secondary["payload_behaviour"]["both"]) == (1, 2)
+    assert (secondary["persistence"]["only_H3"], secondary["persistence"]["neither"]) == (1, 2)
+    assert (secondary["children"]["both"], secondary["children"]["neither"]) == (1, 2)
+    # 0-3 count: SHA0 1 vs 2, SHA1 1 vs 1, SHA2 0 vs 3 -> two higher on H3, one tie
+    assert (secondary["behaviours"]["only_H3"], secondary["behaviours"]["only_A0"]) == (2, 0)
+    assert secondary["behaviours"]["both"] == 1
+    assert summary["mcnemar_p"] == pytest.approx(0.5)
+
+
+def test_sample_outcome_takes_the_majority_and_counts_ties_as_observed():
+    def run(network, complete=True):
+        return {"network_intent": network, "persistence": network, "telemetry_complete": complete}
+
+    assert m5.sample_outcome([run(False), run(True)]) is True
+    assert m5.sample_outcome([run(False), run(False), run(True)]) is False
+    assert m5.sample_outcome([run(True, complete=False)]) is None
+    assert m5.sample_outcome([run(True), run(False)], "behaviours") == 2
 
 
 def test_register_rejects_bad_rows(tmp_path):
@@ -377,7 +415,7 @@ def test_report_compares_arms_on_windows_malware_only(tmp_path):
     (tmp_path / "schedule.json").write_text(json.dumps({"register": str(register), "arms": ["A0", "H3"], "schedule": [1] * 6}))
 
     def run(sha, arm, os_, observed):
-        return {"sha256": sha, "arm": arm, "os": os_, "payload_behaviour": observed, "telemetry_complete": True, "verdict": "benign"}
+        return {"sha256": sha, "arm": arm, "os": os_, "network_intent": observed, "telemetry_complete": True, "verdict": "benign"}
 
     results = [run(SHA[0], "A0", "windows", False), run(SHA[0], "H3", "windows", True),
                run(SHA[1], "L", "linux", True), run(SHA[2], "A0", "windows", False), run(SHA[2], "H3", "windows", False)]
@@ -388,6 +426,8 @@ def test_report_compares_arms_on_windows_malware_only(tmp_path):
     report = (tmp_path / "report.md").read_text()
     assert "## Linux samples" in report and "XorDDoS" in report
     assert "## Benign samples (false-positive check)" in report and "Bginfo" in report
+    assert report.index("## Primary outcome: network intent") < report.index("## Secondary outcomes")
+    assert "| persistence |" in report and "| distinct behaviours (0-3) |" in report
 
 
 def test_linux_shortlist_takes_recent_elf_and_skips_spreading_bots():
