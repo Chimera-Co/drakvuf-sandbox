@@ -286,7 +286,10 @@ class SingleBinaryToolConfigSection(BaseModel):
     # VMAware's vmaware.exe). Not redistributed: download the release and record
     # its SHA-256. Copied into the disposable overlay per scan, like al-khaser.
     host_binary_path: Optional[pathlib.Path] = None
-    timeout: int = 600
+    # With DRAKVUF attached every tool is staged first, so the budget also covers
+    # the tools that run before it (PERDEDOR + al-khaser take ~18 min); it must
+    # stay below the scan's own limit (evasion default_timeout, 2400 s).
+    timeout: int = 1800
 
 
 class PerdedorConfigSection(BaseModel):

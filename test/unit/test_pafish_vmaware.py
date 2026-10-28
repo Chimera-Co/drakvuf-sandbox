@@ -122,7 +122,21 @@ def test_missing_binary_is_unsupported_and_runs_nothing(tmp_path):
 
 def test_guest_timeout_is_reported_as_timeout(binary, tmp_path):
     session = FakeGuestSession(raise_on_run=VerifierTimeout("slow"))
-    assert run(VMAwareAdapter(), session, binary, tmp_path).status == ToolStatus.timeout
+    result = run(VMAwareAdapter(), session, binary, tmp_path)
+    assert result.status == ToolStatus.timeout and not result.checks
+
+
+def test_timeout_keeps_the_checks_written_before_the_budget_ran_out(binary, tmp_path):
+    # Stuck in the reverse Turing tests: the checks before them are already in stdout.txt
+    partial = PAFISH_STDOUT.split("[-] Generic reverse turing tests")[0]
+    session = FakeGuestSession(
+        files={r"C:\Users\Public\pafish\stdout.txt": partial.encode()},
+        raise_on_run=VerifierTimeout("slow"),
+    )
+    result = run(PafishAdapter(), session, binary, tmp_path)
+    assert result.status == ToolStatus.timeout and len(result.checks) == 3
+    assert "3 checks from its partial output" in result.error
+    assert result.raw_artifacts == ["raw/pafish/stdout.txt"]
 
 
 def test_vmaware_verdict_and_techniques():

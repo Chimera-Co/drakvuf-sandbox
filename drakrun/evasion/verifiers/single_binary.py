@@ -103,13 +103,19 @@ class SingleBinaryAdapter(VerifierAdapter):
         )
         command = " ".join(argv)
         (raw_dir / "command.txt").write_text(command, encoding="utf-8")
+        timed_out = False
         try:
             session.put_file(pathlib.Path(host_binary_path), guest_binary_path)
             yield  # staged; DRAKVUF attaches here on an instrumented scan
-            result = session.run(
-                argv, timeout=max(0.0, deadline - time.time()), cwd=self.guest_dir
-            )
-            exit_code, _stdout, _stderr = result
+            try:
+                result = session.run(
+                    argv, timeout=max(0.0, deadline - time.time()), cwd=self.guest_dir
+                )
+                exit_code, _stdout, _stderr = result
+            except VerifierTimeout:
+                # Still read back what it wrote before the budget ran out: Pafish
+                # logs check by check, so a run stuck on one check keeps the rest.
+                timed_out, result, exit_code = True, None, None
         except VerifierTimeout:
             return ToolResult(
                 tool=self.id,
@@ -152,6 +158,18 @@ class SingleBinaryAdapter(VerifierAdapter):
                 checks = self.parse(outputs)
             except ValueError as exc:
                 error = str(exc)
+        if timed_out:
+            return ToolResult(
+                tool=self.id,
+                status=ToolStatus.timeout,
+                started_at=started_at,
+                finished_at=_now(),
+                command=command,
+                checks=[] if error else checks,
+                raw_artifacts=raw_artifacts,
+                error=f"{self.display_name} did not finish within its time budget"
+                + (f" ({error})." if error else f"; {len(checks)} checks from its partial output."),
+            )
         status = ToolStatus.error if error else ToolStatus.ok
         return ToolResult(
             tool=self.id,

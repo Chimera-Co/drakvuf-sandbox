@@ -14,7 +14,10 @@ export EV=${EV:-/var/lib/chimera-evidence/g1-$(date +%F)}
 mkdir -p "$EV"; cp $CFG "$EV/config.toml.production"
 restart() { systemctl restart 'drakrun-evasion-worker@*'; sleep 10; }
 restore() {
-  cp "$EV/config.toml.production" $CFG; chimera-arm use H3 >/dev/null; restart
+  # Stopping the workers ends a scan in flight; its domain is left behind and blocks the arm switch
+  cp "$EV/config.toml.production" $CFG; systemctl stop 'drakrun-evasion-worker@*'
+  xl destroy vm-1 2>/dev/null; chimera-arm use H3 >/dev/null
+  systemctl start drakrun-evasion-worker@1 drakrun-evasion-worker@2; sleep 10
   echo "restored: config $(diff -q $CFG "$EV/config.toml.production" >/dev/null && echo identical), arm $(cat /var/lib/chimera-arms/CURRENT)" | tee -a "$EV/arms-config.txt"
 }
 trap restore EXIT
