@@ -28,7 +28,7 @@ from drakrun.lib.networking import make_network_info_for_vm
 from drakrun.lib.paths import INSTALL_INFO_PATH, VMI_INFO_PATH, VMI_KERNEL_PROFILE_PATH
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "linux"))
-from containment_test import counters, sh  # noqa: E402
+from containment_test import counters, lan_addresses, sh  # noqa: E402
 
 PRELUDE = "$ProgressPreference='SilentlyContinue';$ErrorActionPreference='Stop';"
 JSON_ERR = 'catch{@{error="$($_.Exception.Message)"}|ConvertTo-Json -c}'
@@ -55,8 +55,6 @@ PROBES = {
     "C3_http_direct_ip": http("http://203.0.113.10/"),
     "C3_udp_dns_8888": PRELUDE + "try{@{answer_ip=(Resolve-DnsName example.com -Server 8.8.8.8 -Type A -DnsOnly "
                        "-QuickTimeout)[0].IPAddress}|ConvertTo-Json -c}" + JSON_ERR,
-    "C4_lan_router_http": http("http://192.168.0.1/"),
-    "L1_host_lan_ssh": tcp("192.168.0.125", 22, read=True),
     "L2_metadata_http": http("http://169.254.169.254/latest/meta-data/"),
     "L2_link_local_tcp": tcp("169.254.1.1", 443),
     # Windows treats 169.254.0.0/16 as on-link even with no route for it: it ARPs for the address
@@ -99,14 +97,18 @@ def main():
     network_conf = NetworkConfigSection(out_interface=config.network.out_interface,
                                         dns_server=config.network.dns_server, net_enable=True)
     gateway = make_network_info_for_vm(args.vm_id, network_conf).gateway_address
-    for port in (22, 5000, 6379):
+    for port in (22, 5000, 6379, 7070):
         PROBES[f"C5_dom0_{port}"] = tcp(gateway, port)
+    router, host_ip = lan_addresses(args.uplink)
+    PROBES["C4_lan_router_http"] = http(f"http://{router}/")
+    PROBES["L1_host_lan_ssh"] = tcp(host_ip, 22, read=True)
 
     results = {"C0_net_check_before": subprocess.run(["chimera-net-check", "--require-inetsim"],
                                                      capture_output=True, text=True).returncode == 0}
     before = counters(ev / "counters-before.txt")
+    results.update(lan_router=router, host_lan_ip=host_ip)
     uplink_filter = ("net 10.13.0.0/16 or host 203.0.113.10 or host 8.8.8.8 or host 2001:db8::1 "
-                     "or (host 192.168.0.1 and tcp port 80)")
+                     f"or (host {router} and tcp port 80)")
     capture = subprocess.Popen(["tcpdump", "-i", args.uplink, "-n", "-U", "-w", str(ev / "uplink.pcap"),
                                 uplink_filter], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(2)
@@ -143,7 +145,7 @@ def main():
         "C2": http_inetsim(guest["C2_http_by_name"]),
         "C3": http_inetsim(guest["C3_http_direct_ip"]) and guest["C3_udp_dns_8888"].get("answer_ip") == "10.99.0.2",
         "C4": http_inetsim(guest["C4_lan_router_http"]),
-        "C5": not any(guest[f"C5_dom0_{p}"]["connected"] for p in (22, 5000, 6379))
+        "C5": not any(guest[f"C5_dom0_{p}"]["connected"] for p in (22, 5000, 6379, 7070))
               and after.get("CHIMERA_IN", 0) > before.get("CHIMERA_IN", 0),
         "C6": guest["C6_ipv6_all_nodes"].get("reply") is False,
         "L1": not guest["L1_host_lan_ssh"].get("banner", "").startswith("SSH-"),

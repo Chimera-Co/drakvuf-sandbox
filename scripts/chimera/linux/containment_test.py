@@ -60,13 +60,13 @@ except Exception as e:
 r["C2_http_by_name"] = http("http://example.com/")
 r["C3_http_direct_ip"] = http("http://203.0.113.10/")
 r["C3_udp_dns_8888"] = udp_dns("8.8.8.8")
-r["C4_lan_router_http"] = http("http://192.168.0.1/")
+r["C4_lan_router_http"] = http("http://__LAN_ROUTER__/")
 gw = [l.split()[2] for l in open("/proc/net/route").read().splitlines()[1:] if l.split()[1] == "00000000"]
 gw_ip = socket.inet_ntoa(bytes.fromhex(gw[0])[::-1]) if gw else "10.13.1.1"
 r["C5_gateway"] = gw_ip
-for port in (22, 5000, 6379):
+for port in (22, 5000, 6379, 7070):
     r[f"C5_dom0_{port}"] = tcp(gw_ip, port)
-r["L1_host_lan_ssh"] = tcp("192.168.0.125", 22, read=True)
+r["L1_host_lan_ssh"] = tcp("__HOST_LAN_IP__", 22, read=True)
 r["L2_metadata_http"] = http("http://169.254.169.254/latest/meta-data/")
 r["L2_link_local_tcp"] = tcp("169.254.1.1", 443)
 for name, addr in (("C6_ipv6_all_nodes", ("ff02::1%ens3", 9, 0, 0)), ("C6_ipv6_global", ("2001:db8::1", 80, 0, 0))):
@@ -85,6 +85,17 @@ print(json.dumps(r))
 
 def sh(cmd: str) -> str:
     return subprocess.run(cmd, shell=True, capture_output=True, text=True).stdout
+
+
+def lan_addresses(uplink: str) -> tuple:
+    """(LAN router, host address) from the uplink's default route: the probes must target the LAN the host
+    is on today, not the one of the day the test was written."""
+    words = sh(f"ip -4 route show default dev {uplink}").split()
+    return words[words.index("via") + 1], words[words.index("src") + 1]
+
+
+def guest_probes(router: str, host_ip: str) -> str:
+    return GUEST_PROBES.replace("__LAN_ROUTER__", router).replace("__HOST_LAN_IP__", host_ip)
 
 
 def counters(path: pathlib.Path) -> dict:
@@ -124,8 +135,10 @@ def main():
                                                      capture_output=True, text=True).returncode == 0}
     before = counters(ev / "counters-before.txt")
     # Everything the guest could send to the outside world: its own subnet, the probe targets, the router
+    router, host_ip = lan_addresses(args.uplink)
+    results.update(lan_router=router, host_lan_ip=host_ip)
     uplink_filter = ("net 10.13.0.0/16 or host 203.0.113.10 or host 8.8.8.8 or host 2001:db8::1 "
-                     "or (host 192.168.0.1 and tcp port 80)")
+                     f"or (host {router} and tcp port 80)")
     capture = subprocess.Popen(["tcpdump", "-i", args.uplink, "-n", "-U", "-w", str(ev / "uplink.pcap"),
                                 uplink_filter], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(2)
@@ -137,7 +150,7 @@ def main():
             try:
                 agent.wait_ready(60)
                 results["guest_net"] = wait_for_vm_network(agent, args.vm_id)
-                out = agent.call("sh", {"cmd": "python3 - <<'EOF'\n" + GUEST_PROBES + "EOF\n", "timeout": 150},
+                out = agent.call("sh", {"cmd": "python3 - <<'EOF'\n" + guest_probes(router, host_ip) + "EOF\n", "timeout": 150},
                                  timeout=170)
             finally:
                 agent.close()
@@ -164,7 +177,7 @@ def main():
         "C2": http_inetsim(guest["C2_http_by_name"]),
         "C3": http_inetsim(guest["C3_http_direct_ip"]) and guest["C3_udp_dns_8888"].get("answer_ip") == "10.99.0.2",
         "C4": http_inetsim(guest["C4_lan_router_http"]),
-        "C5": not any(guest[f"C5_dom0_{p}"]["connected"] for p in (22, 5000, 6379))
+        "C5": not any(guest[f"C5_dom0_{p}"]["connected"] for p in (22, 5000, 6379, 7070))
               and after.get("CHIMERA_IN", 0) > before.get("CHIMERA_IN", 0),
         "C6": not guest["C6_ipv6_all_nodes"]["reply"] and not guest["C6_ipv6_global"]["reply"],
         "L1": not guest["L1_host_lan_ssh"].get("banner", "").startswith("SSH-"),
