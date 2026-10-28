@@ -1,5 +1,7 @@
 # Classifier retrain and calibration: handoff to the classifier owner
 
+> **Update 28 Oct 2026:** superseded for the v1 retrain by [`classifier/RETRAIN.md`](../../classifier/RETRAIN.md). As agreed with the classifier owner, the October cohort's CHIMERA malware runs are now training data (grouped by family), and calibration, thresholds and fusion are cross-fitted on grouped folds instead of fitted on a held-out cohort. Stage 1 stays the untouched holdout.
+
 For Monty (classifier owner), from the sandbox side. Status 25 Oct 2026. The detailed plan is
 [`plan/calibration-cohort.md`](plan/calibration-cohort.md); the training steps are in
 [`classifier/RUNBOOK.md`](../../classifier/RUNBOOK.md); the model contract is in

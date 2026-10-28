@@ -4,13 +4,15 @@ Deployed as /etc/drakrun/classifier/model.py next to featurize.py, hooks.txt, mo
 family.txt and, for the static part, static_meta.json + static_<pe|elf|pdf>.txt. CPU only, no network,
 no pickles: boosters are LightGBM text files, calibrations are JSON tables.
 
-    dynamic  features.json behaviour   -> LightGBM (WinMET + CHIMERA benign)       -> calibrated p_d
+    dynamic  features.json behaviour   -> LightGBM (WinMET + CHIMERA runs)         -> calibrated p_d
+             (meta calibration: Platt {"method": "platt", a, b}, or an isotonic table {x, y} in v0)
     static   features["static"] vector -> LightGBM per format (EMBER2024)         -> calibrated p_s
              (formats without a model:  rule score from static findings, half weight, caps at "suspicious")
-    fusion   each part on its own threshold scale: m = logit(p) - logit(t_malicious)
-             combined m = weighted mean -> score = sigmoid(m), so 0.5 = "at the malicious threshold"
-
-Weights are fixed (equal) until they can be fitted on paired CHIMERA runs; the result says so.
+    fusion   fitted (meta "fusion", v1+): logistic regression on featurize.fusion_vector (each part's logit
+             and an "abstained" flag) -> p_f, which is returned as calibrated_probability;
+             score = sigmoid(logit(p_f) - logit(t_malicious)), so 0.5 = "at the malicious threshold"
+             fixed (v0): each part on its own threshold scale, m = logit(p) - logit(t_malicious),
+             combined m = weighted mean -> score = sigmoid(m); the result says the weights are fixed.
 
 Check from this folder:
     python -c "import model, json; print(model.classify(json.load(open('features.json')), '.'))"
@@ -29,7 +31,7 @@ if str(HERE) not in sys.path:
 
 import featurize as fz  # noqa: E402  (sibling file)
 
-FUSION_VERSION = "0.1"
+FUSION_VERSION = "0.1"  # fixed weights; a fitted fusion reports "lr" + the model version
 RULE_WEIGHT = 0.5
 _STATE: dict = {}
 
@@ -63,6 +65,26 @@ def _load():
                 if path.exists():
                     _STATE["static"][name] = lgb.Booster(model_file=str(path))
     return _STATE
+
+
+def calibrate(raw: float, cal: dict, np=None) -> float:
+    """Platt (v1+) or an isotonic table (v0); no calibration leaves the raw score."""
+    if cal.get("method") == "platt":
+        return _sigmoid(cal["a"] * _logit(raw) + cal["b"])
+    if cal.get("x"):
+        return float(np.interp(raw, cal["x"], cal["y"]))
+    return raw
+
+
+def fuse_fitted(parts: dict, fusion: dict) -> tuple[float, float, float]:
+    """Fitted fusion: (p_f, margin to malicious, margin to suspicious) from the components' labels and scores."""
+    d, st = parts.get("dynamic") or {}, parts.get("static") or {}
+    d_p = d.get("score") if d.get("label") != "unknown" else None
+    vec = fz.fusion_vector(d_p, st.get("label"), st.get("score"), st.get("model"))
+    z = fusion["intercept"] + sum(c * v for c, v in zip(fusion["coef"], vec))
+    p = _sigmoid(z)
+    thr = fusion["thresholds"]
+    return p, _logit(p) - _logit(thr["malicious"]), _logit(p) - _logit(thr["suspicious"])
 
 
 def _label(margin_mal: float, margin_sus: float) -> str:
@@ -99,8 +121,7 @@ def _dynamic(features: dict, s: dict) -> dict:
     seen = fz.restrict(features, allowed)
     booster = s["booster"]
     raw = float(booster.predict(x, num_iteration=meta.get("num_iteration"))[0])
-    cal = meta["calibration"]
-    p = float(np.interp(raw, cal["x"], cal["y"])) if cal.get("x") else raw
+    p = calibrate(raw, meta.get("calibration") or {}, np)
     thr = meta["thresholds"]
     m_mal, m_sus = _logit(p) - _logit(thr["malicious"]), _logit(p) - _logit(thr["suspicious"])
     label = _label(m_mal, m_sus)
@@ -217,7 +238,8 @@ def classify(features: dict, analysis_dir: str) -> dict:
     if st is not None:
         parts["static"] = st
     voting = {k: v for k, v in parts.items() if v["label"] != "unknown" and "margin_malicious" in v}
-    version = f"{meta.get('model_version', '0')}+fusion{FUSION_VERSION}"
+    fusion = meta.get("fusion")
+    version = f"{meta.get('model_version', '0')}+fusion{'lr' if fusion else FUSION_VERSION}"
     clean = {k: {kk: vv for kk, vv in v.items() if not kk.startswith("margin")} for k, v in parts.items()}
 
     if not voting:
@@ -225,9 +247,13 @@ def classify(features: dict, analysis_dir: str) -> dict:
         return {"schema": "chimera-verdict/1", "label": "unknown", "score": 0.0, "family": None,
                 "model": "chimera-fusion", "model_version": version, "explanation": reasons[:8], "components": clean}
 
-    wsum = sum(v["weight"] for v in voting.values())
-    m_mal = sum(v["weight"] * v["margin_malicious"] for v in voting.values()) / wsum
-    m_sus = sum(v["weight"] * v["margin_suspicious"] for v in voting.values()) / wsum
+    calibrated = None
+    if fusion:
+        calibrated, m_mal, m_sus = fuse_fitted(parts, fusion)
+    else:
+        wsum = sum(v["weight"] for v in voting.values())
+        m_mal = sum(v["weight"] * v["margin_malicious"] for v in voting.values()) / wsum
+        m_sus = sum(v["weight"] * v["margin_suspicious"] for v in voting.values()) / wsum
     label = _label(m_mal, m_sus)
     if label == "malicious" and all(v["model"] == "chimera-static-rules" for v in voting.values()):
         label = "suspicious"
@@ -241,8 +267,14 @@ def classify(features: dict, analysis_dir: str) -> dict:
     for name in ("dynamic", "static"):
         if name in parts:
             explanation += [f"{name.capitalize()}: {line}" for line in parts[name]["explanation"][:3]]
-    if len(voting) > 1:
+    if fusion:
+        explanation.append(f"Fusion fitted on CHIMERA runs; probability {calibrated:.2f} assuming equal class priors.")
+    elif len(voting) > 1:
         explanation.append("Fusion weights are fixed (not yet fitted on paired CHIMERA runs).")
     family = parts["dynamic"].get("family") if label == "malicious" else None
-    return {"schema": "chimera-verdict/1", "label": label, "score": round(score, 4), "family": family,
-            "model": "chimera-fusion", "model_version": version, "explanation": explanation[:10], "components": clean}
+    out = {"schema": "chimera-verdict/1", "label": label, "score": round(score, 4), "family": family,
+           "model": "chimera-fusion", "model_version": version, "explanation": explanation[:10], "components": clean}
+    if fusion:
+        out["calibrated_probability"] = round(calibrated, 4)
+        out["calibration"] = fusion.get("calibration", "fusion LR")[:200]
+    return out

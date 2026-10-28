@@ -238,6 +238,27 @@ def coverage_vocabulary(cape_freq: dict, chimera_freq: dict, cape_blind=(0.03, 0
     return kept, dropped
 
 
+# ------------------------------------------------------------------ fusion inputs
+FUSION_FEATURES = ("dynamic_logit", "dynamic_abstained", "static_logit", "static_abstained", "static_rules_only")
+
+
+def _logit(p: float) -> float:
+    p = min(1 - 1e-6, max(1e-6, float(p)))
+    return math.log(p / (1 - p))
+
+
+def fusion_vector(dynamic_p, static_label, static_p, static_model) -> list[float]:
+    """Inputs of the fitted fusion (logistic regression), the same in training and in the sandbox.
+
+    A component that gave no verdict (label unknown, no score, not run) contributes 0 and sets its
+    "abstained" flag, so the fusion learns how much an abstention says instead of guessing."""
+    d_ok = dynamic_p is not None
+    s_ok = static_p is not None and static_label not in (None, "unknown")
+    return [_logit(dynamic_p) if d_ok else 0.0, 0.0 if d_ok else 1.0,
+            _logit(static_p) if s_ok else 0.0, 0.0 if s_ok else 1.0,
+            1.0 if s_ok and static_model == "chimera-static-rules" else 0.0]
+
+
 # ------------------------------------------------------------------ explanations
 def concept(name: str) -> str:
     """Feature name -> the thing a human would recognise (several features share one)."""
