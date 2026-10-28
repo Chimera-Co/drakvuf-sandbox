@@ -123,7 +123,8 @@ def classify(model: Path, aid: str, base: Path, analysis_dir: Path | None, work:
         ctx = SimpleNamespace(
             config=SimpleNamespace(classifier=ClassifierConfigSection(enabled=True, model_path=model, timeout_s=60),
                                    static=StaticConfigSection(enabled=True, wait_s=5)),
-            metadata=SimpleNamespace(id=aid), analysis_dir=target, update_metadata=captured.update)
+            metadata=SimpleNamespace(id=aid, options=SimpleNamespace(mode="combined")),  # the default mode
+            analysis_dir=target, update_metadata=captured.update)
         t = time.time()
         classify_sample(ctx)
         verdict = captured.get("classification", {})
