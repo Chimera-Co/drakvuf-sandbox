@@ -22,7 +22,9 @@ CHIMERA's own extractor if `features.json` is missing), or loose `features.json`
 ```
 Runs without `labels.json` count as benign (`--role`). Add `--labels-csv labels.csv` (columns
 `key,role,family,program,category`; key = analysis folder name or sha256) to name programs or mark malware.
-Malware runs (`role` test/control) are stored with `split=chimera_test` and are never used for training.
+Stage 1 malware runs (`role` test/control) are stored with `split=chimera_test` and are never used for training.
+The October cohort (`role` calibration) is CHIMERA malware for training (`split=train`, label 1). The v1 retrain
+is written out step by step in [RETRAIN.md](RETRAIN.md).
 
 Benign runs come from https://github.com/Chimera-Co/chimera-benign-dataset (Shreyas pushes them as the batch runs):
 ```bash
