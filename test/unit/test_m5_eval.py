@@ -245,9 +245,13 @@ def test_tools_the_batch_calls_are_executable():
 
 def test_register_takes_guest_os_and_benign_role(tmp_path):
     path = tmp_path / "register.csv"
-    path.write_text(f"sha256,path,role,guest_os\n{SHA[0]},a.zip,benign,Linux\n{SHA[1]},b.zip,test,\n")
+    path.write_text(
+        f"sha256,path,role,guest_os\n{SHA[0]},a.zip,benign,Linux\n{SHA[1]},b.zip,test,\n{SHA[2]},c.zip,calibration,\n"
+    )
     rows = m5.read_register(path)
-    assert [(r["role"], r["guest_os"]) for r in rows] == [("benign", "linux"), ("test", "windows")]
+    assert [(r["role"], r["guest_os"]) for r in rows] == [
+        ("benign", "linux"), ("test", "windows"), ("calibration", "windows")  # calibration: m5_samples.py cohort
+    ]
     path.write_text(f"sha256,path,role,guest_os\n{SHA[0]},a.zip,test,macos\n")
     with pytest.raises(ValueError):
         m5.read_register(path)

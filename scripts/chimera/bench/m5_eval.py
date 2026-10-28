@@ -60,7 +60,7 @@ DATASET_DIR = pathlib.Path("/var/lib/chimera-dataset")
 CLASSIFIER_DIR = pathlib.Path("/etc/drakrun/classifier")
 # Scoring map for verdicts: suspicious and "no verdict" are indeterminate, never counted as either class
 VERDICT_CLASS = {"malicious": "M", "benign": "B", "suspicious": "I", "unknown": "I"}
-ROLES = ("test", "control", "benign")
+ROLES = ("test", "control", "benign", "calibration")  # calibration: the cohort from m5_samples.py cohort
 GUEST_OSES = ("windows", "linux")
 # The VM slots restored from the Windows arms (vm-0 = the golden image). chimera-arm
 # only waits for these, so a Linux analysis on vm-2 does not block an arm switch.
