@@ -56,7 +56,7 @@ Out of scope: hardware/firmware attacks, hypervisor 0-days by well-resourced act
 ### T1 Guest-to-host escape (A1 → B2)
 - **Vector:** bugs in Xen, the qemu-xen device model (an HVM device model running in dom0), emulated devices (e1000, stdvga, HDA audio, USB tablet), or DRAKVUF/LibVMI parsing guest memory.
 - **Controls:** HVM with HAP [in place]; no PCI passthrough [in place].
-- **Gaps:** device model not deprivileged or stub-domain'd [gap, evaluate `device_model_user`]; unneeded devices enabled (HDA audio, USB) [planned: removed in the M4 hardening profile]; Xen 4.19.2 patch level not yet checked against XSAs [gap, check].
+- **Gaps:** device model not deprivileged or stub-domain'd [gap, evaluate `device_model_user`]; unneeded devices enabled (HDA audio, USB) [planned: removed in the M4 hardening profile]; Xen is the 4.19.2 release tarball plus our altp2m patch, four stable releases behind 4.19.6. Checked 2026-10-29 against XSA-466 to XSA-522: 13 advisories apply to this configuration, among them guest-kernel → host escalation through EPT (XSA-480) and grant tables (XSA-486, 500, 501, 517), and host crashes (XSA-470, 505) [gap: move to 4.19.6 plus the later 4.19 patches; meanwhile `max_grant_version = 1` closes the grant-table v2 routes].
 - **Residual:** a hypervisor 0-day isn't mitigable at capstone scale. Mitigation is blast-radius reduction (T2, T7) and minimising sensitive data reachable from dom0.
 
 ### T2 Network escape / attacks on third parties (A1 → B3)
@@ -115,6 +115,13 @@ Out of scope: hardware/firmware attacks, hypervisor 0-days by well-resourced act
 - **Output:** the worker accepts only `static.json` (≤ 32 MiB, no symlink, schema `chimera-static/1`) and never parses the sample itself.
 - **Gaps:** Docker (development) cannot mount the sample `noexec` (mode bits still forbid execution); the image is not yet built reproducibly with pinned hashes; no seccomp profile tighter than the engine default.
 
+### T13 The per-VM DHCP service (A1 → B3, B2)
+- **What it is:** for every analysis drakrun starts its own `dnsmasq` (Debian 2.90) bound to that VM's bridge only (`--bind-interfaces --interface=drakN`), with DNS off (`--port=0`), no config file, no hosts or resolv file, a read-only lease file, and a range of exactly one address. It drops to `nobody` after binding. It is the only dom0 service a guest can reach: `CHIMERA_IN` accepts UDP 68 → 67 from `drak+` and drops everything else.
+- **Vectors:** dnsmasq parses guest-built DHCP packets in dom0, a classic attack surface (CVE-2017-14491 to 14496 were remote code execution and leaks in its DHCP/DHCPv6 and DNS code); starvation (a guest requesting with many client MACs); a guest answering as a rogue DHCP server; oversized or malformed options.
+- **Controls in place:** one VM per bridge, so a rogue server or starvation can only affect the guest itself; the single-address range means there is no pool to exhaust for anyone else; DNS and DHCPv6 are off; IPv6 is dropped on `drak+`; the process runs as `nobody` with the lease file read-only. dnsmasq is restarted per analysis, so state does not carry over between samples.
+- **Gaps:** dnsmasq starts as root and still runs in dom0's network namespace, so a memory-safety bug in its DHCP parser before or after the privilege drop is a dom0 compromise, as `nobody` at least; no seccomp or systemd sandboxing around it.
+- **Planned:** the hostile-guest test (G3: starvation, rogue replies, oversized options) checks the service survives and the guest gets nothing beyond its one lease; a later step is to run it in its own network namespace or replace it with a static lease in the guest image.
+
 ### T10 Thermal / hardware availability (operational)
 - Sustained analyses raise temperatures. The fan daemon (`acer-fan-control.service`) depends on an out-of-tree kernel module that breaks on kernel updates (seen 2026-10-19). Check `systemctl is-active acer-fan-control` before long batches.
 
@@ -130,7 +137,7 @@ Out of scope: hardware/firmware attacks, hypervisor 0-days by well-resourced act
 ## 6. Containment-failure response
 
 If a guest is seen reaching anything other than INetSim (the `CHIMERA-EGRESS` drop log fires, or packets from 10.13.0.0/16 appear on the Wi-Fi interface):
-1. `xl destroy` every analysis domain, then take the Wi-Fi interface down.
+1. `xl destroy` every analysis domain, then take the guest bridges down, and the Wi-Fi too if it is up (real-sample batches run with it off). The batch runner (`m5_eval.py run`) does the domains and the guest bridges itself within about 2 s of the log line and stops both lanes.
 2. Save `iptables-save`, `ip -d link`, the analysis directory and its PCAP to an evidence folder.
 3. Don't restart the worker until the rule set is re-verified with C1–C8.
 4. If dom0 compromise is suspected (unexpected processes, modified binaries), stop using the boot, keep the disk for analysis, and reinstall dom0 from a known-good state.
@@ -142,3 +149,4 @@ If a guest is seen reaching anything other than INetSim (the `CHIMERA-EGRESS` dr
 | 2026-10-19 | Initial version from the Phase-1 recon and code review | Group 3 |
 | 2026-10-21 | v1.1: containment, INetSim isolation, localhost-only services and root-owned deployment marked in place after checking the live host; Linux guest added (T11) | Group 3 |
 | 2026-10-23 | v1.2: static analysis in a locked-down container (T12); uploads made non-executable | Group 3 |
+| 2026-10-29 | v1.3: Xen advisories checked (T1); DHCP service added (T13); automatic abort on an egress drop (§6) | Group 3 |
