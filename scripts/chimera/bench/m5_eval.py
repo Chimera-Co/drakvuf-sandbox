@@ -6,10 +6,15 @@ Follows docs/chimera/malware-evaluation-protocol.md. The operator supplies the
 samples; this tool never downloads anything. The sample register is private
 and must stay outside the repository.
 
-  plan    register CSV -> schedule.json (every sample x arm x run, order randomised per sample)
+  plan    register CSV -> schedule.json (every sample x arm x run, in rounds: every
+          sample once on each arm, then the repeat round; order randomised per round)
   run     submit the schedule: a Windows lane (one analysis at a time, switching arms
           with chimera-arm) and a Linux lane run side by side on their own workers;
-          resumable: runs already in results.jsonl are skipped
+          resumable: runs already in results.jsonl are skipped. Stop rules: any
+          CHIMERA-EGRESS-DROP stops both lanes, destroys every analysis domain and
+          takes the guest bridges down at once; a hot CPU pauses the batch between
+          runs; every run records the SHA-256 of the image it restored
+          (stops.jsonl, images.json)
   label   print the outcome labels of one analysis directory
   report  results.jsonl -> per-run CSV, per-sample tables and McNemar test (report.md)
   export  the classifier dataset folder -> one .tar.gz (features and labels, no samples)
@@ -70,6 +75,27 @@ WINDOWS_SLOTS = ("vm-0", "vm-1")
 EVASION_WORKERS = ["drakrun-evasion-worker@1", "drakrun-evasion-worker@2"]
 TERMINAL = {"finished", "failed"}
 EARLY_EXIT_S = 10
+# What a restored analysis reads. chimera-arm points the Windows paths at the current arm; the Linux image is one
+# golden set. A directory counts as the files in it.
+WINDOWS_IMAGE_PATHS = (
+    "/var/lib/drakrun/volumes/vm-0.img", "/var/lib/drakrun/volumes/snapshot.sav", "/etc/drakrun/install.json",
+    "/etc/drakrun/cfg.template", "/var/lib/drakrun/profiles",
+)
+LINUX_IMAGE_PATHS = (
+    "/var/lib/drakrun/linux/golden/vm-0.img", "/var/lib/drakrun/linux/golden/snapshot.sav",
+    "/var/lib/drakrun/linux/golden/install.json", "/var/lib/drakrun/linux/golden/kernel.json",
+    "/etc/drakrun/cfg-linux.template", "/var/lib/drakrun/linux/profile",
+)
+ANALYSIS_DOMAIN = re.compile(r"^vm-\d+$")
+EGRESS_POLL_S = 2
+STOP_GRACE_S = 120  # after a stop, how long a run in flight may take to reach a terminal status
+# CPU temperature sensors, hottest wins: coretemp's package sensor where the kernel has one (a Xen dom0 has not),
+# the DPTF CPU zone and the embedded controller's CPU sensor, as the thermal panel reads them
+CPU_THERMAL_ZONES = ("x86_pkg_temp", "TCPU")
+CPU_HWMON_LABELS = ("Package id 0", "CPU (EC)")
+PAUSE_TEMP_C = 92
+RESUME_TEMP_C = 80
+THERMAL_POLL_S = 30
 DROP_EXTENSIONS = {
     "exe", "dll", "sys", "scr", "com", "cpl", "ocx", "ps1", "psm1", "vbs", "vbe",
     "js", "jse", "wsf", "bat", "cmd", "hta", "jar", "lnk", "msi",
@@ -145,22 +171,24 @@ def read_register(path):
 
 
 def make_schedule(register, arms, runs, seed, linux_arms=("L",)):
-    """Every sample x arm x run. Samples in random order; each sample's runs in
-    its own random arm order, so no arm always runs first (C2 time checks).
-    Windows samples run on `arms`, Linux samples on `linux_arms`."""
+    """Every sample x arm x run, in rounds: round i runs every sample once on each of its arms, so a batch that
+    stops early has whole rounds, not some samples with all their runs and others with none. Samples in a new
+    random order each round; each sample's arms back to back in their own random order, so no arm always runs
+    first (C2 time checks). Windows samples run on `arms`, Linux samples on `linux_arms`."""
     rng = random.Random(seed)
-    samples = list(register)
-    rng.shuffle(samples)
     schedule = []
-    for sample in samples:
-        guest_os = sample.get("guest_os", "windows")
-        sample_arms = linux_arms if guest_os == "linux" else arms
-        slots = [(arm, i) for arm in sample_arms for i in range(1, runs + 1)]
-        rng.shuffle(slots)
-        for arm, i in slots:
-            schedule.append(
-                {"key": f"{sample['sha256']}/{arm}/{i}", "sha256": sample["sha256"], "arm": arm, "run": i, "os": guest_os}
-            )
+    for i in range(1, runs + 1):
+        samples = list(register)
+        rng.shuffle(samples)
+        for sample in samples:
+            guest_os = sample.get("guest_os", "windows")
+            sample_arms = list(linux_arms if guest_os == "linux" else arms)
+            rng.shuffle(sample_arms)
+            for arm in sample_arms:
+                schedule.append(
+                    {"key": f"{sample['sha256']}/{arm}/{i}", "sha256": sample["sha256"], "arm": arm, "run": i,
+                     "os": guest_os}
+                )
     return schedule
 
 
@@ -374,8 +402,132 @@ def current_arm():
     return (ARMS_DIR / "CURRENT").read_text().strip()
 
 
+def egress_drop_lines():
+    return [line for line in sh("dmesg").splitlines() if "CHIMERA-EGRESS-DROP" in line]
+
+
 def egress_drops():
-    return sh("dmesg").count("CHIMERA-EGRESS-DROP")
+    return len(egress_drop_lines())
+
+
+def log_stop(ctx, event):
+    with ctx["lock"]:
+        with (ctx["out"] / "stops.jsonl").open("a") as f:
+            f.write(json.dumps({"time": now(), **event}) + "\n")
+    print(json.dumps(event), flush=True)
+
+
+def destroy_analysis_domains():
+    names = [line.split()[0] for line in sh("xl", "list").splitlines()[1:] if line.split()]
+    names = [n for n in names if ANALYSIS_DOMAIN.match(n)]
+    for name in names:
+        sh("xl", "destroy", name, check=False)
+    return names
+
+
+def guest_bridges_down():
+    """Every drakrun guest bridge (drak<N>) down; the next analysis's network setup deletes and recreates it."""
+    bridges = [line.split(": ")[1].split("@")[0] for line in sh("ip", "-o", "link", "show", "type", "bridge").splitlines()
+               if ": " in line]
+    bridges = [b for b in bridges if re.fullmatch(r"drak\d+", b)]
+    for bridge in bridges:
+        sh("ip", "link", "set", "dev", bridge, "down", check=False)
+    return bridges
+
+
+def egress_watchdog(ctx, baseline, finished, poll=EGRESS_POLL_S):
+    """Protocol stop rule: on any new CHIMERA-EGRESS-DROP, at once (not when the run ends) stop both lanes,
+    destroy every analysis domain and take the guest bridges down."""
+    while not finished.wait(poll):
+        drops = egress_drops()
+        if drops > baseline:
+            ctx["stop"].set()
+            domains = destroy_analysis_domains()
+            bridges = guest_bridges_down()
+            log_stop(ctx, {"event": "egress_drop", "new_drops": drops - baseline, "destroyed": domains,
+                           "bridges_down": bridges, "log": egress_drop_lines()[-5:]})
+            return
+
+
+def cpu_temperature(sysfs="/sys"):
+    """Hottest CPU sensor in degrees C, or None if the machine exposes none of them."""
+    readings = []
+    for zone in pathlib.Path(sysfs, "class/thermal").glob("thermal_zone*"):
+        try:
+            if (zone / "type").read_text().strip() in CPU_THERMAL_ZONES:
+                readings.append(int((zone / "temp").read_text()))
+        except (OSError, ValueError):
+            continue
+    for label in pathlib.Path(sysfs, "class/hwmon").glob("hwmon*/temp*_label"):
+        try:
+            if label.read_text().strip() in CPU_HWMON_LABELS:
+                readings.append(int(label.with_name(label.name.replace("_label", "_input")).read_text()))
+        except (OSError, ValueError):
+            continue
+    return max(readings) / 1000 if readings else None
+
+
+def wait_until_cool(ctx):
+    """Protocol stop rule: before the next run, pause while the CPU is at or above pause_temp, until it is at or
+    below resume_temp (or the batch stops)."""
+    temp = cpu_temperature()
+    if temp is None or temp < ctx["pause_temp"]:
+        return
+    log_stop(ctx, {"event": "thermal_pause", "temp_c": temp})
+    while not ctx["stop"].is_set():
+        time.sleep(ctx["thermal_poll"])
+        temp = cpu_temperature()
+        if temp is None or temp <= ctx["resume_temp"]:
+            break
+    log_stop(ctx, {"event": "thermal_resume", "temp_c": temp})
+
+
+def image_files(paths):
+    """{path as drakrun opens it: the real file behind it}; a directory counts as its files."""
+    files = {}
+    for path in map(pathlib.Path, paths):
+        if path.is_dir():
+            files.update((str(p), p.resolve()) for p in sorted(path.iterdir()) if p.is_file())
+        elif path.exists():
+            files[str(path)] = path.resolve()
+    return files
+
+
+def file_sha256(path, cache):
+    """SHA-256 of a file, cached by real path, size and mtime: a 27 GB disk image is hashed once, not per run."""
+    st = path.stat()
+    hit = cache.get(str(path))
+    if hit and hit["size"] == st.st_size and hit["mtime_ns"] == st.st_mtime_ns:
+        return hit["sha256"]
+    digest = hashlib.sha256()
+    with path.open("rb") as f:
+        for block in iter(lambda: f.read(1 << 22), b""):
+            digest.update(block)
+    cache[str(path)] = {"size": st.st_size, "mtime_ns": st.st_mtime_ns, "sha256": digest.hexdigest()}
+    return digest.hexdigest()
+
+
+def image_identity(paths, cache):
+    """(digest, files): the image a run restores, as one digest over its files' SHA-256 by the path drakrun opens."""
+    files = {name: {"file": str(real), "sha256": file_sha256(real, cache)} for name, real in image_files(paths).items()}
+    digest = hashlib.sha256(json.dumps({n: f["sha256"] for n, f in files.items()}, sort_keys=True).encode()).hexdigest()
+    return digest, files
+
+
+def run_image(guest_os, arm, ctx):
+    """The digest of the image this run restores; hashes are cached in image-cache.json, each image's files
+    are listed once in images.json."""
+    paths = LINUX_IMAGE_PATHS if guest_os == "linux" else WINDOWS_IMAGE_PATHS
+    with ctx["image_lock"]:
+        cache_path, images_path = ctx["out"] / "image-cache.json", ctx["out"] / "images.json"
+        cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
+        digest, files = image_identity(paths, cache)
+        cache_path.write_text(json.dumps(cache, indent=1))
+        images = json.loads(images_path.read_text()) if images_path.exists() else {}
+        if digest not in images:
+            images[digest] = {"guest_os": guest_os, "arm": arm, "first_seen": now(), "files": files}
+            images_path.write_text(json.dumps(images, indent=1))
+    return digest
 
 
 def windows_slots_busy():
@@ -449,7 +601,7 @@ def upload_fields(sample, name, timeout):
     return fields
 
 
-def submit(api, sample, timeout, poll):
+def submit(api, sample, timeout, poll, stop=None):
     import requests
 
     name, data = read_sample(sample)
@@ -470,6 +622,9 @@ def submit(api, sample, timeout, poll):
         status = requests.get(f"{api}/status/{task_uid}", timeout=30).json().get("status")
         if status in TERMINAL:
             break
+        if stop is not None and stop.is_set():
+            # The batch stopped (its domain may already be destroyed): wait only briefly for the worker to finish
+            deadline = min(deadline, time.monotonic() + STOP_GRACE_S)
         time.sleep(poll)
     return task_uid, status
 
@@ -519,6 +674,7 @@ def cmd_plan(args):
         "runs": args.runs,
         "timeout": args.timeout,
         "seed": seed,
+        "order": "rounds",
         "classifier": classifier_fingerprint(args.classifier_dir),
         "schedule": make_schedule(register, args.arms, args.runs, seed, args.linux_arms),
     }
@@ -584,13 +740,17 @@ class Lane:
             for item in self.items:
                 if ctx["stop"].is_set():
                     return
+                wait_until_cool(ctx)
+                if ctx["stop"].is_set():
+                    return
                 if self.guest_os == "windows":
                     switch_arm(item["arm"])
+                image = run_image(self.guest_os, item["arm"], ctx)
                 drops_before = egress_drops()
                 started = now()
                 sample = ctx["register"][item["sha256"]]
-                task_uid, status = submit(ctx["api"], sample, ctx["timeout"], ctx["poll"])
-                record = {**item, "task_uid": task_uid, "submitted": started, "completed": now()}
+                task_uid, status = submit(ctx["api"], sample, ctx["timeout"], ctx["poll"], ctx["stop"])
+                record = {**item, "task_uid": task_uid, "submitted": started, "completed": now(), "image": image}
                 record.update(label_analysis(ANALYSES_DIR / task_uid, self.guest_os))
                 record.update(verdict_fields(ANALYSES_DIR / task_uid))
                 record["status"] = status
@@ -647,6 +807,8 @@ def cmd_run(args):
     ctx = {
         "register": register, "api": args.api, "timeout": plan["timeout"], "poll": args.poll,
         "results": results_path, "dataset": dataset, "lock": threading.Lock(), "stop": threading.Event(),
+        "out": out, "image_lock": threading.Lock(), "pause_temp": args.pause_temp, "resume_temp": args.resume_temp,
+        "thermal_poll": THERMAL_POLL_S,
     }
     lanes = [
         Lane(os_, [i for i in plan["schedule"] if i["os"] == os_ and i["key"] not in done], ctx)
@@ -658,6 +820,9 @@ def cmd_run(args):
     evasion_active = [w for w in EVASION_WORKERS if sh("systemctl", "is-active", w, check=False).strip() == "active"]
     for worker in evasion_active:
         sh("systemctl", "stop", worker)
+    finished = threading.Event()
+    watchdog = threading.Thread(target=egress_watchdog, args=(ctx, egress_drops(), finished), name="egress")
+    watchdog.start()
     try:
         threads = [threading.Thread(target=lane.run, name=lane.guest_os) for lane in lanes]
         for thread in threads:
@@ -665,6 +830,8 @@ def cmd_run(args):
         for thread in threads:
             thread.join()
     finally:
+        finished.set()
+        watchdog.join()
         if windows:
             switch_arm(original_arm)
         for worker in evasion_active:
@@ -861,6 +1028,8 @@ def main(argv=None):
     p.add_argument("--classifier-dir", default=str(CLASSIFIER_DIR))
     p.add_argument("--allow-classifier-change", action="store_true",
                    help="run although the deployed classifier differs from the one frozen in the plan")
+    p.add_argument("--pause-temp", type=float, default=PAUSE_TEMP_C, help="pause before a run at this CPU temperature")
+    p.add_argument("--resume-temp", type=float, default=RESUME_TEMP_C, help="resume once the CPU is this cool")
     p.set_defaults(func=cmd_run)
     p = sub.add_parser("label")
     p.add_argument("analysis_dir")

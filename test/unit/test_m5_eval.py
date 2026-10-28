@@ -107,14 +107,16 @@ def test_failed_drakvuf_run_is_not_complete(tmp_path):
     assert not m5.label_analysis(d)["telemetry_complete"]
 
 
-def test_schedule_is_complete_seeded_and_mixes_arm_order():
+def test_schedule_is_complete_seeded_in_rounds_and_mixes_arm_order():
     register = [{"sha256": s, "role": "test"} for s in SHA]
     schedule = m5.make_schedule(register, ["A0", "H3"], 2, seed=7)
     assert schedule == m5.make_schedule(register, ["A0", "H3"], 2, seed=7)
     assert sorted(i["key"] for i in schedule) == sorted(f"{s}/{a}/{r}" for s in SHA for a in ("A0", "H3") for r in (1, 2))
-    # Each sample's four runs are consecutive, and not every sample starts on the same arm
-    assert all(len({schedule[i + j]["sha256"] for j in range(4)}) == 1 for i in range(0, len(schedule), 4))
-    assert {schedule[i]["arm"] for i in range(0, len(schedule), 4)} == {"A0", "H3"}
+    # Round 1 (every sample on both arms) comes first, then the repeat round
+    assert [i["run"] for i in schedule] == [1] * 8 + [2] * 8
+    # A sample's two arms are back to back, and not every sample starts on the same arm
+    assert all(schedule[i]["sha256"] == schedule[i + 1]["sha256"] for i in range(0, len(schedule), 2))
+    assert {schedule[i]["arm"] for i in range(0, len(schedule), 2)} == {"A0", "H3"}
 
 
 def test_mcnemar_exact_values():
@@ -384,26 +386,160 @@ def test_arm_switch_waits_only_for_windows_slots(monkeypatch, domains, drakvuf, 
     assert m5.windows_slots_busy() is busy
 
 
-def test_an_egress_drop_in_one_lane_stops_both(tmp_path, monkeypatch):
+def lane_ctx(tmp_path, **extra):
     import threading
 
+    return {
+        "register": {SHA[0]: {"sha256": SHA[0]}, SHA[1]: {"sha256": SHA[1]}}, "api": "", "timeout": 1, "poll": 0,
+        "results": tmp_path / "results.jsonl", "dataset": tmp_path, "lock": threading.Lock(), "stop": threading.Event(),
+        "out": tmp_path, "image_lock": threading.Lock(), "pause_temp": 92, "resume_temp": 80, "thermal_poll": 0,
+        **extra,
+    }
+
+
+def test_an_egress_drop_in_one_lane_stops_both(tmp_path, monkeypatch):
     drops = iter([0, 1] + [1] * 20)  # the first run sees one new drop
     monkeypatch.setattr(m5, "egress_drops", lambda: next(drops))
     monkeypatch.setattr(m5, "switch_arm", lambda arm: None)
+    monkeypatch.setattr(m5, "cpu_temperature", lambda: None)
+    monkeypatch.setattr(m5, "run_image", lambda os_, arm, ctx: "img")
     monkeypatch.setattr(m5, "submit", lambda *a: ("uid", "finished"))
     monkeypatch.setattr(m5, "label_analysis", lambda d, os_: {"payload_behaviour": False})
     monkeypatch.setattr(m5, "save_to_dataset", lambda *a: None)
     monkeypatch.setattr(m5, "ANALYSES_DIR", tmp_path)
-    ctx = {
-        "register": {SHA[0]: {"sha256": SHA[0]}, SHA[1]: {"sha256": SHA[1]}}, "api": "", "timeout": 1, "poll": 0,
-        "results": tmp_path / "results.jsonl", "dataset": tmp_path, "lock": threading.Lock(), "stop": threading.Event(),
-    }
+    ctx = lane_ctx(tmp_path)
     windows = m5.Lane("windows", [{"key": f"{SHA[0]}/H3/{i}", "sha256": SHA[0], "arm": "H3", "run": i, "os": "windows"} for i in (1, 2)], ctx)
     windows.run()
     linux = m5.Lane("linux", [{"key": f"{SHA[1]}/L/1", "sha256": SHA[1], "arm": "L", "run": 1, "os": "linux"}], ctx)
     linux.run()
     assert "EGRESS-DROP" in str(windows.error) and ctx["stop"].is_set()
     assert len((tmp_path / "results.jsonl").read_text().splitlines()) == 1  # nothing ran after the drop
+    assert json.loads((tmp_path / "results.jsonl").read_text())["image"] == "img"
+
+
+def test_egress_watchdog_destroys_analysis_domains_and_takes_guest_bridges_down(tmp_path, monkeypatch):
+    import threading
+
+    calls = []
+
+    def fake_sh(*argv, check=True):
+        calls.append(argv)
+        if argv[:2] == ("xl", "list"):
+            return "Name ID Mem\nDomain-0 0 6144\nvm-1 56 4100\nvm-2 57 2048\nstatic-vm 9 2048\n"
+        if argv[:2] == ("ip", "-o"):
+            return ("24: drak1: <BROADCAST,UP> mtu 1500\\    link/ether 62:32\n"
+                    "25: drak2: <BROADCAST,UP> mtu 1500\\    link/ether 62:33\n"
+                    "9: docker0: <BROADCAST,UP> mtu 1500\\    link/ether 02:42\n")
+        if argv[0] == "dmesg":
+            return "[1.0] CHIMERA-EGRESS-DROP IN=drak1 OUT=wlo1 SRC=10.13.1.10 DST=192.0.2.1 PROTO=47\n"
+        return ""
+
+    monkeypatch.setattr(m5, "sh", fake_sh)
+    ctx = lane_ctx(tmp_path)
+    m5.egress_watchdog(ctx, baseline=0, finished=threading.Event(), poll=0)
+    assert ctx["stop"].is_set()
+    assert ("xl", "destroy", "vm-1") in calls and ("xl", "destroy", "vm-2") in calls
+    assert not any(c[:3] == ("xl", "destroy", "static-vm") for c in calls)
+    assert ("ip", "link", "set", "dev", "drak1", "down") in calls and ("ip", "link", "set", "dev", "drak2", "down") in calls
+    assert not any("docker0" in c for c in calls)
+    event = json.loads((tmp_path / "stops.jsonl").read_text())
+    assert event["event"] == "egress_drop" and event["destroyed"] == ["vm-1", "vm-2"] and "PROTO=47" in event["log"][0]
+
+
+def test_egress_watchdog_ends_quietly_without_a_drop(tmp_path, monkeypatch):
+    import threading
+
+    monkeypatch.setattr(m5, "egress_drops", lambda: 3)
+    finished = threading.Event()
+    finished.set()
+    ctx = lane_ctx(tmp_path)
+    m5.egress_watchdog(ctx, baseline=3, finished=finished, poll=0)
+    assert not ctx["stop"].is_set() and not (tmp_path / "stops.jsonl").exists()
+
+
+def fake_sysfs(root, zones=(), hwmon=()):
+    for i, (kind, millideg) in enumerate(zones):
+        zone = root / f"class/thermal/thermal_zone{i}"
+        zone.mkdir(parents=True)
+        (zone / "type").write_text(kind + "\n")
+        (zone / "temp").write_text(f"{millideg}\n")
+    for i, (label, millideg) in enumerate(hwmon):
+        mon = root / "class/hwmon/hwmon0"
+        mon.mkdir(parents=True, exist_ok=True)
+        (mon / f"temp{i + 1}_label").write_text(label + "\n")
+        (mon / f"temp{i + 1}_input").write_text(f"{millideg}\n")
+
+
+def test_cpu_temperature_takes_the_hottest_cpu_sensor(tmp_path):
+    fake_sysfs(tmp_path, zones=[("acpitz", 99000), ("TCPU", 67050), ("TCPU_PCI", 98000)],
+               hwmon=[("CPU (EC)", 71000), ("GPU (EC)", 95000)])
+    assert m5.cpu_temperature(str(tmp_path)) == 71.0  # the ACPI zone, spiky PCU reading and GPU do not count
+    assert m5.cpu_temperature(str(tmp_path / "none")) is None
+
+
+def test_a_hot_cpu_pauses_the_batch_until_it_cools(tmp_path, monkeypatch):
+    temps = iter([95.0, 90.0, 85.0, 79.5])
+    monkeypatch.setattr(m5, "cpu_temperature", lambda: next(temps))
+    monkeypatch.setattr(m5.time, "sleep", lambda s: None)
+    ctx = lane_ctx(tmp_path)
+    m5.wait_until_cool(ctx)
+    events = [json.loads(line) for line in (tmp_path / "stops.jsonl").read_text().splitlines()]
+    assert [(e["event"], e["temp_c"]) for e in events] == [("thermal_pause", 95.0), ("thermal_resume", 79.5)]
+    monkeypatch.setattr(m5, "cpu_temperature", lambda: 91.9)
+    m5.wait_until_cool(ctx)  # below the pause threshold: no pause
+    assert len((tmp_path / "stops.jsonl").read_text().splitlines()) == 2
+
+
+def test_image_identity_follows_links_and_hashes_each_file_once(tmp_path, monkeypatch):
+    arm = tmp_path / "arms/H3"
+    (arm / "profiles").mkdir(parents=True)
+    (arm / "snapshot.sav").write_bytes(b"memory")
+    (arm / "profiles/kernel.json").write_text("{}")
+    live = tmp_path / "live"
+    live.mkdir()
+    (live / "snapshot.sav").symlink_to(arm / "snapshot.sav")
+    (live / "profiles").symlink_to(arm / "profiles")
+    paths = (str(live / "snapshot.sav"), str(live / "profiles"), str(live / "absent.img"))
+    cache = {}
+    digest, files = m5.image_identity(paths, cache)
+    assert set(files) == {str(live / "snapshot.sav"), str(live / "profiles/kernel.json")}
+    assert files[str(live / "snapshot.sav")]["file"] == str(arm / "snapshot.sav")
+    opened = []
+    real_open = pathlib.Path.open
+    monkeypatch.setattr(pathlib.Path, "open", lambda self, *a, **k: opened.append(self) or real_open(self, *a, **k))
+    assert m5.image_identity(paths, cache)[0] == digest and not opened  # cached by size and mtime
+    (arm / "snapshot.sav").write_bytes(b"memory, recommitted")
+    opened.clear()
+    assert m5.image_identity(paths, cache)[0] != digest and opened == [arm / "snapshot.sav"]
+
+
+def test_run_image_records_each_image_once(tmp_path, monkeypatch):
+    (tmp_path / "vm-0.img").write_bytes(b"disk")
+    monkeypatch.setattr(m5, "WINDOWS_IMAGE_PATHS", (str(tmp_path / "vm-0.img"),))
+    ctx = lane_ctx(tmp_path)
+    assert m5.run_image("windows", "H3", ctx) == m5.run_image("windows", "H3", ctx)
+    images = json.loads((tmp_path / "images.json").read_text())
+    assert len(images) == 1 and next(iter(images.values()))["arm"] == "H3"
+
+
+def test_submit_stops_waiting_soon_after_the_batch_stops(monkeypatch):
+    import sys
+    import threading
+    import types
+
+    stop = threading.Event()
+    stop.set()
+    clock = iter(range(0, 10_000, 30))
+    monkeypatch.setattr(m5.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(m5.time, "sleep", lambda s: None)
+    monkeypatch.setattr(m5, "read_sample", lambda s: ("a.exe", b"MZ"))
+    monkeypatch.setattr(m5.hashlib, "sha256", lambda data=b"": types.SimpleNamespace(hexdigest=lambda: "x"))
+    response = types.SimpleNamespace(raise_for_status=lambda: None, json=lambda: {"task_uid": "u", "status": "running"})
+    polls = []
+    requests = types.SimpleNamespace(post=lambda *a, **k: response, get=lambda *a, **k: polls.append(1) or response)
+    monkeypatch.setitem(sys.modules, "requests", requests)
+    assert m5.submit("api", {"sha256": "x"}, 180, 5, stop) == ("u", "running")
+    assert len(polls) <= m5.STOP_GRACE_S // 30 + 2  # not the full timeout + 1800 s
 
 
 def test_report_compares_arms_on_windows_malware_only(tmp_path):
