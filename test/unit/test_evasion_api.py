@@ -617,7 +617,7 @@ def test_scan_artifacts_zip_unknown_scan_is_404(client, scan_dir):
 @pytest.mark.parametrize(
     "guest_os,expected",
     [
-        ("windows", {"perdedor", "alkhaser", "pafish", "vmaware"}),
+        ("windows", {"perdedor", "alkhaser", "pafish", "vmaware", "cpuid-timing"}),
         ("linux", {"perdedor", "chimera-vmcheck"}),
     ],
 )

@@ -13,6 +13,7 @@ from fake_guest_session import FakeGuestSession  # noqa: E402
 from drakrun.evasion.constants import Category, CheckStatus, ToolStatus  # noqa: E402
 from drakrun.evasion.verifiers import get_adapters_for_platform  # noqa: E402
 from drakrun.evasion.verifiers.base import VerifierError, VerifierTimeout  # noqa: E402
+from drakrun.evasion.verifiers.cpuid_timing import CpuidTimingAdapter  # noqa: E402
 from drakrun.evasion.verifiers.pafish import PafishAdapter, parse_stdout  # noqa: E402
 from drakrun.evasion.verifiers.vmaware import VMAwareAdapter, parse_report  # noqa: E402
 from drakrun.lib.config import (  # noqa: E402
@@ -203,3 +204,43 @@ def test_vmaware_disable_option_is_validated_and_passed_last(binary, tmp_path):
     result = adapter.run(session, options, tmp_path / "scan", time.time() + 60)
     assert result.status == ToolStatus.ok
     assert "--disable GPU_CAPABILITIES,TIMER < NUL >" in session.run_calls[0][0][2]
+
+
+def test_cpuid_timing_reads_its_statistics_back(binary, tmp_path):
+    stat = {
+        "n": 100000,
+        "min": 1,
+        "p5": 2,
+        "p25": 3,
+        "median": 4,
+        "p75": 5,
+        "p95": 6,
+        "p99": 7,
+        "max": 8,
+        "mean": 4.0,
+    }
+    report = {
+        "tool": "chimera-cpuid-timing 1",
+        "iterations": 100000,
+        "rdtsc_rdtsc": stat,
+        "rdtsc_cpuid_rdtsc": stat,
+        "alkhaser_style_avg10": stat,
+        "alkhaser_style_detected": "997/1000",
+    }
+    session = FakeGuestSession(
+        files={
+            r"C:\Users\Public\cpuid-timing\cpuid-timing.json": json.dumps(
+                report
+            ).encode(),
+            r"C:\Users\Public\cpuid-timing\cpuid-timing.csv": b"20,1500\n",
+        }
+    )
+    result = run(CpuidTimingAdapter(), session, binary, tmp_path)
+    assert result.status == ToolStatus.ok
+    check = result.checks[0]
+    assert check.status == CheckStatus.detected and check.measured_value == "997/1000"
+    assert check.evidence["rdtsc_cpuid_rdtsc"]["median"] == 4
+    assert "raw/cpuid-timing/cpuid-timing.csv" in result.raw_artifacts
+    assert session.run_calls[0][0][2].startswith(
+        r"C:\Users\Public\cpuid-timing\cpuid_timing.exe 100000 C:\Users\Public\cpuid-timing\cpuid-timing.json "
+    )

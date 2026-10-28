@@ -62,7 +62,13 @@ def test_zero_sandbox_tables_synthesizes_default(base_config):
     assert len(registry) == 1
     assert registry[0].id == DEFAULT_SANDBOX_ID
     assert registry[0].platform == "windows"
-    assert set(registry[0].verifiers) == {"perdedor", "alkhaser", "pafish", "vmaware"}
+    assert set(registry[0].verifiers) == {
+        "perdedor",
+        "alkhaser",
+        "pafish",
+        "vmaware",
+        "cpuid-timing",
+    }
 
 
 def test_one_sandbox_table(config_factory):

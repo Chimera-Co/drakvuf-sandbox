@@ -258,7 +258,13 @@ class SandboxDefinitionSection(BaseModel):
     # platforms each adapter actually supports, so declaring an unsupported
     # tool here is harmless - it simply won't be offered.
     verifiers: List[str] = Field(
-        default_factory=lambda: ["perdedor", "alkhaser", "pafish", "vmaware"]
+        default_factory=lambda: [
+            "perdedor",
+            "alkhaser",
+            "pafish",
+            "vmaware",
+            "cpuid-timing",
+        ]
     )
     metadata: Dict[str, str] = Field(default_factory=dict)
 
@@ -296,6 +302,7 @@ class EvasionConfigSection(BaseModel):
     perdedor: PerdedorConfigSection = PerdedorConfigSection()
     pafish: SingleBinaryToolConfigSection = SingleBinaryToolConfigSection()
     vmaware: SingleBinaryToolConfigSection = SingleBinaryToolConfigSection()
+    cpuid_timing: SingleBinaryToolConfigSection = SingleBinaryToolConfigSection()
     # Default wall-clock budget for a whole verification scan, in seconds.
     default_timeout: int = 2400
     # CHIMERA evasion score thresholds (0-100, higher is better).

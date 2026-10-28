@@ -44,6 +44,7 @@ def _register_builtin_adapters() -> None:
     # force-load every adapter module (and their optional dependencies) as a
     # side effect of an unrelated import elsewhere in the codebase.
     from drakrun.evasion.verifiers.alkhaser import AlKhaserAdapter
+    from drakrun.evasion.verifiers.cpuid_timing import CpuidTimingAdapter
     from drakrun.evasion.verifiers.linux_vmcheck import LinuxVmcheckAdapter
     from drakrun.evasion.verifiers.pafish import PafishAdapter
     from drakrun.evasion.verifiers.perdedor import PerdedorAdapter
@@ -54,6 +55,7 @@ def _register_builtin_adapters() -> None:
         AlKhaserAdapter,
         PafishAdapter,
         VMAwareAdapter,
+        CpuidTimingAdapter,
         LinuxVmcheckAdapter,
     ):
         register(adapter_cls())
