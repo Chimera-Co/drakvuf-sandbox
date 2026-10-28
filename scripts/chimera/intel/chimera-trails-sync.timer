@@ -1,0 +1,10 @@
+[Unit]
+Description=Maltrail trails pull every six hours (upstream publishes about four times a day)
+
+[Timer]
+OnCalendar=*-*-* 00/6:20:00
+RandomizedDelaySec=30m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

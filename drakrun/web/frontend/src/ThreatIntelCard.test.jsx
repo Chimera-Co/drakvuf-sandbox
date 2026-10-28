@@ -260,3 +260,38 @@ it("queues an online refresh", async () => {
     );
     expect(screen.getByText("Online lookup running").disabled).toBe(true);
 });
+it("shows Maltrail attribution with APT families first", () => {
+    const attribution = {
+        commit: "abcdef0123",
+        committed_at: "2026-10-28T20:00:00+00:00",
+        stale: false,
+        matches: [
+            {
+                file: "malware/apt_fixture.txt",
+                references: ["https://ref.example/one", "javascript:alert(1)"],
+            },
+        ],
+        families: [
+            {
+                family: "fixture",
+                apt: true,
+                category: "malware",
+                file: "malware/apt_fixture.txt",
+                aliases: ["fixture group"],
+                indicators: ["evil.example"],
+                observed_in: ["dynamic"],
+            },
+        ],
+    };
+    render(
+        <ThreatIntelCard
+            isOffline
+            stage={{ status: "ok", payload: { attribution } }}
+        />,
+    );
+    expect(screen.getByText("fixture")).toBeTruthy();
+    expect(screen.getByText("APT")).toBeTruthy();
+    expect(screen.getByText("Sample's processes")).toBeTruthy();
+    expect(screen.getByText("https://ref.example/one").tagName).toBe("A");
+    expect(screen.getByText("javascript:alert(1)").tagName).toBe("DIV");
+});

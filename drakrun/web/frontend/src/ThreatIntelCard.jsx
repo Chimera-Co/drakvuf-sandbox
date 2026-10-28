@@ -594,6 +594,122 @@ function OfflineFeeds({ payload, onCopy }) {
     );
 }
 
+function Attribution({ attribution }) {
+    const families = attribution.families || [];
+    const matches = attribution.matches || [];
+    return (
+        <section className="intel-section">
+            <h3 className="intel-heading">
+                Maltrail attribution{" "}
+                <span className="badge bg-secondary">{families.length}</span>
+            </h3>
+            <p className="small text-muted">
+                Trails {String(attribution.commit || "").slice(0, 7)} of{" "}
+                {formatWhen(attribution.committed_at)}
+                {attribution.stale ? " (stale)" : ""}. A listed indicator ties
+                the run to a family; shared hosting, sinkholes and reused
+                infrastructure can make that wrong.
+            </p>
+            {families.length ? (
+                <div className="chimera-table-scroll">
+                    <table
+                        className="table table-sm chimera-data-table"
+                        aria-label="Maltrail attribution"
+                    >
+                        <thead>
+                            <tr>
+                                {[
+                                    "Family",
+                                    "Trail",
+                                    "Indicators",
+                                    "Where observed",
+                                    "References",
+                                ].map((h) => (
+                                    <th key={h}>{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {families.map((family) => {
+                                const refs = [
+                                    ...new Set(
+                                        matches
+                                            .filter(
+                                                (m) => m.file === family.file,
+                                            )
+                                            .flatMap((m) => m.references || []),
+                                    ),
+                                ].slice(0, 3);
+                                const extra = family.indicators.length - 5;
+                                return (
+                                    <tr key={family.file}>
+                                        <td>
+                                            <strong>{family.family}</strong>
+                                            {family.apt ? (
+                                                <span className="badge bg-danger ms-1">
+                                                    APT
+                                                </span>
+                                            ) : null}
+                                            {family.aliases?.length ? (
+                                                <div className="small text-muted">
+                                                    {family.aliases
+                                                        .slice(0, 4)
+                                                        .join(", ")}
+                                                </div>
+                                            ) : null}
+                                        </td>
+                                        <td>
+                                            <span
+                                                className={`badge ${family.category === "suspicious" ? "bg-secondary" : "bg-warning text-dark"}`}
+                                            >
+                                                {family.category}
+                                            </span>
+                                        </td>
+                                        <td className="text-break">
+                                            {family.indicators
+                                                .slice(0, 5)
+                                                .join(", ")}
+                                            {extra > 0 ? ` +${extra}` : ""}
+                                        </td>
+                                        <td>
+                                            {family.observed_in
+                                                .map(
+                                                    (o) => ORIGIN_LABEL[o] || o,
+                                                )
+                                                .join(", ")}
+                                        </td>
+                                        <td className="text-break">
+                                            {refs.map((ref) =>
+                                                safeLink(ref) ? (
+                                                    <div key={ref}>
+                                                        <a
+                                                            href={ref}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                        >
+                                                            {ref}
+                                                        </a>
+                                                    </div>
+                                                ) : (
+                                                    <div key={ref}>{ref}</div>
+                                                ),
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            ) : (
+                <p className="small">
+                    No indicator from the run or the file is in the trails.
+                </p>
+            )}
+        </section>
+    );
+}
+
 const PROVIDER_STATE = {
     ok: "Ready",
     not_configured: "No API key",
@@ -779,6 +895,7 @@ export function ThreatIntelCard({ analysisId, stage, isOffline = false }) {
     const payload = current?.payload;
     const online = payload?.online;
     const assessment = current?.assessment;
+    const attribution = payload?.attribution;
     const feeds = payload?.feeds || [];
     const results = (online?.results || []).filter(
         (r) => r.status !== "not_configured" && r.status !== "unsupported",
@@ -893,6 +1010,9 @@ export function ThreatIntelCard({ analysisId, stage, isOffline = false }) {
                                         ).length
                                     }{" "}
                                     providers ·{" "}
+                                    {online.scope === "sample-hash"
+                                        ? "sample hash only · "
+                                        : ""}
                                     {formatWhen(online.generated_at)} ·{" "}
                                     {online.connectivity}
                                 </span>
@@ -915,6 +1035,9 @@ export function ThreatIntelCard({ analysisId, stage, isOffline = false }) {
                         <SampleReputation rows={hashRows} />
                         <NetworkIndicators rows={otherRows} />
                     </>
+                ) : null}
+                {attribution ? (
+                    <Attribution attribution={attribution} />
                 ) : null}
                 {feeds.length ? (
                     <OfflineFeeds payload={payload} onCopy={copy} />

@@ -682,6 +682,7 @@ def intel_providers():
             "providers": inventory(config.intel),
             "online_enabled": config.intel.online_enabled,
             "online_default": config.intel.online_default,
+            "hash_providers": config.intel.hash_providers,
         }
     )
 

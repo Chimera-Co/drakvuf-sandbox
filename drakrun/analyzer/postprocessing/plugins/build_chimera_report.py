@@ -749,6 +749,10 @@ def build_report(
         assessment["text"] = f"{assessed['label']}: {assessed['basis']}. " + "; ".join(
             assessed["reasons"]
         )
+    elif len(assessed["reasons"]) > 1:
+        assessment["text"] = (
+            assessment["text"].rstrip() + " " + "; ".join(assessed["reasons"][1:]) + "."
+        )
     intel_stage["assessment"] = assessed
     for index, result in enumerate(online_results):
         if result.get("status") != "ok":
@@ -768,6 +772,49 @@ def build_report(
                 "source": "intel:" + result["provider"],
                 "evidence_ids": eids,
             }
+        )
+
+    attribution = intel_payload.get("attribution") or {}
+    for row in attribution.get("matches", []):
+        iocs.append(
+            {
+                "type": row["type"],
+                "value": row["indicator"],
+                "source": "maltrail:" + row["file"],
+                "evidence_ids": row["evidence_ids"],
+            }
+        )
+    # Suspicious trails (dynamic DNS, parking, TLDs) are listed as IOCs but do not name a family.
+    named = [f for f in attribution.get("families", []) if f["category"] != "suspicious"]
+    for index, family in enumerate(named[:10]):
+        claim(
+            f"attribution-{index}",
+            f"{', '.join(family['indicators'][:3])}"
+            + (f" and {len(family['indicators']) - 3} more" if len(family["indicators"]) > 3 else "")
+            + f" {'is' if len(family['indicators']) == 1 else 'are'} listed in Maltrail's {family['family']} trail"
+            + (" (APT group)" if family["apt"] else "")
+            + ".",
+            "inferred",
+            "unknown",
+            [
+                eid
+                for row in attribution["matches"]
+                if row["file"] == family["file"]
+                for eid in row["evidence_ids"]
+            ],
+            rationale="Maltrail lists the indicator under this family; shared hosting, sinkholes and reused "
+            "infrastructure can make the attribution wrong.",
+        )
+    if named:
+        assessment["attribution"] = [
+            {"family": f["family"], "apt": f["apt"], "category": f["category"]}
+            for f in named
+        ]
+        assessment["text"] = (
+            assessment["text"].rstrip()
+            + " Network indicators are listed by Maltrail under: "
+            + ", ".join(f["family"] + (" (APT)" if f["apt"] else "") for f in named[:5])
+            + "."
         )
 
     stages = {

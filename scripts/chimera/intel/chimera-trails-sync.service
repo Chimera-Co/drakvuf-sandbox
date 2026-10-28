@@ -1,0 +1,19 @@
+[Unit]
+Description=Pull Maltrail trails (github.com/stamparm/trails) and rebuild the CHIMERA attribution index
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+# Not while an analysis VM runs: the index rebuild takes ~30 s of dom0 CPU, which would disturb timing runs.
+ExecCondition=/bin/sh -c '! /usr/local/sbin/xl list | grep -q "^vm-[0-9]"'
+ExecStart=/opt/chimera/venv/bin/drakrun intel trails-sync
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=1h
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/chimera-intel /var/lib/drakrun/intel
+UMask=0022

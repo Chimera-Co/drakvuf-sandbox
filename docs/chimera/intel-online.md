@@ -158,11 +158,30 @@ The separate assessment applies these rules in order:
 
 1. A MalwareBazaar or ThreatFox hash match means malicious, basis `known malware`,
    with family when available.
-2. VirusTotal with at least 10 malicious engines means malicious. Three through
-   nine means at least suspicious, preserving an already malicious classifier.
+2. VirusTotal with at least 10 malicious engines on the sample's own hash means
+   malicious. Three through nine means at least suspicious, preserving an already
+   malicious classifier. A contacted domain, IP or URL that VirusTotal flags does
+   not count here: it is evidence about the run, not a verdict on the file.
 3. A CIRCL hashlookup known-good match means benign, basis `known software`,
    unless the classifier says malicious.
 4. Otherwise retain the classifier label, basis `behaviour model`.
+
+Whatever the basis, the reasons end with VirusTotal's view of the sample's hash
+("VirusTotal: 1 of 70 engines flag the sample (family)", or "VirusTotal does not
+know the sample's hash"), and the report's assessment text repeats it when the
+classifier verdict stands. The batch evaluation (`m5_eval.py`) reads only
+`classification.json`; VirusTotal is the label source for the evaluation, so it
+must never feed the classifier or the scored verdict.
+
+## Sample hash on every analysis
+
+`hash_providers = ["virustotal"]` in `[intel]` looks up the sample's own hash with
+the listed providers on every analysis, also when "online intel" was not ticked
+(`intel-online.json` then has `"scope": "sample-hash"`, and the report's online tile
+says "sample hash only"). Only the hash leaves the host; domains, IPs and URLs stay
+opt-in. Ticking "online intel" or "Run online lookup" runs the full lookup. The
+default is an empty list. VirusTotal's public API pacing (15 s, 450 a day) applies;
+with Wi-Fi off the lookup records `offline`.
 
 Assessment reasons explain differences. Online matches carry evidence IDs and IOC
 sources `intel:<provider>`. No-match results never mean clean. Offline feeds remain

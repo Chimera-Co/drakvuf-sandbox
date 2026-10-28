@@ -568,6 +568,14 @@ function UploadForm() {
                     are sent to the configured providers; the sample is never
                     uploaded)
                 </label>
+                {intelSettings?.online_enabled &&
+                    !intelOnline &&
+                    intelSettings?.hash_providers?.length > 0 && (
+                        <p className="form-text">
+                            The sample's hash is still looked up with{" "}
+                            {intelSettings.hash_providers.join(", ")}.
+                        </p>
+                    )}
                 {!intelSettings?.online_enabled && (
                     <p>
                         Online lookups are disabled. Enable online_enabled in

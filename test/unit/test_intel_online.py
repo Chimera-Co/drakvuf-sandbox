@@ -542,3 +542,71 @@ def test_string_artifacts_are_not_looked_up(setup, tmp_path):
     }}}))
     values = [v for _, v, _ in collect(directory, directory, config)]
     assert values == ["evil-c2.example", "http://185.220.101.4/gate.php", "185.220.101.4"]
+
+
+def test_hash_providers_get_the_sample_hash_without_online_intel(setup, tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from drakrun.lib.intel.online.run import enqueue
+
+    config, _, _ = setup
+    config.online_enabled = True
+    monkeypatch.setattr(
+        "drakrun.lib.config.load_config", lambda: SimpleNamespace(intel=config)
+    )
+    queue = MagicMock()
+    monkeypatch.setattr("rq.Queue", queue)
+    assert enqueue("fixture", object(), {"intel_online": False}) is None
+    config.hash_providers = ["virustotal"]
+    enqueue("fixture", object(), {"intel_online": False})
+    assert queue.return_value.enqueue.call_args.args[1:] == ("fixture", "sample-hash")
+    enqueue("fixture", object(), {"intel_online": True})
+    assert queue.return_value.enqueue.call_args.args[1:] == ("fixture", None)
+
+    looked = []
+    monkeypatch.setattr(
+        base.Provider,
+        "lookup",
+        lambda self, kind, value, cfg, cache: looked.append((self.id, kind))
+        or self.result(kind, value),
+    )
+    directory = tmp_path / "hash-only"
+    directory.mkdir()
+    (directory / "metadata.json").write_text(json.dumps({"file": {"sha256": HASH}}))
+    (directory / "report.json").write_text(
+        json.dumps({"dns_queries": [{"domain": "observed.example"}]})
+    )
+    doc = run(directory, directory, config, scope="sample-hash")
+    assert looked == [("virustotal", "sha256")]
+    assert [p["id"] for p in doc["providers"]] == ["virustotal"]
+    assert doc["scope"] == "sample-hash"
+
+
+def test_only_the_sample_hash_is_weighed():
+    flagged_domain = dict(
+        provider="virustotal",
+        type="domain",
+        status="ok",
+        verdict="malicious",
+        detections={"malicious": 15},
+    )
+    result = assessment("benign", [flagged_domain])
+    assert (result["label"], result["basis"]) == ("benign", "behaviour model")
+    clean_file = dict(
+        provider="virustotal",
+        type="sha256",
+        status="ok",
+        verdict="harmless",
+        family="fixture",
+        detections={"malicious": 1, "harmless": 3, "undetected": 66},
+    )
+    result = assessment("malicious", [flagged_domain, clean_file])
+    assert result["label"] == "malicious"
+    assert result["reasons"] == [
+        "Classifier verdict retained",
+        "VirusTotal: 1 of 70 engines flag the sample (fixture)",
+    ]
+    unknown = dict(provider="virustotal", type="sha256", status="not_found")
+    assert assessment("benign", [unknown])["reasons"][-1] == (
+        "VirusTotal does not know the sample's hash"
+    )

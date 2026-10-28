@@ -76,3 +76,41 @@ def providers_command(test_lookup):
             )
             message += f" status={result['status']}"
         click.echo(message)
+
+
+@intel.command("trails-sync")
+@click.option("--log", "log_path", type=click.Path(dir_okay=False), default=None)
+def trails_sync_command(log_path):
+    """Pull github.com/stamparm/trails, log the diff and rebuild the attribution index."""
+    from drakrun.lib.intel.trails import sync
+
+    config = load_config().intel
+    if config.trails_db_path is None:
+        raise click.ClickException("Set [intel] trails_db_path to enable Maltrail attribution")
+    log_path = log_path or config.trails_checkout.parent / "trails-changes.jsonl"
+    record = sync(config.trails_checkout, config.trails_db_path, log_path)
+    click.echo(
+        f"trails {str(record['to'])[:12]} ({record['committed_at']}): {record['status']}"
+        + (
+            f"; {record['files_changed']} files changed, +{record['added']}/-{record['removed']} lines"
+            if "files_changed" in record
+            else ""
+        )
+        + ("; LICENCE CHANGED, review it" if record.get("license_changed") else "")
+    )
+
+
+@intel.command("trails-status")
+def trails_status_command():
+    from drakrun.lib.intel.trails import read_meta
+
+    path = load_config().intel.trails_db_path
+    if path is None or not path.exists():
+        click.echo("Maltrail attribution unavailable: index missing (run drakrun intel trails-sync)")
+        return
+    meta = read_meta(path)
+    click.echo(
+        f"trails {meta['commit'][:12]} committed {meta['committed_at']}, built {meta['built_at']}: "
+        f"{meta['trails']} trails ({meta['apt_trails']} APT), "
+        + ", ".join(f"{k} {v}" for k, v in meta["counts"].items())
+    )

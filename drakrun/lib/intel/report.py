@@ -5,7 +5,7 @@ import sqlite3
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from . import digest, match
+from . import digest, match, trails
 
 
 def sample_scope(report):
@@ -117,18 +117,9 @@ def observations(metadata, report, static, tls, scope=None):
     return out
 
 
-def _offline_stage(directory, config, metadata, report, static, ev, static_path=None):
-    base = {
-        "status": "unavailable",
-        "reason": "offline intel disabled or database missing",
-        "producer": {"name": "chimera-offline-intel"},
-        "payload": None,
-        "evidence_ids": [],
-    }
-    if not config.enabled or not Path(config.db_path).is_file():
-        return base
-    directory = Path(directory)
-    for candidate in (static_path, directory / "static.json"):
+def _inputs(directory, static, static_path=None):
+    """(static, tls): the static analysis next to the job (or in the analysis), and the TLS sessions."""
+    for candidate in (static_path, Path(directory) / "static.json"):
         if candidate is None:
             continue
         candidate = Path(candidate)
@@ -141,9 +132,24 @@ def _offline_stage(directory, config, metadata, report, static, ev, static_path=
             except (OSError, ValueError):
                 pass
     try:
-        tls = json.loads((directory / "tls_sessions.json").read_bytes())
+        tls = json.loads((Path(directory) / "tls_sessions.json").read_bytes())
     except (OSError, ValueError):
         tls = {}
+    return static, tls
+
+
+def _offline_stage(directory, config, metadata, report, static, ev, static_path=None):
+    base = {
+        "status": "unavailable",
+        "reason": "offline intel disabled or database missing",
+        "producer": {"name": "chimera-offline-intel"},
+        "payload": None,
+        "evidence_ids": [],
+    }
+    if not config.enabled or not Path(config.db_path).is_file():
+        return base
+    directory = Path(directory)
+    static, tls = _inputs(directory, static, static_path)
     try:
         payload = match(config.db_path, observations(metadata, report, static, tls))
     except (
@@ -186,7 +192,62 @@ def _offline_stage(directory, config, metadata, report, static, ev, static_path=
     }
 
 
+def _attribution(directory, config, metadata, report, static, ev, static_path=None):
+    """Maltrail family / APT attribution of the network indicators the sample's own processes produced (or that
+    nobody can attribute) and of those in the file; other guest processes' traffic is left out."""
+    path = Path(getattr(config, "trails_db_path", None) or "")
+    if not config.enabled or not path.is_file():
+        return None
+    static, tls = _inputs(directory, static, static_path)
+    wanted = [
+        row
+        for row in observations(
+            metadata, report, static, tls, scope=sample_scope(report) or None
+        )
+        if row[0] in {"domain", "ip", "ip_port", "url"} and row[2] != "system"
+    ]
+    try:
+        payload = trails.match(path, wanted)
+    except (OSError, ValueError, sqlite3.Error, KeyError, TypeError):
+        return None
+    raw = json.dumps(payload, sort_keys=True).encode()
+    artifact = "intel-attribution.json"
+    temporary = Path(directory) / (artifact + ".tmp")
+    temporary.write_bytes(raw)
+    temporary.replace(Path(directory) / artifact)
+    ev.hashes[artifact] = digest(raw)
+    eids = []
+    for index, row in enumerate(payload["matches"]):
+        row["evidence_ids"] = [ev.add(artifact, f"/matches/{index}", "maltrail")]
+        eids.extend(row["evidence_ids"])
+    return payload, eids
+
+
 def stage(directory, config, metadata, report, static, ev, static_path=None):
+    result = _feed_stage(directory, config, metadata, report, static, ev, static_path)
+    attribution = _attribution(
+        directory, config, metadata, report, static, ev, static_path
+    )
+    if attribution is None:
+        return result
+    payload, eids = attribution
+    named = [f for f in payload["families"] if f["category"] != "suspicious"]
+    note = (
+        "Maltrail: "
+        + ", ".join(f["family"] + (" (APT)" if f["apt"] else "") for f in named[:5])
+        if named
+        else f"Maltrail: no family match (trails of {str(payload['committed_at'])[:10]})"
+    )
+    return {
+        **result,
+        "status": "ok" if result["status"] == "unavailable" else result["status"],
+        "reason": result["reason"] + "; " + note,
+        "payload": {**(result.get("payload") or {}), "attribution": payload},
+        "evidence_ids": result["evidence_ids"] + eids,
+    }
+
+
+def _feed_stage(directory, config, metadata, report, static, ev, static_path=None):
     offline = _offline_stage(
         directory, config, metadata, report, static, ev, static_path
     )

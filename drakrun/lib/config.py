@@ -128,10 +128,16 @@ class IntelConfigSection(BaseModel):
             True,
         )
     )
+    # Providers asked about the sample's own hash on every analysis, also when online intel was not ticked.
+    hash_providers: List[str] = Field(default_factory=list)
     max_observables: int = Field(default=20, gt=0, le=1000)
     request_timeout_s: float = Field(default=10, gt=0, le=10, allow_inf_nan=False)
     enabled: bool = False
     db_path: pathlib.Path = pathlib.Path("/var/lib/drakrun/intel/intel.db")
+    # Maltrail trails (github.com/stamparm/trails) for family / APT attribution, built by `drakrun intel trails-sync`;
+    # attribution is off until a path is set (e.g. /var/lib/drakrun/intel/trails.db).
+    trails_db_path: Optional[pathlib.Path] = None
+    trails_checkout: pathlib.Path = pathlib.Path("/var/lib/chimera-intel/trails")
     max_bundle_bytes: int = Field(default=200 * 1024 * 1024, gt=0)
 
 

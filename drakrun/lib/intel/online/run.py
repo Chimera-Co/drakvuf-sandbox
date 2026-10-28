@@ -11,6 +11,7 @@ from drakrun.lib.intel import normalize
 from drakrun.lib.intel.report import observations, sample_scope
 
 from . import inventory, providers
+from .base import HASHES
 from .cache import Cache
 from .noise import background, non_public, string_artifact
 
@@ -118,11 +119,17 @@ def collect(directory, static_directory, config, network=None):
     return selected
 
 
-def run(directory, static_directory, config, network=None):
+def run(directory, static_directory, config, network=None, scope=None):
+    """scope="sample-hash": only the sample's own hash, only with `config.hash_providers` (the lookup every
+    analysis gets when online intel was not asked for)."""
     items = collect(directory, static_directory, config, network)
+    if scope == "sample-hash":
+        items = [item for item in items if item[2] == "sample"]
     results, states = [], []
     cache = Cache(config.cache_path)
     for provider, info in zip(providers(), inventory(config)):
+        if scope == "sample-hash" and provider.id not in config.hash_providers:
+            continue
         rows = []
         # A provider without its key is reported once in `providers`, not once per observable.
         if info["enabled"] and info["configured"]:
@@ -180,6 +187,7 @@ def run(directory, static_directory, config, network=None):
         schema="chimera-intel-online/1",
         analysis_id=directory.name,
         generated_at=datetime.now(timezone.utc).isoformat(),
+        scope=scope or "all",
         connectivity="partial" if ran and offline else "online" if ran else "offline",
         providers=states,
         results=results,
@@ -205,13 +213,16 @@ def enqueue(analysis_id, connection, options=None, depends_on=None):
     from drakrun.lib.config import load_config
 
     settings = load_config().intel
-    if not settings.online_enabled or not (options or {}).get(
-        "intel_online", settings.online_default
-    ):
+    if not settings.online_enabled:
+        return None
+    # Without online intel the sample's hash is still looked up with `hash_providers`; nothing else leaves the host.
+    full = (options or {}).get("intel_online", settings.online_default)
+    if not full and not settings.hash_providers:
         return None
     return Queue(name=INTEL_QUEUE_NAME, connection=connection).enqueue(
         run_online_intel_job,
         analysis_id,
+        None if full else "sample-hash",
         job_id=f"intel-online-{analysis_id}",
         job_timeout=3600,
         result_ttl=3600,
@@ -219,7 +230,7 @@ def enqueue(analysis_id, connection, options=None, depends_on=None):
     )
 
 
-def run_online_intel_job(analysis_id):
+def run_online_intel_job(analysis_id, scope=None):
     from drakrun.analyzer.static.worker import _refresh_report, _write_json, job_dir
     from drakrun.lib.config import load_config
     from drakrun.lib.paths import ANALYSES_DIR
@@ -230,12 +241,15 @@ def run_online_intel_job(analysis_id):
     target = job_dir(analysis_id)
     target.mkdir(parents=True, exist_ok=True)
     try:
-        doc = run(ANALYSES_DIR / target.name, target, config.intel, config.network)
+        doc = run(
+            ANALYSES_DIR / target.name, target, config.intel, config.network, scope
+        )
     except Exception:
         doc = dict(
             schema="chimera-intel-online/1",
             analysis_id=target.name,
             generated_at=datetime.now(timezone.utc).isoformat(),
+            scope=scope or "all",
             connectivity="offline",
             providers=[
                 dict(
@@ -255,27 +269,48 @@ def run_online_intel_job(analysis_id):
     return doc["summary"]
 
 
+def virustotal_reason(results):
+    """What VirusTotal said about the sample's own hash, in one line (None when it was not asked)."""
+    for row in results:
+        if row.get("provider") != "virustotal" or row.get("type") not in HASHES:
+            continue
+        if row.get("status") == "not_found":
+            return "VirusTotal does not know the sample's hash"
+        if row.get("status") == "ok":
+            counts = row.get("detections") or {}
+            engines = sum(
+                counts.get(k, 0)
+                for k in ("malicious", "suspicious", "harmless", "undetected")
+            )
+            family = f" ({row['family']})" if row.get("family") else ""
+            return f"VirusTotal: {counts.get('malicious', 0)} of {engines} engines flag the sample{family}"
+    return None
+
+
 def assessment(label, results):
-    """Precedence: known malware hashes, engine consensus, known software, model."""
+    """Precedence: known malware hashes, engine consensus, known software, model.
+
+    Engine consensus counts only the sample's own hash: a contacted domain or IP that VirusTotal flags is
+    evidence about the run, not a verdict on the file. VirusTotal's view of the hash is added to every basis.
+    """
     hits = [r for r in results if r.get("status") == "ok"]
+    reason = virustotal_reason(results)
+    vt = [reason] if reason else []
     for row in hits:
-        if row["provider"] in {"malwarebazaar", "threatfox"} and row["type"] in {
-            "sha256",
-            "sha1",
-            "md5",
-        }:
+        if row["provider"] in {"malwarebazaar", "threatfox"} and row["type"] in HASHES:
             return dict(
                 label="malicious",
                 basis="known malware",
                 reasons=[
                     f"{row['provider']} hash match: {row.get('family') or 'unknown family'}"
-                ],
+                ]
+                + vt,
             )
     engines = max(
         [
             r.get("detections", {}).get("malicious", 0)
             for r in hits
-            if r["provider"] == "virustotal"
+            if r["provider"] == "virustotal" and r["type"] in HASHES
         ]
         or [0]
     )
@@ -285,7 +320,7 @@ def assessment(label, results):
                 "malicious" if engines >= 10 or label == "malicious" else "suspicious"
             ),
             basis="engine consensus",
-            reasons=[f"VirusTotal: {engines} malicious engines"],
+            reasons=vt,
         )
     if label != "malicious" and any(
         r["provider"] == "hashlookup" and r["verdict"] == "harmless" for r in hits
@@ -293,10 +328,12 @@ def assessment(label, results):
         return dict(
             label="benign",
             basis="known software",
-            reasons=["CIRCL known software hash match"],
+            reasons=["CIRCL known software hash match"] + vt,
         )
     return dict(
-        label=label, basis="behaviour model", reasons=["Classifier verdict retained"]
+        label=label,
+        basis="behaviour model",
+        reasons=["Classifier verdict retained"] + vt,
     )
 
 
