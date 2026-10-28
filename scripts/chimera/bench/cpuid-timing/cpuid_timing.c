@@ -38,7 +38,11 @@ static const char *DEFAULT_OUT = "C:\\Users\\Public\\cpuid-timing.json";
 #ifdef __APPLE__
 static void pin(void) {}
 #else
-static void pin(void) { cpu_set_t s; CPU_ZERO(&s); CPU_SET(0, &s); sched_setaffinity(0, sizeof s, &s); }
+/* CPUID_TIMING_CPU picks the logical CPU (default 0), e.g. an E-core on a hybrid CPU */
+static void pin(void) {
+    const char *cpu = getenv("CPUID_TIMING_CPU");
+    cpu_set_t s; CPU_ZERO(&s); CPU_SET(cpu ? atoi(cpu) : 0, &s); sched_setaffinity(0, sizeof s, &s);
+}
 #endif
 static const char *DEFAULT_OUT = "cpuid-timing.json";
 #endif

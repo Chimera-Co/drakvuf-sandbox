@@ -24,7 +24,8 @@ cpuid_timing [iterations] [output.json] [raw.csv]
 - Windows guest: `cpuid_timing.exe 100000 C:\Users\Public\h3-drakvuf-cpuidmon-1.json C:\Users\Public\h3-drakvuf-cpuidmon-1.csv`
   and read the files back the way the evasion lane reads PERDEDOR's report.
 
-The thread pins itself to logical CPU 0. Check with `lscpu --extended` that CPU 0 is a P-core and that the
+The thread pins itself to logical CPU 0 (on Linux, `CPUID_TIMING_CPU=<n>` picks another, e.g. an E-core; the
+Windows build always uses the guest's vCPU 0). Check with `lscpu --extended` that CPU 0 is a P-core and that the
 guest's vCPU 0 is pinned to a P-core too (`xl vcpu-list`); keep the same core type everywhere.
 
 Configurations, three repeats each: bare metal (Debian booted without Xen), dom0, A0 without DRAKVUF, H3 without
