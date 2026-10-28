@@ -257,7 +257,9 @@ class SandboxDefinitionSection(BaseModel):
     # Verifier ids this sandbox opts into. The API intersects this with the
     # platforms each adapter actually supports, so declaring an unsupported
     # tool here is harmless - it simply won't be offered.
-    verifiers: List[str] = Field(default_factory=lambda: ["perdedor", "alkhaser"])
+    verifiers: List[str] = Field(
+        default_factory=lambda: ["perdedor", "alkhaser", "pafish", "vmaware"]
+    )
     metadata: Dict[str, str] = Field(default_factory=dict)
 
 
@@ -273,6 +275,14 @@ class AlKhaserConfigSection(BaseModel):
     timeout: int = 1800
 
 
+class SingleBinaryToolConfigSection(BaseModel):
+    # Host-side path to a checker that is one Windows PE (Pafish's pafish64.exe,
+    # VMAware's vmaware.exe). Not redistributed: download the release and record
+    # its SHA-256. Copied into the disposable overlay per scan, like al-khaser.
+    host_binary_path: Optional[pathlib.Path] = None
+    timeout: int = 600
+
+
 class PerdedorConfigSection(BaseModel):
     # Checkout of the perdedor repository. The adapter needs the on-disk
     # Windows agent tree or Linux/common Python sources to stage in the guest,
@@ -284,6 +294,8 @@ class PerdedorConfigSection(BaseModel):
 class EvasionConfigSection(BaseModel):
     alkhaser: AlKhaserConfigSection = AlKhaserConfigSection()
     perdedor: PerdedorConfigSection = PerdedorConfigSection()
+    pafish: SingleBinaryToolConfigSection = SingleBinaryToolConfigSection()
+    vmaware: SingleBinaryToolConfigSection = SingleBinaryToolConfigSection()
     # Default wall-clock budget for a whole verification scan, in seconds.
     default_timeout: int = 2400
     # CHIMERA evasion score thresholds (0-100, higher is better).

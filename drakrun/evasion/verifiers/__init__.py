@@ -45,9 +45,17 @@ def _register_builtin_adapters() -> None:
     # side effect of an unrelated import elsewhere in the codebase.
     from drakrun.evasion.verifiers.alkhaser import AlKhaserAdapter
     from drakrun.evasion.verifiers.linux_vmcheck import LinuxVmcheckAdapter
+    from drakrun.evasion.verifiers.pafish import PafishAdapter
     from drakrun.evasion.verifiers.perdedor import PerdedorAdapter
+    from drakrun.evasion.verifiers.vmaware import VMAwareAdapter
 
-    for adapter_cls in (PerdedorAdapter, AlKhaserAdapter, LinuxVmcheckAdapter):
+    for adapter_cls in (
+        PerdedorAdapter,
+        AlKhaserAdapter,
+        PafishAdapter,
+        VMAwareAdapter,
+        LinuxVmcheckAdapter,
+    ):
         register(adapter_cls())
 
 

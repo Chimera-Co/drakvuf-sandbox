@@ -59,6 +59,9 @@ def _admin_options_for_tool(tool_id: str, config: DrakrunConfig) -> dict:
     if tool_id == "perdedor":
         path = config.evasion.perdedor.repo_path
         return {"repo_path": str(path) if path else None}
+    if tool_id in ("pafish", "vmaware"):
+        path = getattr(config.evasion, tool_id).host_binary_path
+        return {"host_binary_path": str(path) if path else None}
     return {}
 
 
@@ -67,6 +70,8 @@ def _timeout_seconds_for_tool(tool_id: str, config: DrakrunConfig) -> float:
         return float(config.evasion.alkhaser.timeout)
     if tool_id == "perdedor":
         return float(config.evasion.perdedor.timeout)
+    if tool_id in ("pafish", "vmaware"):
+        return float(getattr(config.evasion, tool_id).timeout)
     return float(config.evasion.default_timeout)
 
 

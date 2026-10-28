@@ -107,7 +107,7 @@ def _synthesize_default_sandbox(config: DrakrunConfig) -> SandboxDefinition:
         platform="windows",
         hypervisor="xen",
         lifecycle="drakrun-vm",
-        verifiers=["perdedor", "alkhaser"],
+        verifiers=["perdedor", "alkhaser", "pafish", "vmaware"],
         metadata=metadata,
     )
 

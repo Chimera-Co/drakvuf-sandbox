@@ -616,7 +616,10 @@ def test_scan_artifacts_zip_unknown_scan_is_404(client, scan_dir):
 
 @pytest.mark.parametrize(
     "guest_os,expected",
-    [("windows", {"perdedor", "alkhaser"}), ("linux", {"perdedor", "chimera-vmcheck"})],
+    [
+        ("windows", {"perdedor", "alkhaser", "pafish", "vmaware"}),
+        ("linux", {"perdedor", "chimera-vmcheck"}),
+    ],
 )
 def test_tools_filtered_by_os(client, guest_os, expected):
     response = client.get(f"/api/evasion/tools?guest_os={guest_os}")
