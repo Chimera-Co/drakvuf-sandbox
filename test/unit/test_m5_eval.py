@@ -576,6 +576,22 @@ def test_report_compares_arms_on_windows_malware_only(tmp_path):
     assert "| persistence |" in report and "| distinct behaviours (0-3) |" in report
 
 
+def test_report_on_three_arms_writes_one_report_per_compared_pair(tmp_path):
+    register = tmp_path / "register.csv"
+    register.write_text(f"sha256,path,role,family,guest_os\n{SHA[0]},a,test,GuLoader,windows\n")
+    (tmp_path / "schedule.json").write_text(
+        json.dumps({"register": str(register), "arms": ["A0", "A0d", "H3"], "schedule": [1] * 3}))
+    results = [{"sha256": SHA[0], "arm": arm, "os": "windows", "network_intent": observed, "telemetry_complete": True}
+               for arm, observed in (("A0", False), ("A0d", True), ("H3", True))]
+    (tmp_path / "results.jsonl").write_text("".join(json.dumps(r) + "\n" for r in results))
+    m5.main(["report", "--out", str(tmp_path), "--arms", "A0", "H3"])
+    m5.main(["report", "--out", str(tmp_path), "--arms", "A0d", "H3"])
+    assert json.loads((tmp_path / "summary-A0-vs-H3.json").read_text())["only_H3"] == 1
+    assert json.loads((tmp_path / "summary-A0d-vs-H3.json").read_text())["both"] == 1
+    assert (tmp_path / "report-A0d-vs-H3.md").read_text().startswith("# M5 results: Windows A0d vs H3")
+    assert not (tmp_path / "report.md").exists()
+
+
 def test_linux_shortlist_takes_recent_elf_and_skips_spreading_bots():
     by_family = {
         "BPFDoor": [

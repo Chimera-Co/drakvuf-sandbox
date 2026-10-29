@@ -1030,8 +1030,10 @@ def cmd_report(args):
         )
     lines += verdict_tables(results, register, plan.get("classifier"))
     lines += other_tables(results, register)
-    (out / "report.md").write_text("\n".join(lines) + "\n")
-    (out / "summary.json").write_text(json.dumps(summary, indent=1))
+    # With more than two arms each compared pair gets its own report (report-A0d-vs-H3.md)
+    suffix = "" if len(plan["arms"]) <= 2 else f"-{arm_a}-vs-{arm_b}"
+    (out / f"report{suffix}.md").write_text("\n".join(lines) + "\n")
+    (out / f"summary{suffix}.json").write_text(json.dumps(summary, indent=1))
     print("\n".join(lines[:16]))
 
 
