@@ -104,11 +104,13 @@ send("H2_mac_spoof", [eth(GW_MAC, FORGED_MAC, 0x0800, q)] * 4 + [eth(GW_MAC, GW_
 # H3 IP spoofing
 send("H3_ip_spoof", [eth(GW_MAC, mac, 0x0800, ipv4(src, INETSIM, 17, udp(40001, 53, DNSQ)))
                      for src in FORGED_SOURCES + [OTHER_VM] for _ in range(4)])
-# H4 802.1Q and 802.1ad (inner UDP source ports 40002/40003)
+# H4 802.1Q and 802.1ad (inner UDP source ports 40002/40003; 40004 for VID 0, a priority tag that Linux takes as
+# untagged, so those frames are told apart from real VLAN traffic)
 frames = []
 for vid in (0, 1, 100):
     for dst in (INETSIM, ROUTER):
-        frames.append(eth(GW_MAC, mac, 0x8100, struct.pack("!HH", vid, 0x0800) + ipv4(ip, dst, 17, udp(40002, 53, DNSQ))))
+        sport = 40004 if vid == 0 else 40002
+        frames.append(eth(GW_MAC, mac, 0x8100, struct.pack("!HH", vid, 0x0800) + ipv4(ip, dst, 17, udp(sport, 53, DNSQ))))
 frames.append(eth(GW_MAC, mac, 0x88a8, struct.pack("!HHHH", 100, 0x8100, 1, 0x0800) + ipv4(ip, ROUTER, 17, udp(40003, 53, DNSQ))))
 send("H4_vlan", [f for f in frames for _ in range(3)])
 # H5 DHCP misuse
@@ -279,6 +281,8 @@ def main():
         # Informational: dom0 routes by IP, so forged-MAC frames with the guest's own address reach INetSim
         h2_forwarded_to_inetsim=pcap_count(inetsim, "udp src port 40000"),
         h3_forged_sources_on_inetsim0=pcap_count(inetsim, f"udp src port 40001 and not src host {guest['ip']}"),
+        # Informational: VID 0 is a priority tag, not a VLAN (IEEE 802.1Q); Linux takes it as untagged
+        h4_priority_tagged_on_inetsim0=pcap_count(inetsim, "udp src port 40004"),
         h4_tagged_payload_on_inetsim0=pcap_count(inetsim, "udp src port 40002 or udp src port 40003 or vlan"),
     )
     results["C0_net_check_after"] = subprocess.run(["chimera-net-check", "--require-inetsim"],
