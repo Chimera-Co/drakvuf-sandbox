@@ -51,13 +51,17 @@ import math
 import pathlib
 import random
 import re
+import shutil
 import subprocess
 import sys
 import time
 
 ANALYSES_DIR = pathlib.Path("/var/lib/drakrun/analyses")
 ARMS_DIR = pathlib.Path("/var/lib/chimera-arms")
+# The repository copy, or the installed one when this script runs from elsewhere (an evidence folder's frozen copy)
 CHIMERA_ARM = pathlib.Path(__file__).resolve().parents[1] / "arms/chimera-arm"
+if not CHIMERA_ARM.exists() and shutil.which("chimera-arm"):
+    CHIMERA_ARM = pathlib.Path(shutil.which("chimera-arm"))
 ANALYSIS_WORKER = "drakrun-worker@1"  # the Windows worker; arm switches restart only it
 # Windows files the guest starts by extension (startup_command.py); anything else gets ".exe"
 WINDOWS_RUN_EXTENSIONS = (".exe", ".msi", ".ps1", ".bat", ".cmd", ".vbs", ".js")
@@ -89,6 +93,9 @@ LINUX_IMAGE_PATHS = (
 ANALYSIS_DOMAIN = re.compile(r"^vm-\d+$")
 EGRESS_POLL_S = 2
 STOP_GRACE_S = 120  # after a stop, how long a run in flight may take to reach a terminal status
+# Every unit that restores analysis VMs. A job a worker has already taken can restore its VM minutes later (seen in
+# G3: 4 s after the stop), so an egress drop kills these first and leaves them stopped for the operator.
+VM_WORKER_UNITS = ("drakrun-worker@*", "drakrun-evasion-worker@*")
 # CPU temperature sensors, hottest wins: coretemp's package sensor where the kernel has one (a Xen dom0 has not),
 # the DPTF CPU zone and the embedded controller's CPU sensor, as the thermal panel reads them
 CPU_THERMAL_ZONES = ("x86_pkg_temp", "TCPU")
@@ -417,6 +424,16 @@ def log_stop(ctx, event):
     print(json.dumps(event), flush=True)
 
 
+def stop_vm_workers():
+    """Kill and stop every VM worker (SIGKILL first: on SIGTERM an rq worker finishes its job, and Restart=on-failure
+    would bring a killed one back), so nothing restores a VM after the stop. Returns the units that were running."""
+    units = [line.split()[0] for line in sh("systemctl", "list-units", "--plain", "--no-legend", "--state=active",
+                                              *VM_WORKER_UNITS, check=False).splitlines() if line.split()]
+    sh("systemctl", "kill", "--signal=SIGKILL", *VM_WORKER_UNITS, check=False)
+    sh("systemctl", "stop", *VM_WORKER_UNITS, check=False)
+    return units
+
+
 def destroy_analysis_domains():
     names = [line.split()[0] for line in sh("xl", "list").splitlines()[1:] if line.split()]
     names = [n for n in names if ANALYSIS_DOMAIN.match(n)]
@@ -436,16 +453,20 @@ def guest_bridges_down():
 
 
 def egress_watchdog(ctx, baseline, finished, poll=EGRESS_POLL_S):
-    """Protocol stop rule: on any new CHIMERA-EGRESS-DROP, at once (not when the run ends) stop both lanes,
-    destroy every analysis domain and take the guest bridges down."""
+    """Protocol stop rule: on any new CHIMERA-EGRESS-DROP, at once (not when the run ends) stop both lanes, stop the
+    VM workers so no analysis already handed to them can start a VM, destroy every analysis domain and take the guest
+    bridges down. The workers stay stopped until the operator restarts them."""
     while not finished.wait(poll):
         drops = egress_drops()
         if drops > baseline:
             ctx["stop"].set()
+            ctx["egress_drop"] = True
+            workers = stop_vm_workers()
             domains = destroy_analysis_domains()
             bridges = guest_bridges_down()
-            log_stop(ctx, {"event": "egress_drop", "new_drops": drops - baseline, "destroyed": domains,
-                           "bridges_down": bridges, "log": egress_drop_lines()[-5:]})
+            log_stop(ctx, {"event": "egress_drop", "new_drops": drops - baseline, "workers_stopped": workers,
+                           "destroyed": domains, "bridges_down": bridges,
+                           "log": egress_drop_lines()[-min(drops - baseline, 10):]})
             return
 
 
@@ -544,7 +565,7 @@ def windows_slots_busy():
     return False
 
 
-def switch_arm(arm):
+def switch_arm(arm, restart_worker=True):
     if current_arm() == arm:
         return
     # chimera-arm refuses while a Windows slot or its drakvuf is running; the
@@ -554,6 +575,8 @@ def switch_arm(arm):
             break
         time.sleep(2)
     sh(str(CHIMERA_ARM), "use", arm)
+    if not restart_worker:
+        return
     # The worker reads install.json and profiles on start, so restart it on the new arm
     sh("systemctl", "restart", ANALYSIS_WORKER)
     time.sleep(10)
@@ -832,10 +855,16 @@ def cmd_run(args):
     finally:
         finished.set()
         watchdog.join()
+        dropped = ctx.get("egress_drop", False)
         if windows:
-            switch_arm(original_arm)
-        for worker in evasion_active:
-            sh("systemctl", "start", worker)
+            switch_arm(original_arm, restart_worker=not dropped)
+        if dropped:
+            print("egress drop: the VM workers stay stopped; start them once the drop is understood "
+                  "(systemctl start drakrun-worker@1 drakrun-worker@2 drakrun-evasion-worker@1 drakrun-evasion-worker@2)",
+                  flush=True)
+        else:
+            for worker in evasion_active:
+                sh("systemctl", "start", worker)
     errors = [f"{lane.guest_os}: {lane.error}" for lane in lanes if lane.error]
     if errors:
         raise SystemExit("; ".join(errors))

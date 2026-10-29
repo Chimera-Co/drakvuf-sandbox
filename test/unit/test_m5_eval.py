@@ -431,19 +431,29 @@ def test_egress_watchdog_destroys_analysis_domains_and_takes_guest_bridges_down(
                     "25: drak2: <BROADCAST,UP> mtu 1500\\    link/ether 62:33\n"
                     "9: docker0: <BROADCAST,UP> mtu 1500\\    link/ether 02:42\n")
         if argv[0] == "dmesg":
-            return "[1.0] CHIMERA-EGRESS-DROP IN=drak1 OUT=wlo1 SRC=10.13.1.10 DST=192.0.2.1 PROTO=47\n"
+            return ("[0.5] CHIMERA-EGRESS-DROP IN=drak2 OUT=wlo1 SRC=10.13.2.10 DST=8.8.8.8 PROTO=ESP\n"
+                    "[1.0] CHIMERA-EGRESS-DROP IN=drak1 OUT=wlo1 SRC=10.13.1.10 DST=192.0.2.1 PROTO=47\n")
+        if argv[:2] == ("systemctl", "list-units"):
+            return "drakrun-worker@1.service loaded active running\ndrakrun-worker@2.service loaded active running\n"
         return ""
 
     monkeypatch.setattr(m5, "sh", fake_sh)
     ctx = lane_ctx(tmp_path)
-    m5.egress_watchdog(ctx, baseline=0, finished=threading.Event(), poll=0)
-    assert ctx["stop"].is_set()
+    m5.egress_watchdog(ctx, baseline=1, finished=threading.Event(), poll=0)
+    assert ctx["stop"].is_set() and ctx["egress_drop"]
+    # The workers die before any domain is destroyed, so a job a worker already holds cannot restore a VM afterwards
+    kill = calls.index(("systemctl", "kill", "--signal=SIGKILL", *m5.VM_WORKER_UNITS))
+    stop = calls.index(("systemctl", "stop", *m5.VM_WORKER_UNITS))
+    assert kill < stop < calls.index(("xl", "list"))
     assert ("xl", "destroy", "vm-1") in calls and ("xl", "destroy", "vm-2") in calls
     assert not any(c[:3] == ("xl", "destroy", "static-vm") for c in calls)
     assert ("ip", "link", "set", "dev", "drak1", "down") in calls and ("ip", "link", "set", "dev", "drak2", "down") in calls
     assert not any("docker0" in c for c in calls)
     event = json.loads((tmp_path / "stops.jsonl").read_text())
-    assert event["event"] == "egress_drop" and event["destroyed"] == ["vm-1", "vm-2"] and "PROTO=47" in event["log"][0]
+    assert event["event"] == "egress_drop" and event["destroyed"] == ["vm-1", "vm-2"]
+    assert event["workers_stopped"] == ["drakrun-worker@1.service", "drakrun-worker@2.service"]
+    # Only the new drop line: older ones (an earlier test's) are not this stop's evidence
+    assert event["new_drops"] == 1 and len(event["log"]) == 1 and "PROTO=47" in event["log"][0]
 
 
 def test_egress_watchdog_ends_quietly_without_a_drop(tmp_path, monkeypatch):
@@ -654,3 +664,12 @@ def test_run_refuses_a_changed_classifier(tmp_path):
     (clf / "model.py").write_text("x = 2\n")
     with pytest.raises(SystemExit, match="classifier changed"):
         m5.main(["run", "--out", str(tmp_path), "--classifier-dir", str(clf)])
+
+
+def test_arm_restore_after_an_egress_drop_leaves_the_worker_stopped(monkeypatch):
+    calls = []
+    monkeypatch.setattr(m5, "current_arm", lambda: "A0")
+    monkeypatch.setattr(m5, "windows_slots_busy", lambda: False)
+    monkeypatch.setattr(m5, "sh", lambda *argv, check=True: calls.append(argv) or "")
+    m5.switch_arm("H3", restart_worker=False)
+    assert calls == [(str(m5.CHIMERA_ARM), "use", "H3")]
