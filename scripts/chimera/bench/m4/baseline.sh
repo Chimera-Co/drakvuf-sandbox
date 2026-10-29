@@ -6,13 +6,16 @@
 #   A0   arm A0-scan (A0 + Defender exclusion for the checker folders), production plugins minus cpuidmon/hidsim, no -s
 #   A0r  arm A0-scan, production plugins (cpuidmon -s, hidsim): the Stage 1 baseline's runtime hiding
 #   H3   arm H3, production plugins
+#   H3r  arm H3-rebuild (H3 rebuilt from the arm scripts on a fresh A0 copy, goal G1.4), production plugins
+# VMAWARE_RELEASED=0 skips the one VMAware scan as released (it is known to end the guest).
 # The production config.toml and arm H3 are restored on exit, whatever happens.
 set -u
 : "${VMAWARE_DISABLE:?comma-separated VMAware techniques to skip in the limited scans}"
 S=$(cd "$(dirname "$0")" && pwd); CFG=/etc/drakrun/config.toml
 export EV=${EV:-/var/lib/chimera-evidence/g1-$(date +%F)}
 mkdir -p "$EV"; cp $CFG "$EV/config.toml.production"
-restart() { systemctl restart 'drakrun-evasion-worker@*'; sleep 10; }
+# By name: a glob only matches loaded units, so it skipped a worker that had been stopped (G1.4)
+restart() { systemctl restart drakrun-evasion-worker@1 drakrun-evasion-worker@2; sleep 10; }
 restore() {
   # Stopping the workers ends a scan in flight; its domain is left behind and blocks the arm switch
   cp "$EV/config.toml.production" $CFG; systemctl stop 'drakrun-evasion-worker@*'
@@ -30,6 +33,7 @@ for arm in ${ARMS:-A0 A0r H3}; do
            && { echo "A0 config still has the runtime hiding"; exit 1; } ;;
     A0r) chimera-arm use A0-scan ;;
     H3)  chimera-arm use H3 ;;
+    H3r) chimera-arm use H3-rebuild ;;
     *)   echo "unknown arm $arm"; exit 1 ;;
   esac
   chimera-net-check --require-inetsim || exit 1
@@ -38,5 +42,5 @@ for arm in ${ARMS:-A0 A0r H3}; do
   TOOLS=perdedor,alkhaser,pafish "$S/scan.sh" "$arm" "${RUNS:-5}"
   TOOLS=vmaware TOOL_OPTIONS="{\"vmaware\":{\"disable\":$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1].split(",")))' "$VMAWARE_DISABLE")}}" \
     "$S/scan.sh" "$arm-vmaware-limited" "${RUNS:-5}"
-  TOOLS=vmaware "$S/scan.sh" "$arm-vmaware-released" 1
+  [[ ${VMAWARE_RELEASED:-1} == 0 ]] || TOOLS=vmaware "$S/scan.sh" "$arm-vmaware-released" 1
 done

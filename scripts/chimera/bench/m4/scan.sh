@@ -1,12 +1,12 @@
 #!/bin/bash
-# usage: [TOOLS=perdedor,alkhaser,pafish,vmaware] [TOOL_OPTIONS='{"vmaware":{...}}'] scan.sh <label> <runs>
+# usage: [TOOLS=perdedor,alkhaser,pafish,vmaware] [TOOL_OPTIONS='{"vmaware":{...}}'] scan.sh <label> <runs>  (FIRST=<n> starts the numbering at run n, to resume)
 # DRAKVUF-attached scans (default PERDEDOR + al-khaser; TOOL_OPTIONS makes it a custom-profile scan); one summary
 # line + per-check JSONL per run.
 API=http://127.0.0.1:5000/api/evasion
 EV=${EV:-/var/lib/chimera-evidence/m4-2026-10-19}; sudo -n mkdir -p $EV
 TOOL_OPTIONS=${TOOL_OPTIONS:-}; PROFILE=custom; [[ -z "$TOOL_OPTIONS" ]] && { TOOL_OPTIONS='{}'; PROFILE=full; }
 TOOLS_JSON=$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1].split(",")))' "${TOOLS:-perdedor,alkhaser}")
-for n in $(seq 1 $2); do
+for n in $(seq ${FIRST:-1} $2); do
   ID=$(curl -s -X POST $API/scans -H 'Content-Type: application/json' \
     -d '{"sandbox_id":"default","tools":'"$TOOLS_JSON"',"profile":"'"$PROFILE"'","tool_options":'"$TOOL_OPTIONS"',"with_drakvuf":true}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["scan_id"])')
   start=$(date +%s); outcome=ok
