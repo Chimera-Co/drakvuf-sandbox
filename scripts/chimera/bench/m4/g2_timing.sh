@@ -55,7 +55,7 @@ guest() {  # <label> <with_drakvuf: true|false>
     cp "$raw/cpuid-timing.json" "$EV/raw/$1-$n.json" 2>/dev/null; cp "$raw/cpuid-timing.csv" "$EV/raw/$1-$n.csv" 2>/dev/null
     tool=$(python3 -c 'import json,sys
 e = json.load(open(sys.argv[1])); t = e["tool_results"]; t = t if isinstance(t, list) else list(t.values())
-print(f"attached={e.get(\"drakvuf_attached\")} tool={t[0].get(\"status\")}", t[0].get("error") or "")' \
+print("attached=%s tool=%s" % (e.get("drakvuf_attached"), t[0].get("status")), t[0].get("error") or "")' \
       /var/lib/drakrun/evasion/$id/evasion.json 2>/dev/null)
     log "$1 run$n scan=$id status=$status secs=$(( $(date +%s) - start )) $tool" \
         "detected=$( [[ -f "$EV/raw/$1-$n.json" ]] && detected "$EV/raw/$1-$n.json" || echo none)"
