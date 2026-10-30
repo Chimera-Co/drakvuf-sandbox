@@ -102,8 +102,9 @@ def run_step(step, spec):
         proc = subprocess.run(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
                               timeout=float(step["timeout_s"]))
         rec.update(exit_code=proc.returncode, stderr=proc.stderr.decode("utf-8", "replace")[-2000:])
-    except subprocess.TimeoutExpired:
-        rec["timed_out"] = True
+    except subprocess.TimeoutExpired as exc:
+        # run() hands over what the step wrote to stderr before the kill.
+        rec.update(timed_out=True, stderr=(exc.stderr or b"").decode("utf-8", "replace")[-2000:])
         for verb in (["kill"], ["rm", "-f"]):
             subprocess.run(["podman", *verb, step["container"]], stdout=subprocess.DEVNULL,
                            stderr=subprocess.DEVNULL, timeout=30)

@@ -23,7 +23,7 @@ from .analysis_metadata import AnalysisMetadata, FileMetadata
 from .analysis_options import AnalysisOptions
 from .analyzer import AnalysisSubstatus, analyze_file
 from .linux_analyzer import analyze_linux_file
-from .static.worker import STATIC_ONLY_QUEUE_NAME
+from .static.worker import STATIC_ONLY_QUEUE_NAME, reconcile_late_static
 
 ANALYSIS_QUEUE_NAME = "drakrun-analysis"
 LINUX_ANALYSIS_QUEUE_NAME = "drakrun-analysis-linux"
@@ -184,6 +184,13 @@ def worker_analyze(options: AnalysisOptions):
         job.save_meta()
 
         metadata.store_to_file(metadata_file)
+        if job_success:
+            # A fast pass that finished after classify_sample stopped waiting is picked up here or by the
+            # static worker, whichever finishes second.
+            try:
+                reconcile_late_static(job.id, job=job)
+            except Exception:
+                logger.exception("Late static reclassification failed for %s", job.id)
         options.host_sample_path.unlink()
         if s3_client is not None:
             upload_analysis(job.id, output_dir, s3_client, s3_bucket)

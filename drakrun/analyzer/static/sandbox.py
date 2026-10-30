@@ -19,6 +19,7 @@ import shutil
 import subprocess
 import uuid
 from pathlib import Path
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -126,15 +127,23 @@ def _prepare_out(job_dir: Path, settings) -> Path:
 
 
 def run_in_container(
-    settings, analysis_id: str, job_dir: Path, file_name: str, deep: bool = False
+    settings,
+    analysis_id: str,
+    job_dir: Path,
+    file_name: str,
+    deep: bool = False,
+    lock_wait_s: Optional[float] = None,
 ) -> dict:
     """Run the analyzer; return the parsed, validated static.json, or deep.json with deep=True (or an error
-    document)."""
+    document). With the VM backend, `lock_wait_s` bounds the wait for the VM (None: as long as it takes).
+    """
     if getattr(settings, "backend", "container") == "vm":
         from .vm_backend import VmUnavailable, analyze_in_vm
 
         try:
-            return analyze_in_vm(settings, analysis_id, job_dir, file_name, deep)
+            return analyze_in_vm(
+                settings, analysis_id, job_dir, file_name, deep, lock_wait_s
+            )
         except VmUnavailable as exc:
             if not settings.vm_fallback_container:
                 return {"schema": DEEP_SCHEMA if deep else SCHEMA, "error": str(exc)}
@@ -201,12 +210,64 @@ def run_in_container(
 GHIDRA_STARTUP_S = 90  # JVM start, import and the script itself, on top of analysis + decompile budgets
 
 
+GHIDRA_LOG = "headless.log"  # run.sh passes -log /out/headless.log
+LOG_TAIL_LINES = 40
+
+
 def ghidra_wall_s(settings) -> float:
     return (
         settings.ghidra_analysis_timeout_s
         + settings.ghidra_decompile_budget_s
         + GHIDRA_STARTUP_S
     )
+
+
+def ghidra_failure(
+    wall: float,
+    exit_code: Optional[int] = None,
+    stderr: str = "",
+    log: Optional[str] = None,
+) -> dict:
+    """{"error", "stderr", "log"} for a decompiler run that produced nothing usable. Ghidra's analysis timeout
+    only asks the running analyzer to stop, so a run can overshoot it; the end of its headless log shows which
+    phase it was in (import, "ANALYZING all memory and code", the script, the save)."""
+    if exit_code is None:
+        error = f"decompiler timed out after {wall:.0f}s"
+    elif exit_code == 137:
+        # The step limit is reported as a timeout; 137 is a SIGKILL from elsewhere, e.g. the memory limit.
+        error = "decompiler was killed (exit 137, SIGKILL before the time limit)"
+    else:
+        error = f"decompiler exited with {exit_code}"
+    # stderr starts with the JVM's banner; its last line is the one that says what went wrong.
+    last = [line for line in (stderr or "").splitlines() if line.strip()][-1:]
+    if last and exit_code is not None:
+        error += ": " + last[0].strip()[:200]
+    doc = {"error": error, "stderr": (stderr or "")[-500:]}
+    lines = [line for line in (log or "").splitlines() if line.strip()]
+    if lines:
+        doc["log"] = "\n".join(lines[-LOG_TAIL_LINES:])[-4000:]
+    return doc
+
+
+def ghidra_result(text: Optional[str], max_bytes: int, timed_out: bool = False) -> dict:
+    """ghidra.json's content, or {"error": ...}. After a timeout a complete ghidra.json means the script had
+    finished before the kill (Ghidra was still in post-analysis or the save): keep it and say so.
+    """
+    if not text:
+        return {"error": "no ghidra.json written"}
+    if len(text) > max_bytes:
+        return {"error": "ghidra.json too large"}
+    try:
+        doc = json.loads(text)
+    except ValueError:
+        return {"error": "ghidra.json is not valid JSON"}
+    if not isinstance(doc, dict):
+        return {"error": "ghidra.json is not an object"}
+    if timed_out:
+        if not isinstance(doc.get("functions"), list):
+            return {"error": "ghidra.json is not a decompiler result"}
+        doc["timed_out"] = True
+    return doc
 
 
 def build_ghidra_command(
@@ -263,6 +324,14 @@ def build_ghidra_command(
     ]
 
 
+def _read_out(path: Path, max_bytes: int) -> Optional[str]:
+    """Up to `max_bytes` of a file the container wrote, as text; None when it is missing or a symlink."""
+    if path.is_symlink() or not path.is_file():
+        return None
+    with path.open("rb") as fh:
+        return fh.read(max_bytes).decode("utf-8", "replace")
+
+
 def run_ghidra(settings, analysis_id: str, job_dir: Path, targets: list[dict]) -> dict:
     """Decompile the staged sample; return ghidra.json's content, or {"error": ...}. Never raises."""
     if getattr(settings, "backend", "container") == "vm":
@@ -302,18 +371,17 @@ def run_ghidra(settings, analysis_id: str, job_dir: Path, targets: list[dict]) -
             timeout=wall,
         )
         if proc.returncode != 0:
-            tail = proc.stderr.decode("utf-8", "replace")[-500:]
-            return {"error": f"decompiler exited with {proc.returncode}: {tail}"}
-        result_path = out / "ghidra.json"
-        if result_path.is_symlink() or not result_path.is_file():
-            return {"error": "no ghidra.json written"}
-        if result_path.stat().st_size > settings.max_output_bytes:
-            return {"error": "ghidra.json too large"}
-        doc = json.loads(result_path.read_bytes())
-        return (
-            doc if isinstance(doc, dict) else {"error": "ghidra.json is not an object"}
+            return ghidra_failure(
+                wall,
+                proc.returncode,
+                proc.stderr.decode("utf-8", "replace"),
+                _read_out(out / GHIDRA_LOG, settings.max_output_bytes),
+            )
+        return ghidra_result(
+            _read_out(out / "ghidra.json", settings.max_output_bytes + 1),
+            settings.max_output_bytes,
         )
-    except subprocess.TimeoutExpired:
+    except subprocess.TimeoutExpired as exc:
         for verb in ("kill", "rm"):
             subprocess.run(
                 [settings.engine, verb, *(["-f"] if verb == "rm" else []), name],
@@ -321,7 +389,18 @@ def run_ghidra(settings, analysis_id: str, job_dir: Path, targets: list[dict]) -
                 stderr=subprocess.DEVNULL,
                 timeout=30,
             )
-        return {"error": f"decompiler timed out after {wall:.0f}s"}
+        doc = ghidra_result(
+            _read_out(out / "ghidra.json", settings.max_output_bytes + 1),
+            settings.max_output_bytes,
+            timed_out=True,
+        )
+        if "error" not in doc:
+            return doc
+        return ghidra_failure(
+            wall,
+            stderr=(exc.stderr or b"").decode("utf-8", "replace"),
+            log=_read_out(out / GHIDRA_LOG, settings.max_output_bytes),
+        )
     except FileNotFoundError:
         return {"error": f"container engine {settings.engine!r} not installed"}
     except (OSError, ValueError) as exc:

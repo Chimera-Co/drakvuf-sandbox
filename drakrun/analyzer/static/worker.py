@@ -26,7 +26,14 @@ from rq import Queue, Worker
 from drakrun.lib.config import load_config
 from drakrun.lib.paths import ANALYSES_DIR, STATIC_DIR
 
-from .sandbox import SCHEMA, ghidra_wall_s, run_ghidra, run_in_container, stage_sample
+from .sandbox import (
+    GRACE_S,
+    SCHEMA,
+    ghidra_wall_s,
+    run_ghidra,
+    run_in_container,
+    stage_sample,
+)
 
 logger = logging.getLogger(__name__)
 STATIC_QUEUE_NAME = "chimera-static"
@@ -53,6 +60,25 @@ def static_path(analysis_id: str, base: Optional[Path] = None) -> Path:
     return job_dir(analysis_id, base) / "static.json"
 
 
+def vm_wait_s(settings) -> float:
+    """How long the fast pass may wait for the static VM; RQ's job timeout adds it, so the wait no longer eats
+    into the analysis' own time. 0 without the VM backend."""
+    if getattr(settings, "backend", "container") != "vm":
+        return 0
+    from .vm_backend import lock_wait_s
+
+    return lock_wait_s(settings)
+
+
+def _vm_turn_s(settings) -> float:
+    """How long a deep-queue step may wait for the VM: one fast pass ahead of it (see vm_backend._vm_lock)."""
+    if getattr(settings, "backend", "container") != "vm":
+        return 0
+    from .vm_backend import step_hold_s
+
+    return step_hold_s(settings, settings.timeout_s + GRACE_S)
+
+
 def stage_and_enqueue(
     analysis_id: str,
     sample_path: Path,
@@ -72,7 +98,7 @@ def stage_and_enqueue(
         file_name,
         str(base or STATIC_DIR),
         job_id=f"static-{analysis_id}",
-        job_timeout=int(settings.timeout_s + 120),
+        job_timeout=int(settings.timeout_s + 120 + vm_wait_s(settings)),
         result_ttl=24 * 3600,
     )
 
@@ -84,7 +110,13 @@ def run_static_job(
     directory = job_dir(analysis_id, Path(base) if base else None)
     started = time.time()
     try:
-        result = run_in_container(settings, analysis_id, directory, file_name)
+        result = run_in_container(
+            settings,
+            analysis_id,
+            directory,
+            file_name,
+            lock_wait_s=vm_wait_s(settings) or None,
+        )
     except BaseException:
         shutil.rmtree(directory / "in", ignore_errors=True)
         raise
@@ -102,6 +134,13 @@ def run_static_job(
         json.dump(result, fh, allow_nan=False)
     os.replace(tmp, final)
     shutil.rmtree(directory / "out", ignore_errors=True)
+    if base is None or Path(base) == STATIC_DIR:
+        try:
+            reconcile_late_static(analysis_id)
+        except Exception:
+            logger.exception(
+                "[static] late reclassification failed for %s", analysis_id
+            )
     # static.json stays for the classifier and the UI; the job itself failed
     if result.get("error"):
         logger.error(
@@ -135,10 +174,12 @@ def _enqueue_deep(
             file_name,
             str(base or STATIC_DIR),
             job_id=f"static-deep-{analysis_id}",
+            # Each VM step (capa, then Ghidra) may wait for one fast pass first.
             job_timeout=int(
                 settings.deep_timeout_s
                 + (ghidra_wall_s(settings) if settings.ghidra_enabled else 0)
                 + 120
+                + (2 if settings.ghidra_enabled else 1) * _vm_turn_s(settings)
             ),
             result_ttl=24 * 3600,
         )
@@ -229,19 +270,116 @@ def _decompile(
     result.setdefault("timings_s", {})["ghidra"] = round(time.time() - started, 3)
     if doc.get("error") and "functions" not in doc:
         result.setdefault("errors", []).append(
-            {"stage": "ghidra", "error": str(doc["error"])[:300]}
+            {
+                "stage": "ghidra",
+                "error": str(doc["error"])[:300],
+                # Where Ghidra was when it failed: the end of stderr and of its headless log.
+                **{k: str(doc[k]) for k in ("stderr", "log") if doc.get(k)},
+            }
         )
         return None
     return doc
 
 
-def _refresh_report(analysis_id: str) -> None:
+def reconcile_late_static(
+    analysis_id: str, job=None, analyses_dir: Optional[Path] = None
+) -> Optional[str]:
+    """Where static.json and the finished analysis meet, whichever comes second: the static worker calls it
+    after writing static.json, the analysis worker after writing metadata.json. If the verdict was computed
+    without static features (the fast pass was still waiting for the static VM past static.wait_s), classify
+    again with them; then rebuild the report so its static stage shows the result. Returns what it redid.
+    """
+    from drakrun.analyzer.classifier.runner import run_classifier
+
+    try:
+        directory = Path(analyses_dir or ANALYSES_DIR) / str(uuid.UUID(analysis_id))
+    except ValueError:  # not a UUID: nothing was staged for static analysis
+        return None
+    try:
+        metadata = json.loads((directory / "metadata.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if (
+        metadata.get("status") not in ("finished", "failed")
+        or not (directory / "chimera-report.json").is_file()
+    ):
+        return None  # still running: classify_sample and the report read static.json themselves
+    static = load_static(analysis_id)
+    if static is None:
+        return None
+    config = load_config()
+    try:
+        features = json.loads((directory / "features.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        features = None
+    reclassify = (
+        config.classifier.enabled
+        and isinstance(features, dict)
+        and features.get("static") is None
+        and (metadata.get("options") or {}).get("mode") != "dynamic-only"
+        and (directory / "classification.json").is_file()
+    )
+    report_stale = (
+        static_path(analysis_id).stat().st_mtime
+        > (directory / "chimera-report.json").stat().st_mtime
+    )
+    if not (reclassify or report_stale):
+        return None  # static.json was there in time: nothing to redo
+    redone = "report"
+    if reclassify:
+        features["static"] = static
+        (directory / "features.json").write_text(
+            json.dumps(features, indent=2, allow_nan=False), encoding="utf-8"
+        )
+        verdict = run_classifier(
+            features,
+            directory,
+            config.classifier.model_path,
+            config.classifier.timeout_s,
+        )
+        (directory / "classification.json").write_text(
+            json.dumps(verdict, indent=2, allow_nan=False), encoding="utf-8"
+        )
+        metadata["classification"] = verdict
+        (directory / "metadata.json").write_text(
+            json.dumps(metadata, allow_nan=False), encoding="utf-8"
+        )
+        _set_job_classification(analysis_id, verdict, job)
+        redone = "verdict and report"
+    _refresh_report(analysis_id, directory)
+    logger.info(
+        "[static] %s arrived after the analysis: %s redone", analysis_id, redone
+    )
+    return redone
+
+
+def _set_job_classification(analysis_id: str, verdict: dict, job=None) -> None:
+    """The analysis list reads the verdict from the analysis job's meta, not metadata.json."""
+    from rq import get_current_job
+    from rq.exceptions import NoSuchJobError
+    from rq.job import Job
+
+    if job is None:
+        current = get_current_job()
+        if current is None:
+            return
+        try:
+            job = Job.fetch(analysis_id, connection=current.connection)
+        except NoSuchJobError:
+            return
+    extra = dict(job.meta.get("extra_metadata") or {})
+    extra["classification"] = verdict
+    job.meta["extra_metadata"] = extra
+    job.save_meta()
+
+
+def _refresh_report(analysis_id: str, directory: Optional[Path] = None) -> None:
     from drakrun.analyzer.postprocessing.plugins.build_chimera_report import (
         build_report,
         render_html,
     )
 
-    directory = ANALYSES_DIR / str(uuid.UUID(analysis_id))
+    directory = directory or ANALYSES_DIR / str(uuid.UUID(analysis_id))
     if not (directory / "chimera-report.json").is_file():
         return  # the analysis is still running; its postprocessing will read deep.json itself
     try:
@@ -327,7 +465,12 @@ def enqueue_static_only(
         options.to_dict(),
         job_id=analysis_id,
         meta={"file": file_metadata.to_dict(), "options": options.to_dict()},
-        job_timeout=int(config.static.timeout_s + config.classifier.timeout_s + 120),
+        job_timeout=int(
+            config.static.timeout_s
+            + config.classifier.timeout_s
+            + 120
+            + vm_wait_s(config.static)
+        ),
         result_ttl=config.drakrun.result_ttl,
     )
 

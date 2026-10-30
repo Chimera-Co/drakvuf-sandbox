@@ -7,9 +7,9 @@ every isolation flag stays in one place. dom0 never mounts anything the guest wr
 length-prefixed, sha256-checked JSON envelope from the raw result disk and validates it like a container's
 output.
 
-One job at a time (flock shared by the fast and deep workers). A job that times out, or a disk that will not
-detach, restarts the VM; the VM also restarts every `vm_restart_every` jobs. Its root disk is read-only and
-its scratch disk is reformatted at boot, so a restart returns it to the built image.
+One job at a time (flock shared by the fast and deep workers, taken in turn: see _vm_lock). A job that times
+out, or a disk that will not detach, restarts the VM; the VM also restarts every `vm_restart_every` jobs. Its
+root disk is read-only and its scratch disk is reformatted at boot, so a restart returns it to the built image.
 """
 
 from __future__ import annotations
@@ -40,8 +40,16 @@ DETACH_TIMEOUT_S = 30
 JOB_SLACK_S = 60
 
 
+LOCK_POLL_S = 0.5
+RESTART_TIMEOUT_S = 180
+
+
 class VmUnavailable(RuntimeError):
     """The VM is not running or not ready: the caller may fall back to the dom0 container."""
+
+
+class VmBusy(RuntimeError):
+    """Another job held the VM for longer than the caller may wait. Never a reason to fall back to dom0."""
 
 
 def _run(argv, timeout=30, check=True) -> subprocess.CompletedProcess:
@@ -86,7 +94,7 @@ def restart_vm(settings) -> Optional[int]:
     subprocess.run(
         ["systemctl", "restart", "chimera-static-vm.service"],
         capture_output=True,
-        timeout=180,
+        timeout=RESTART_TIMEOUT_S,
     )
     deadline = time.monotonic() + settings.vm_boot_timeout_s
     while time.monotonic() < deadline:
@@ -97,16 +105,66 @@ def restart_vm(settings) -> Optional[int]:
     return None
 
 
+def step_hold_s(settings, wall: float) -> float:
+    """Longest a job step with this wall clock holds the VM: the wall, the slack, then a restart and boot."""
+    return wall + JOB_SLACK_S + RESTART_TIMEOUT_S + settings.vm_boot_timeout_s
+
+
+def lock_wait_s(settings) -> float:
+    """Longest any one step of another job can hold the VM. With the turnstile in _vm_lock a waiting job is
+    next after at most one step."""
+    from .sandbox import GRACE_S, ghidra_wall_s
+
+    walls = [settings.timeout_s + GRACE_S, settings.deep_timeout_s + GRACE_S]
+    if settings.ghidra_enabled:
+        walls.append(ghidra_wall_s(settings))
+    if settings.mobsf_enabled:
+        walls.append(settings.mobsf_timeout_s + 60)
+    return step_hold_s(settings, max(walls))
+
+
+def _flock(fh, deadline: Optional[float]) -> bool:
+    if deadline is None:
+        fcntl.flock(fh, fcntl.LOCK_EX)
+        return True
+    while True:
+        try:
+            fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return True
+        except BlockingIOError:
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(LOCK_POLL_S)
+
+
 @contextlib.contextmanager
-def _vm_lock(blocking: bool = True):
-    """Serialises jobs and the idle shutdown. Non-blocking: yields False when a job holds it."""
+def _vm_lock(blocking: bool = True, wait_s: Optional[float] = None):
+    """Serialises jobs and the idle shutdown. Non-blocking: yields False when a job holds it.
+
+    flock does not queue its waiters, so a deep-queue job that runs several steps (capa then Ghidra, one memory
+    dump after another) could take the VM again the moment it let go, ahead of a waiting fast pass. A job
+    therefore takes the turnstile first and keeps it only until it holds the VM: the job running the next step
+    finds the turnstile taken and waits behind the one already waiting. With `wait_s`, raises VmBusy when the
+    VM is not free in time.
+    """
     RUN_DIR.mkdir(parents=True, exist_ok=True)
     with (RUN_DIR / "static-vm.lock").open("a") as fh:
-        try:
-            fcntl.flock(fh, fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB))
-        except BlockingIOError:
-            yield False
-            return
+        if not blocking:
+            try:
+                fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                yield False
+                return
+        else:
+            deadline = None if wait_s is None else time.monotonic() + wait_s
+            with (RUN_DIR / "static-vm.turnstile.lock").open("a") as turnstile:
+                try:
+                    if not (_flock(turnstile, deadline) and _flock(fh, deadline)):
+                        raise VmBusy(
+                            f"static VM busy with another job for {wait_s:.0f}s"
+                        )
+                finally:
+                    fcntl.flock(turnstile, fcntl.LOCK_UN)
         try:
             yield True
         finally:
@@ -226,10 +284,15 @@ def _attached(settings) -> set[str]:
 
 
 def run_job(
-    settings, steps: list[dict], sample: Path, uid: Optional[int] = None
+    settings,
+    steps: list[dict],
+    sample: Path,
+    uid: Optional[int] = None,
+    lock_wait_s: Optional[float] = None,
 ) -> dict:
     """Send one job (a list of podman steps) to the VM; return the guest's envelope. Raises VmUnavailable when
-    the VM is not there; any other failure is returned as {"error": ...}."""
+    the VM is not there and VmBusy when it stays taken past `lock_wait_s` (None waits as long as it takes);
+    any other failure is returned as {"error": ...}."""
     job_id = uuid.uuid4().hex
     digest = hashlib.sha256()
     with sample.open("rb") as fh:
@@ -244,7 +307,7 @@ def run_job(
         "steps": steps,
     }
     wall = sum(float(step["timeout_s"]) for step in steps) + JOB_SLACK_S
-    with _vm_lock():
+    with _vm_lock(wait_s=lock_wait_s):
         _mark_used()
         dom = ready(settings)
         if dom is None and settings.vm_autostart:
@@ -292,6 +355,21 @@ def run_job(
             _mark_used()
 
 
+def _first_step(envelope: dict) -> dict:
+    steps = envelope.get("steps") if isinstance(envelope.get("steps"), list) else []
+    return steps[0] if steps and isinstance(steps[0], dict) else {}
+
+
+def _step_file(envelope: dict, name: str) -> Optional[str]:
+    files = _first_step(envelope).get("files")
+    text = files.get(name) if isinstance(files, dict) else None
+    return text if isinstance(text, str) else None
+
+
+def _step_timed_out(envelope: dict) -> bool:
+    return not envelope.get("error") and bool(_first_step(envelope).get("timed_out"))
+
+
 def _step_status(
     envelope: dict, name: str
 ) -> tuple[dict, Optional[str], Optional[str]]:
@@ -313,7 +391,12 @@ def _step_status(
 
 
 def analyze_in_vm(
-    settings, analysis_id: str, job_dir: Path, file_name: str, deep: bool
+    settings,
+    analysis_id: str,
+    job_dir: Path,
+    file_name: str,
+    deep: bool,
+    lock_wait_s: Optional[float] = None,
 ) -> dict:
     from .sandbox import DEEP_SCHEMA, GRACE_S, SCHEMA, build_command, container_name
 
@@ -335,7 +418,12 @@ def analyze_in_vm(
         "prepare": {"dirs": ["out"]},
         "outputs": [f"out/{output}"],
     }
-    envelope = run_job(settings, [step], job_dir / "in" / "sample")
+    try:
+        envelope = run_job(
+            settings, [step], job_dir / "in" / "sample", lock_wait_s=lock_wait_s
+        )
+    except VmBusy as exc:
+        return {"schema": schema, "error": str(exc)}
     if "steps" not in envelope:
         return {
             "schema": schema,
@@ -361,8 +449,15 @@ def analyze_in_vm(
 def ghidra_in_vm(
     settings, analysis_id: str, job_dir: Path, targets: list[dict]
 ) -> dict:
-    from .sandbox import build_ghidra_command, ghidra_wall_s
+    from .sandbox import (
+        GHIDRA_LOG,
+        build_ghidra_command,
+        ghidra_failure,
+        ghidra_result,
+        ghidra_wall_s,
+    )
 
+    wall = ghidra_wall_s(settings)
     argv = build_ghidra_command(
         settings,
         analysis_id,
@@ -373,7 +468,7 @@ def ghidra_in_vm(
     step = {
         "name": "ghidra",
         "argv": argv,
-        "timeout_s": ghidra_wall_s(settings),
+        "timeout_s": wall,
         "container": f"chimera-ghidra-{uuid.UUID(analysis_id)}",
         "prepare": {
             "dirs": ["ghidra-work", "ghidra-out"],
@@ -381,27 +476,30 @@ def ghidra_in_vm(
                 "ghidra-work/targets.json": json.dumps({"addresses": targets[:200]})
             },
         },
-        "outputs": ["ghidra-out/ghidra.json"],
+        "outputs": ["ghidra-out/ghidra.json", f"ghidra-out/{GHIDRA_LOG}"],
     }
     envelope = run_job(settings, [step], job_dir / "in" / "sample")
     if "steps" not in envelope:
         return {"error": envelope.get("error", "static VM returned nothing")}
     status, text, error = _step_status(envelope, "ghidra-out/ghidra.json")
+    log = _step_file(envelope, f"ghidra-out/{GHIDRA_LOG}")
+    if _step_timed_out(envelope):
+        # The agent still collects the outputs after the kill.
+        doc = ghidra_result(
+            _step_file(envelope, "ghidra-out/ghidra.json"),
+            settings.max_output_bytes,
+            timed_out=True,
+        )
+        if "error" not in doc:
+            return doc
+        return ghidra_failure(wall, stderr=status.get("stderr", ""), log=log)
     if error:
         return {"error": error}
     if status.get("exit_code") != 0:
-        return {
-            "error": f"decompiler exited with {status.get('exit_code')}: {status.get('stderr', '')[-500:]}"
-        }
-    if not text:
-        return {"error": "no ghidra.json written"}
-    if len(text) > settings.max_output_bytes:
-        return {"error": "ghidra.json too large"}
-    try:
-        doc = json.loads(text)
-    except ValueError:
-        return {"error": "ghidra.json is not valid JSON"}
-    return doc if isinstance(doc, dict) else {"error": "ghidra.json is not an object"}
+        return ghidra_failure(
+            wall, status.get("exit_code"), status.get("stderr", ""), log
+        )
+    return ghidra_result(text, settings.max_output_bytes)
 
 
 def mobsf_in_vm(
