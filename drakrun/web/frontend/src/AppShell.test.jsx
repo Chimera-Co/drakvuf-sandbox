@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+    cleanup,
+    fireEvent,
+    render,
+    screen,
+    within,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { AppHeader, useSidebar } from "./App.jsx";
+import App, { AppHeader, useSidebar } from "./App.jsx";
 
 // the pages themselves are not under test (and pull in the VNC viewer)
 vi.mock("./AnalysisList.jsx", () => ({ default: () => null }));
@@ -49,6 +55,43 @@ it("folds the sidebar on reports by default and remembers the choice per page ki
     expect(screen.getByLabelText("mode").textContent).toBe("open");
     fireEvent.click(screen.getByRole("button", { name: "Fold to icons" }));
     expect(screen.getByLabelText("mode").textContent).toBe("rail");
+});
+
+it("the logo links to the Home page; Analyses stays the default page", () => {
+    at("/");
+    expect(screen.getByRole("link", { name: /CHIMERA/ })).toHaveAttribute(
+        "href",
+        "/home",
+    );
+});
+
+it("opens Home from the logo and the docs from the sidebar", () => {
+    vi.stubGlobal("__APP_VERSION__", "test");
+    window.scrollTo = vi.fn(); // jsdom has no scrolling; the docs page scrolls on navigation
+    render(
+        <MemoryRouter initialEntries={["/"]}>
+            <App />
+        </MemoryRouter>,
+    );
+    expect(
+        screen.queryByRole("heading", { name: "What CHIMERA is" }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("link", { name: /CHIMERA/ }));
+    expect(
+        screen.getByRole("heading", { name: "What CHIMERA is" }),
+    ).toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(within(nav).getByRole("link", { name: "Home" })).toHaveClass(
+        "active",
+    );
+    fireEvent.click(within(nav).getByRole("link", { name: "Documentation" }));
+    expect(
+        screen.getByRole("heading", {
+            level: 1,
+            name: "CHIMERA documentation",
+        }),
+    ).toBeInTheDocument();
+    vi.unstubAllGlobals();
 });
 
 it("opens and closes the phone menu without changing the pinned preference", () => {

@@ -16,13 +16,17 @@ import AnalysisView from "./AnalysisView.jsx";
 import SandboxEvasion from "./SandboxEvasion.jsx";
 import EvasionScanView from "./EvasionScanView.jsx";
 import VerificationRuns from "./VerificationRuns.jsx";
+import HomePage from "./home/HomePage.jsx";
+import DocsPage from "./docs/DocsPage.jsx";
 import { ChimeraLogo } from "./ChimeraLogo.jsx";
 import { ChimeraIntro } from "./ChimeraIntro.jsx";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
     faAnglesLeft,
     faBars,
+    faBook,
     faFolder,
+    faHouse,
     faUpload,
     faGear,
     faShieldHalved,
@@ -88,9 +92,11 @@ export function AppHeader({ sidebar }) {
                     <FontAwesomeIcon icon={faBars} />
                 </button>
             ) : null}
+            {/* The mark opens the project's Home page; "/" (Analyses) stays the default landing page. */}
             <Link
                 className={`navbar-brand ps-3 ${sidebar ? "chimera-brand" : ""}`}
-                to="/"
+                to="/home"
+                title="CHIMERA home"
             >
                 {/* Dark Solarized shell -> white ("light") creature variant. */}
                 <ChimeraLogo
@@ -118,6 +124,13 @@ const NAV = [
         [
             ["/verification-runs", faClockRotateLeft, "Verification Runs"],
             ["/evasion", faShieldHalved, "Sandbox Evasion"],
+        ],
+    ],
+    [
+        "About",
+        [
+            ["/home", faHouse, "Home"],
+            ["/docs", faBook, "Documentation"],
         ],
     ],
 ];
@@ -299,6 +312,9 @@ export default function App() {
                                 path="/verification-runs"
                                 element={<VerificationRuns />}
                             />
+                            <Route path="/home" element={<HomePage />} />
+                            <Route path="/docs" element={<DocsPage />} />
+                            <Route path="/docs/:slug" element={<DocsPage />} />
                         </Routes>
                     </main>
                     <AppFooter />
