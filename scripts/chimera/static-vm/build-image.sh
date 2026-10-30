@@ -1,7 +1,7 @@
 #!/bin/bash
 # Build the CHIMERA static-analysis VM: Debian 12 root image with podman, the agent and the analyzer images.
 #   sudo scripts/chimera/static-vm/build-image.sh            full build (debootstrap from deb.debian.org)
-#   sudo scripts/chimera/static-vm/build-image.sh --images   reload only the analyzer images (VM stopped)
+#   sudo scripts/chimera/static-vm/build-image.sh --images   reload the analyzer images and the agent (VM stopped)
 # Output in /var/lib/chimera-static-vm: root.img (read-only for the guest), scratch.img, vmlinuz, initrd.img.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -78,6 +78,7 @@ else
         echo "root.img mounted read-only; a loop device on it is still in use (losetup -j $ROOT)" >&2
         exit 1
     fi
+    install -m 0755 "$HERE/guest/chimera-static-agent.py" "$MNT/usr/local/sbin/chimera-static-agent"
 fi
 
 # Analyzer images into the read-only additional store (same podman version and driver as the guest).
