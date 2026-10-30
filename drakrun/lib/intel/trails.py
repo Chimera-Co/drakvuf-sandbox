@@ -274,13 +274,13 @@ def sync(checkout, db_path, log_path, url=TRAILS_URL, branch="main"):
     return record
 
 
-def _keys(kind, value):
-    """Index keys an observation can match: the value, its parent domains, a URL's host, an ip:port's IP."""
+def _keys(kind, value, tld=True):
+    """Index keys an observation can match: the value, its parent domains, a URL's host, an ip:port's IP, and
+    (with `tld`) a domain's top-level domain."""
     if kind == "domain":
         parts = value.split(".")
-        return [("domain", ".".join(parts[i:])) for i in range(len(parts) - 1)] + [
-            ("tld", parts[-1])
-        ]
+        keys = [("domain", ".".join(parts[i:])) for i in range(len(parts) - 1)]
+        return keys + ([("tld", parts[-1])] if tld else [])
     if kind == "ip":
         return [("ip", value)]
     if kind == "ip_port":
@@ -299,16 +299,44 @@ def _keys(kind, value):
         try:
             keys += _keys("ip", normalize("ip", u.hostname))
         except ValueError:
-            keys += _keys("domain", u.hostname or "")
+            keys += _keys("domain", u.hostname or "", tld)
         return keys
     return []
 
 
+def _add_tld(db, tlds, tld, value, origin, trail, ref, limit=50):
+    """Group a bare-TLD hit under its TLD and trail file."""
+    category, stem = db.execute(
+        "SELECT category,file FROM trails WHERE id=?", (trail,)
+    ).fetchone()
+    file = f"{category}/{stem}.txt"
+    group = tlds.get((tld, file))
+    if group is None:
+        urls = json.loads(
+            db.execute("SELECT urls FROM refs WHERE id=?", (ref,)).fetchone()[0]
+        )
+        group = tlds[(tld, file)] = {
+            "tld": tld,
+            "file": file,
+            "indicators": [],
+            "observed_in": [],
+            "references": urls[:3],
+        }
+    if value not in group["indicators"] and len(group["indicators"]) < limit:
+        group["indicators"].append(value)
+    if origin not in group["observed_in"]:
+        group["observed_in"].append(origin)
+
+
 def match(db_path, observations, now=None, limit=200):
-    """Attribution of (kind, value, origin) observations; `families` groups the matches per trail file."""
+    """Attribution of (kind, value, origin) observations; `families` groups the matches per trail file.
+
+    A bare-TLD trail (".cc", ".pw", ".onion") names no family: those hits are only listed in `suspicious_tlds`,
+    and only for names seen at run time, since short random strings in a packed file end in such TLDs by chance.
+    """
     now = now or datetime.now(timezone.utc)
     meta = read_meta(db_path)
-    rows, seen = [], set()
+    rows, seen, tlds = [], set(), {}
     with sqlite3.connect(f"file:{Path(db_path)}?mode=ro", uri=True) as db:
         cidrs = [
             (ipaddress.ip_network(v), t, r)
@@ -322,18 +350,27 @@ def match(db_path, observations, now=None, limit=200):
             except (ValueError, TypeError, UnicodeError):
                 continue
             hits = []
-            for key in _keys(kind, value):
+            for key in _keys(kind, value, tld=origin != "static"):
                 hits += [
-                    (key[1], t, r)
+                    (key[0], key[1], t, r)
                     for t, r in db.execute(
                         "SELECT trail,ref FROM entries WHERE kind=? AND value=?", key
                     )
                 ]
                 if key[0] == "ip":
                     address = ipaddress.ip_address(key[1])
-                    hits += [(str(n), t, r) for n, t, r in cidrs if address in n]
-            for trail_value, trail, ref in hits:
-                if (value, origin, trail) in seen or len(rows) >= limit:
+                    hits += [
+                        ("cidr", str(n), t, r) for n, t, r in cidrs if address in n
+                    ]
+            for key_kind, trail_value, trail, ref in hits:
+                if (value, origin, trail) in seen:
+                    continue
+                if key_kind == "tld":
+                    if len(tlds) < limit:
+                        seen.add((value, origin, trail))
+                        _add_tld(db, tlds, trail_value, value, origin, trail, ref)
+                    continue
+                if len(rows) >= limit:
                     continue
                 seen.add((value, origin, trail))
                 category, stem, family, apt, aliases = db.execute(
@@ -386,5 +423,8 @@ def match(db_path, observations, now=None, limit=200):
         "families": sorted(
             families.values(),
             key=lambda f: (not f["apt"], order[f["category"]], -len(f["indicators"])),
+        ),
+        "suspicious_tlds": sorted(
+            tlds.values(), key=lambda t: (-len(t["indicators"]), t["tld"])
         ),
     }

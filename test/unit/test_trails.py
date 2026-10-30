@@ -87,7 +87,8 @@ def test_build_and_match(tmp_path):
             ("url", "http://203.0.113.20/gate.php", "dynamic"),
             ("url", "http://any.example/panel/check.php?id=5&x=1", "dynamic"),
             ("ip", "192.0.2.9", "dynamic"),
-            ("domain", "hidden.onion", "static"),
+            ("domain", "hidden.onion", "dynamic"),
+            ("domain", "strings.onion", "static"),
             ("domain", "benign.example", "dynamic"),
         ],
         now=NOW,
@@ -99,8 +100,18 @@ def test_build_and_match(tmp_path):
         "http://203.0.113.20/gate.php",
         "http://any.example/panel/check.php?id=5&x=1",
         "192.0.2.9",
-        "hidden.onion",
     }
+    # The .onion trail is a bare TLD: a weak note for the run-time name only, never a family.
+    assert result["suspicious_tlds"] == [
+        {
+            "tld": "onion",
+            "file": "suspicious/onion.txt",
+            "indicators": ["hidden.onion"],
+            "observed_in": ["dynamic"],
+            "references": ["https://ref.example/onion"],
+        }
+    ]
+    assert "suspicious/onion.txt" not in {f["file"] for f in result["families"]}
     first = by_indicator["x.c2.fixture-apt.example"]
     assert (first["family"], first["apt"], first["trail"]) == (
         "fixture",
@@ -196,3 +207,110 @@ def test_report_attributes_only_the_sample_tree(tmp_path):
     assert build_report(directory, intel_config=without)["stages"]["intel"][
         "status"
     ] == "unavailable"
+
+
+# suspicious/domain.txt upstream mixes bare TLDs with full domains.
+TLD_FILES = {
+    **FILES,
+    "suspicious/domain.txt": "# Reference: https://ref.example/tld\n\n.cc\n.pw\ncz.cc\n",
+}
+
+
+def test_bare_tld_is_never_a_family(tmp_path):
+    db = tmp_path / "trails.db"
+    trails.build(checkout(tmp_path / "trails", TLD_FILES), db, META)
+    result = trails.match(
+        db,
+        [
+            # Random strings from a packed file's static strings.
+            ("domain", "rgu.cc", "static"),
+            ("domain", "p.pw", "static"),
+            ("url", "http://fc.pw/x", "static"),
+            # Names the sample used at run time.
+            ("domain", "c2.example.cc", "dynamic"),
+            ("url", "http://c2.example.cc/gate", "dynamic"),
+            ("domain", "q.example.pw", "unattributed"),
+            # A full domain listed in the same file still matches, from either origin.
+            ("domain", "x.cz.cc", "static"),
+            # A real family from a static string still matches.
+            ("domain", "evil.example", "static"),
+        ],
+        now=NOW,
+    )
+    assert sorted((m["indicator"], m["file"]) for m in result["matches"]) == [
+        ("evil.example", "malware/apt_fixture.txt"),
+        ("x.cz.cc", "suspicious/domain.txt"),
+    ]
+    assert all(m["trail"] not in {"cc", "pw"} for m in result["matches"])
+    families = {f["file"]: f for f in result["families"]}
+    assert families["malware/apt_fixture.txt"]["apt"]
+    assert families["suspicious/domain.txt"]["indicators"] == ["x.cz.cc"]
+    weak = {t["tld"]: t for t in result["suspicious_tlds"]}
+    assert set(weak) == {"cc", "pw"}
+    assert weak["cc"]["indicators"] == ["c2.example.cc", "http://c2.example.cc/gate"]
+    assert weak["cc"]["observed_in"] == ["dynamic"]
+    assert weak["pw"] == {
+        "tld": "pw",
+        "file": "suspicious/domain.txt",
+        "indicators": ["q.example.pw"],
+        "observed_in": ["unattributed"],
+        "references": ["https://ref.example/tld"],
+    }
+
+
+def test_static_tld_strings_add_no_attribution_or_runtime_iocs(tmp_path):
+    from drakrun.analyzer.postprocessing.plugins.build_chimera_report import (
+        build_report,
+        iocs_export,
+    )
+
+    from .test_chimera_report import write_analysis
+
+    db = tmp_path / "trails.db"
+    trails.build(checkout(tmp_path / "trails", TLD_FILES), db, META)
+    strings = ["rgu.cc", "ut.cc", "p.pw", "fc.pw", "c2.fixture-apt.example"]
+    static = {"universal": {"iocs": {"domains": strings}}}
+    directory = write_analysis(
+        tmp_path / "analysis",
+        static=static,
+        verdict={"label": "benign", "explanation": []},
+    )
+    report = json.loads((directory / "report.json").read_text())
+    report["dns_queries"].append({"domain": "c2.example.cc", "process_seqid": 11})
+    (directory / "report.json").write_text(json.dumps(report))
+    config = IntelConfigSection(
+        enabled=True, db_path=tmp_path / "absent.db", trails_db_path=db
+    )
+    result = build_report(directory, intel_config=config)
+    stage = result["stages"]["intel"]
+    attribution = stage["payload"]["attribution"]
+    assert {f["family"] for f in attribution["families"]} == {"fixture"}
+    assert [(t["tld"], t["indicators"]) for t in attribution["suspicious_tlds"]] == [
+        ("cc", ["c2.example.cc"])
+    ]
+    assert attribution["suspicious_tlds"][0]["evidence_ids"]
+    assert "Maltrail: fixture (APT)" in stage["reason"]
+    assert "suspicious TLD only: .cc" in stage["reason"]
+    assert "domain" not in stage["reason"].split("suspicious TLD")[0]
+    assert result["assessment"]["attribution"] == [
+        {"family": "fixture", "apt": True, "category": "malware"}
+    ]
+    assert not any(
+        c["id"].startswith("attribution-") and "domain trail" in c["text"]
+        for c in result["claims"]
+    )
+    maltrail = [
+        i for i in iocs_export(result)["iocs"] if i["source"].startswith("maltrail:")
+    ]
+    # No IOC from a bare TLD; the static family hit keeps its "not observed in use" origin.
+    assert sorted((i["value"], i["source"], i["observed_in"]) for i in maltrail) == [
+        (
+            "c2.fixture-apt.example",
+            "maltrail:malware/apt_fixture.txt; string in the file (not observed in use)",
+            "static",
+        ),
+        ("evil.example", "maltrail:malware/apt_fixture.txt", "dynamic"),
+    ]
+    on_disk = json.loads((directory / "intel-attribution.json").read_text())
+    assert on_disk["suspicious_tlds"][0]["tld"] == "cc"
+    assert all(m["trail"] not in {"cc", "pw"} for m in on_disk["matches"])

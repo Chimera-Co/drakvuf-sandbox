@@ -31,6 +31,11 @@ logger = logging.getLogger(__name__)
 SCHEMA = "chimera-report/1"
 LIST_LIMIT = 25  # rows per list in the report; totals are always given
 TECHNIQUE = re.compile(r"\[?(T\d{4}(?:\.\d{3})?)\]?")
+# Where an indicator Maltrail lists was seen, for the ones the sample's own processes did not use at run time.
+MALTRAIL_ORIGIN = {
+    "static": "string in the file (not observed in use)",
+    "unattributed": "seen at run time, process not attributed",
+}
 VERDICT_TEXT = {
     "malicious": "Malicious",
     "suspicious": "Suspicious",
@@ -776,15 +781,21 @@ def build_report(
 
     attribution = intel_payload.get("attribution") or {}
     for row in attribution.get("matches", []):
+        origin = row.get("observed_in")
         iocs.append(
             {
                 "type": row["type"],
                 "value": row["indicator"],
-                "source": "maltrail:" + row["file"],
+                # The match does not make a file string runtime-observed: keep where the indicator was seen.
+                "source": "maltrail:"
+                + row["file"]
+                + (f"; {MALTRAIL_ORIGIN[origin]}" if origin in MALTRAIL_ORIGIN else ""),
+                "observed_in": origin,
                 "evidence_ids": row["evidence_ids"],
             }
         )
-    # Suspicious trails (dynamic DNS, parking, TLDs) are listed as IOCs but do not name a family.
+    # Suspicious trails (dynamic DNS, parking) are listed as IOCs but do not name a family; bare-TLD hits are
+    # in attribution["suspicious_tlds"] only.
     named = [f for f in attribution.get("families", []) if f["category"] != "suspicious"]
     for index, family in enumerate(named[:10]):
         claim(

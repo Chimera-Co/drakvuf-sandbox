@@ -295,3 +295,37 @@ it("shows Maltrail attribution with APT families first", () => {
     expect(screen.getByText("https://ref.example/one").tagName).toBe("A");
     expect(screen.getByText("javascript:alert(1)").tagName).toBe("DIV");
 });
+it("lists bare-TLD hits as a weak note, not as a family", () => {
+    const attribution = {
+        commit: "abcdef0123",
+        committed_at: "2026-10-28T20:00:00+00:00",
+        stale: false,
+        matches: [],
+        families: [],
+        suspicious_tlds: [
+            {
+                tld: "cc",
+                file: "suspicious/domain.txt",
+                indicators: ["c2.example.cc"],
+                observed_in: ["dynamic"],
+            },
+        ],
+    };
+    render(
+        <ThreatIntelCard
+            isOffline
+            stage={{ status: "ok", payload: { attribution } }}
+        />,
+    );
+    expect(
+        screen.getByText(
+            "No indicator from the run or the file is in the trails.",
+        ),
+    ).toBeTruthy();
+    expect(
+        screen.getByText(
+            /Suspicious TLD only \(weak, not an attribution\): \.cc \(c2\.example\.cc\)/,
+        ),
+    ).toBeTruthy();
+    expect(screen.queryByText("domain")).toBeNull();
+});

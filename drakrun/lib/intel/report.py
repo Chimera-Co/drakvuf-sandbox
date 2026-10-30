@@ -220,6 +220,11 @@ def _attribution(directory, config, metadata, report, static, ev, static_path=No
     for index, row in enumerate(payload["matches"]):
         row["evidence_ids"] = [ev.add(artifact, f"/matches/{index}", "maltrail")]
         eids.extend(row["evidence_ids"])
+    for index, row in enumerate(payload.get("suspicious_tlds", [])):
+        row["evidence_ids"] = [
+            ev.add(artifact, f"/suspicious_tlds/{index}", "maltrail")
+        ]
+        eids.extend(row["evidence_ids"])
     return payload, eids
 
 
@@ -238,6 +243,10 @@ def stage(directory, config, metadata, report, static, ev, static_path=None):
         if named
         else f"Maltrail: no family match (trails of {str(payload['committed_at'])[:10]})"
     )
+    tlds = sorted({t["tld"] for t in payload.get("suspicious_tlds", [])})
+    if tlds:
+        # Weak: a TLD Maltrail lists as often abused, seen at run time; not a family.
+        note += "; suspicious TLD only: " + ", ".join("." + t for t in tlds[:5])
     return {
         **result,
         "status": "ok" if result["status"] == "unavailable" else result["status"],

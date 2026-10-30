@@ -597,6 +597,7 @@ function OfflineFeeds({ payload, onCopy }) {
 function Attribution({ attribution }) {
     const families = attribution.families || [];
     const matches = attribution.matches || [];
+    const tlds = attribution.suspicious_tlds || [];
     return (
         <section className="intel-section">
             <h3 className="intel-heading">
@@ -706,6 +707,17 @@ function Attribution({ attribution }) {
                     No indicator from the run or the file is in the trails.
                 </p>
             )}
+            {tlds.length ? (
+                <p className="small text-muted">
+                    Suspicious TLD only (weak, not an attribution):{" "}
+                    {tlds
+                        .map(
+                            (t) =>
+                                `.${t.tld} (${t.indicators.slice(0, 3).join(", ")}${t.indicators.length > 3 ? ` +${t.indicators.length - 3}` : ""})`,
+                        )
+                        .join("; ")}
+                </p>
+            ) : null}
         </section>
     );
 }
@@ -1036,9 +1048,7 @@ export function ThreatIntelCard({ analysisId, stage, isOffline = false }) {
                         <NetworkIndicators rows={otherRows} />
                     </>
                 ) : null}
-                {attribution ? (
-                    <Attribution attribution={attribution} />
-                ) : null}
+                {attribution ? <Attribution attribution={attribution} /> : null}
                 {feeds.length ? (
                     <OfflineFeeds payload={payload} onCopy={copy} />
                 ) : null}
