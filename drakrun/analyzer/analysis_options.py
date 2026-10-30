@@ -42,6 +42,10 @@ class AnalysisOptions(BaseModel):
     timeout: Optional[int] = None
     # Job timeout leeway for worker
     job_timeout_leeway: Optional[int] = None
+    # Guest clock speed-up factor (1: off); the guest sees timeout * clock_scale seconds pass
+    clock_scale: int = 1
+    # Shorten long sleeps (DRAKVUF delaymon, Windows only)
+    sleep_skip: bool = False
     # networking: Enable Internet access
     net_enable: bool
     # extra arguments for Drakvuf command line

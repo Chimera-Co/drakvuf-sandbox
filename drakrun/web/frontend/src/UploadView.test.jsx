@@ -13,6 +13,19 @@ import { uploadSample } from "./api.js";
 
 vi.mock("./intelApi.js", () => ({ getIntelProviders: vi.fn() }));
 vi.mock("./api.js", () => ({ uploadSample: vi.fn() }));
+vi.mock("./analysisTimeApi.js", () => ({
+    getAnalysisTimeSettings: vi.fn(() =>
+        Promise.resolve({
+            data: {
+                max_timeout_s: 86400,
+                clock_scale_enabled: true,
+                clock_scale_max: 60,
+                sleep_skip_above_ms: 10000,
+                sleep_skip_to_ms: 1000,
+            },
+        }),
+    ),
+}));
 vi.mock("./PluginPicker.jsx", () => ({
     PluginPicker: () => <input name="plugins" value="procmon" readOnly />,
 }));
@@ -104,4 +117,31 @@ it("refuses a non-APK file for Android", async () => {
     });
     expect(await screen.findByText(/takes an APK file/)).toBeTruthy();
     expect(screen.getByText("Analyze").disabled).toBe(true);
+});
+
+it("sends the analysis time in real seconds with the accelerations", async () => {
+    getIntelProviders.mockResolvedValue({
+        data: { online_enabled: false, online_default: false },
+    });
+    uploadSample.mockResolvedValue({ task_uid: "fixture" });
+    render(
+        <MemoryRouter>
+            <UploadView />
+        </MemoryRouter>,
+    );
+    fireEvent.change(screen.getByLabelText("Analysis time"), {
+        target: { value: "60" },
+    });
+    fireEvent.click(await screen.findByLabelText("Speed up the guest clock"));
+    fireEvent.click(screen.getByLabelText(/Shorten long sleeps/));
+    const file = document.querySelector('input[type="file"]');
+    fireEvent.change(file, {
+        target: { files: [new File(["fixture"], "fixture.exe")] },
+    });
+    fireEvent.submit(document.querySelector("form"));
+    await waitFor(() => expect(uploadSample).toHaveBeenCalledOnce());
+    const payload = uploadSample.mock.calls[0][0];
+    expect(payload.timeout).toBe(300);
+    expect(payload.clock_scale).toBe("12");
+    expect(payload.sleep_skip).toBe("1");
 });

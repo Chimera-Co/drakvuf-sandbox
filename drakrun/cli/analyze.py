@@ -140,6 +140,20 @@ from .check_root import check_root
     type=str,
     help="Optional password to use for extracting archive (works only when 7-zip is used for extraction)",
 )
+@click.option(
+    "--clock-scale",
+    "clock_scale",
+    default=1,
+    type=click.IntRange(min=1),
+    show_default=True,
+    help="Run the guest clock this many times faster (Windows; 1: off)",
+)
+@click.option(
+    "--sleep-skip",
+    "sleep_skip",
+    is_flag=True,
+    help="Shorten long sleeps (Windows; DRAKVUF delaymon)",
+)
 @check_root
 def analyze(
     guest_os,
@@ -161,6 +175,8 @@ def analyze(
     no_screenshotter,
     extract_archive,
     archive_password,
+    clock_scale,
+    sleep_skip,
 ):
     """
     Run a CLI analysis using Drakvuf
@@ -214,6 +230,8 @@ def analyze(
         no_screenshotter=no_screenshotter,
         extract_archive=extract_archive,
         archive_password=archive_password,
+        clock_scale=clock_scale,
+        sleep_skip=sleep_skip,
     )
 
     if guest_os == "windows" and target_filepath is not None:

@@ -25,6 +25,7 @@ from drakrun.lib.networking import start_tcpdump_collector
 from drakrun.lib.paths import RUN_DIR
 from drakrun.lib.version_detection import DrakvufVersionInfo
 from drakrun.lib.vm import VirtualMachine
+from drakrun.lib.xen import xen_unpause_vm
 
 logger = logging.getLogger(__name__)
 
@@ -237,7 +238,12 @@ def run_vm(
     install_info: InstallInfo,
     network_conf: NetworkConfigSection,
     no_restore: bool = False,
+    while_paused: Optional[Callable[[VirtualMachine], None]] = None,
 ):
+    """
+    Restores the VM and yields it running. while_paused, if given, is called with the restored
+    VM before it first runs (the clock speed-up must be in place before the guest reads its TSC).
+    """
     vm = VirtualMachine(vm_id, install_info, network_conf)
     with vm_lock(vm_id):
         if no_restore:
@@ -255,7 +261,13 @@ def run_vm(
                 with memory_admission(
                     install_info.memory, load_config().worker, lock_dir=RUN_DIR
                 ) as waited:
-                    vm.restore()
+                    if while_paused is None:
+                        vm.restore()
+                    else:
+                        vm.restore(pause=True)
+                if while_paused is not None:
+                    while_paused(vm)
+                    xen_unpause_vm(vm.vm_name)
                 if waited >= 1:
                     job = get_current_job()
                     if job is not None:

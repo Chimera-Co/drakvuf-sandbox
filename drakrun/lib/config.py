@@ -95,6 +95,9 @@ class CapaConfigSection(BaseModel):
     analyze_memdumps: bool = False
     analyze_only_malware_pids: bool = False
     worker_pool_processes: int = 4
+    # apimon.log + syscall.log above this skip dynamic capa (it loads them whole into memory).
+    # 562 runs up to 30 Oct: median 17 MB, largest 146 MB; a 1-hour run reached 530 MB.
+    max_dynamic_log_mb: int = Field(default=250, gt=0)
 
 
 class ClassifierConfigSection(BaseModel):
@@ -226,6 +229,31 @@ class MemdumpConfigSection(BaseModel):
     filter_out_system_pid: bool = True
 
 
+class AnalysisTimeConfigSection(BaseModel):
+    # Longest analysis the upload API accepts, in real (host) seconds.
+    max_timeout_s: int = Field(default=86400, gt=0)
+    # Free disk an analysis needs before it starts: a base plus a rate per hour of real run time.
+    # Logs, the pcap and memory dumps grow with the run time (memdump.max_total_dumps_size is
+    # applied only in postprocessing). A 1-hour idle run on H3 (30 Oct) peaked at 7.6 GB during
+    # postprocessing, then about 3 GB per further hour plus the postprocessing copy of the log.
+    min_free_disk_gb: float = Field(default=20, ge=0)
+    free_disk_gb_per_hour: float = Field(default=8, ge=0)
+    # Clock speed-up (chimera-clock-scale): the guest clock runs clock_scale times faster. Only
+    # works only if Windows keeps time with the TSC. Tested 30 Oct on H3 (Windows 10 19045, Xen
+    # 4.19, viridian=0) after cold boots: with cpuid "invtsc=1" it still used the HPET (QPC
+    # 62.5 MHz), and with hpet=0 as well the ACPI PM timer (3.58 MHz); Xen runs both in real
+    # time, so only RDTSC would speed up. Off: no image here supports it.
+    clock_scale_enabled: bool = False
+    clock_scale_max: int = Field(default=60, ge=1, le=1000)
+    clock_scale_helper: pathlib.Path = pathlib.Path(
+        "/usr/local/sbin/chimera-clock-scale"
+    )
+    # Sleep shortening (DRAKVUF delaymon): relative NtDelayExecution delays longer than
+    # sleep_skip_above_ms are shortened to sleep_skip_to_ms.
+    sleep_skip_above_ms: int = Field(default=10000, gt=0)
+    sleep_skip_to_ms: int = Field(default=1000, ge=0)
+
+
 class S3StorageConfigSection(BaseModel):
     enabled: bool = True
     bucket: str = "drakrun"
@@ -338,6 +366,9 @@ class DrakrunConfig(BaseSettings):
     memdump: MemdumpConfigSection = MemdumpConfigSection()
     screenshots: ScreenshotConfigSection = Field(
         default_factory=ScreenshotConfigSection
+    )
+    analysis_time: AnalysisTimeConfigSection = Field(
+        default_factory=AnalysisTimeConfigSection
     )
     karton: KartonConfigSection = KartonConfigSection()
     s3: Optional[S3StorageConfigSection] = None

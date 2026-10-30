@@ -63,6 +63,10 @@ CHIMERA_ARM = pathlib.Path(__file__).resolve().parents[1] / "arms/chimera-arm"
 if not CHIMERA_ARM.exists() and shutil.which("chimera-arm"):
     CHIMERA_ARM = pathlib.Path(shutil.which("chimera-arm"))
 ANALYSIS_WORKER = "drakrun-worker@1"  # the Windows worker; arm switches restart only it
+# An arm label is an image under ARMS_DIR, optionally with time acceleration for its runs (analysis_time.py):
+# "H3+skip" shortens long sleeps on image H3, "H3i+clock12" runs image H3i's guest clock 12 times faster.
+ARM_MODIFIERS = {"skip": {"sleep_skip": "1"}}
+ARM_CLOCK = re.compile(r"^clock(\d+)$")
 # Windows files the guest starts by extension (startup_command.py); anything else gets ".exe"
 WINDOWS_RUN_EXTENSIONS = (".exe", ".msi", ".ps1", ".bat", ".cmd", ".vbs", ".js")
 DATASET_DIR = pathlib.Path("/var/lib/chimera-dataset")
@@ -95,7 +99,8 @@ EGRESS_POLL_S = 2
 STOP_GRACE_S = 120  # after a stop, how long a run in flight may take to reach a terminal status
 # Every unit that restores analysis VMs. A job a worker has already taken can restore its VM minutes later (seen in
 # G3: 4 s after the stop), so an egress drop kills these first and leaves them stopped for the operator.
-VM_WORKER_UNITS = ("drakrun-worker@*", "drakrun-evasion-worker@*")
+# chimera-timetest-worker@ runs a repository build of the worker for tests of code not yet deployed.
+VM_WORKER_UNITS = ("drakrun-worker@*", "drakrun-evasion-worker@*", "chimera-timetest-worker@*")
 # CPU temperature sensors, hottest wins: coretemp's package sensor where the kernel has one (a Xen dom0 has not),
 # the DPTF CPU zone and the embedded controller's CPU sensor, as the thermal panel reads them
 CPU_THERMAL_ZONES = ("x86_pkg_temp", "TCPU")
@@ -616,6 +621,21 @@ def sample_name(name, guest_os="windows"):
     return base if base.lower().endswith(WINDOWS_RUN_EXTENSIONS) else base + ".exe"
 
 
+def arm_variant(arm):
+    """The image an arm label restores and the upload fields its modifiers add."""
+    image, *modifiers = arm.split("+")
+    fields = {}
+    for modifier in modifiers:
+        clock = ARM_CLOCK.match(modifier)
+        if clock:
+            fields["clock_scale"] = clock.group(1)
+        elif modifier in ARM_MODIFIERS:
+            fields.update(ARM_MODIFIERS[modifier])
+        else:
+            raise ValueError(f"unknown modifier {modifier!r} in arm {arm!r}")
+    return image, fields
+
+
 def upload_fields(sample, name, timeout):
     fields = {"timeout": str(timeout), "file_name": name, "guest_os": sample.get("guest_os", "windows")}
     if sample.get("start_command"):
@@ -624,7 +644,7 @@ def upload_fields(sample, name, timeout):
     return fields
 
 
-def submit(api, sample, timeout, poll, stop=None):
+def submit(api, sample, timeout, poll, stop=None, extra_fields=None):
     import requests
 
     name, data = read_sample(sample)
@@ -634,7 +654,7 @@ def submit(api, sample, timeout, poll, stop=None):
     resp = requests.post(
         f"{api}/upload",
         files={"file": (name, data)},
-        data=upload_fields(sample, name, timeout),
+        data={**upload_fields(sample, name, timeout), **(extra_fields or {})},
         timeout=60,
     )
     resp.raise_for_status()
@@ -766,13 +786,14 @@ class Lane:
                 wait_until_cool(ctx)
                 if ctx["stop"].is_set():
                     return
+                arm_image, arm_fields = arm_variant(item["arm"])
                 if self.guest_os == "windows":
-                    switch_arm(item["arm"])
+                    switch_arm(arm_image)
                 image = run_image(self.guest_os, item["arm"], ctx)
                 drops_before = egress_drops()
                 started = now()
                 sample = ctx["register"][item["sha256"]]
-                task_uid, status = submit(ctx["api"], sample, ctx["timeout"], ctx["poll"], ctx["stop"])
+                task_uid, status = submit(ctx["api"], sample, ctx["timeout"], ctx["poll"], ctx["stop"], arm_fields)
                 record = {**item, "task_uid": task_uid, "submitted": started, "completed": now(), "image": image}
                 record.update(label_analysis(ANALYSES_DIR / task_uid, self.guest_os))
                 record.update(verdict_fields(ANALYSES_DIR / task_uid))
@@ -799,6 +820,9 @@ class Lane:
 def cmd_run(args):
     import threading
 
+    global ANALYSIS_WORKER
+    ANALYSIS_WORKER = args.worker_unit
+
     out = pathlib.Path(args.out)
     plan = json.loads((out / "schedule.json").read_text())
     frozen = plan.get("classifier")
@@ -815,7 +839,7 @@ def cmd_run(args):
         item.setdefault("os", register[item["sha256"]]["guest_os"])
     windows_arms = {i["arm"] for i in plan["schedule"] if i["os"] == "windows"}
     for arm in windows_arms:
-        if not (ARMS_DIR / arm).is_dir():
+        if not (ARMS_DIR / arm_variant(arm)[0]).is_dir():
             raise SystemExit(f"no such arm: {arm}")
     check = ["chimera-net-check", "--require-inetsim"]
     if subprocess.run(check).returncode != 0:
@@ -1061,6 +1085,8 @@ def main(argv=None):
                    help="run although the deployed classifier differs from the one frozen in the plan")
     p.add_argument("--pause-temp", type=float, default=PAUSE_TEMP_C, help="pause before a run at this CPU temperature")
     p.add_argument("--resume-temp", type=float, default=RESUME_TEMP_C, help="resume once the CPU is this cool")
+    p.add_argument("--worker-unit", default=ANALYSIS_WORKER,
+                   help="the Windows worker unit restarted after an arm switch (e.g. chimera-timetest-worker@1)")
     p.set_defaults(func=cmd_run)
     p = sub.add_parser("label")
     p.add_argument("analysis_dir")

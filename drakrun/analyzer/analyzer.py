@@ -6,6 +6,13 @@ import subprocess
 import time
 from typing import Any, Dict, List, Optional, Protocol
 
+from drakrun.lib.analysis_time import (
+    apply_clock_scale,
+    check_free_disk,
+    sleep_skip_drakvuf_args,
+    summarize_delay_shortening,
+    wait_watching_disk,
+)
 from drakrun.lib.config import DrakrunConfig, NetworkConfigSection, load_config
 from drakrun.lib.drakshell import Drakshell
 from drakrun.lib.injector import Injector
@@ -109,6 +116,10 @@ def prepare_drakvuf_args(
         base_args["--syscall-hooks-list"] = syscall_hooks_path.as_posix()
     if options.extra_drakvuf_args is not None:
         base_args.update(options.extra_drakvuf_args)
+    if options.sleep_skip:
+        if "delaymon" not in base_args["-a"]:
+            base_args["-a"].append("delaymon")
+        base_args.update(sleep_skip_drakvuf_args(load_config().analysis_time))
     return args_dict_to_list(base_args)
 
 
@@ -198,6 +209,13 @@ def analyze_file(
             "required for executing samples with elevated privileges."
         )
 
+    if options.timeout is not None:
+        disk_problem = check_free_disk(
+            output_dir, options.timeout, config.analysis_time
+        )
+        if disk_problem is not None:
+            raise RuntimeError(disk_problem)
+
     prepare_output_dir(output_dir, options)
 
     network_conf = NetworkConfigSection(
@@ -224,8 +242,22 @@ def analyze_file(
     stall_monitor = StallMonitor(f"vm-{vm_id}")
     drakvuf_runtime_s = None
     guest_clock = None
+    clock_scale_report = None
+    stopped_low_disk = False
+
+    def speed_up_clock(vm):
+        nonlocal clock_scale_report
+        clock_scale_report = apply_clock_scale(
+            vm.vm_name, options.clock_scale, config.analysis_time
+        )
+        log.info(f"Guest clock runs {options.clock_scale}x: {clock_scale_report}")
+
     with run_vm(
-        vm_id, install_info, network_conf, no_restore=options.no_vm_restore
+        vm_id,
+        install_info,
+        network_conf,
+        no_restore=options.no_vm_restore,
+        while_paused=speed_up_clock if options.clock_scale > 1 else None,
     ) as vm:
         network_info = vm.get_network_info()
         injector = Injector(vm.vm_name, vmi_info, kernel_profile_path)
@@ -412,10 +444,14 @@ def analyze_file(
                 drakvuf_started = time.monotonic()
                 try:
                     # -t should be respected, but let's give 30 more secs
-                    if options.timeout is not None:
-                        drakvuf.wait(options.timeout + 30)
-                    else:
-                        drakvuf.wait()
+                    stopped_low_disk = wait_watching_disk(
+                        drakvuf,
+                        None if options.timeout is None else options.timeout + 30,
+                        output_dir,
+                        config.analysis_time,
+                    )
+                    if stopped_low_disk:
+                        log.warning("Free disk ran low: DRAKVUF stopped early")
                 except subprocess.TimeoutExpired:
                     log.info("Drakvuf hard timed out - hang?")
                     drakvuf_hard_timeout = True
@@ -443,6 +479,16 @@ def analyze_file(
     metadata.model_extra["telemetry"] = telemetry
     extra_metadata = postprocess_analysis_dir(output_dir, config, metadata)
     extra_metadata["guest_clock"] = guest_clock
+    if stopped_low_disk:
+        extra_metadata["stopped_low_disk"] = True
+    if options.clock_scale > 1 or options.sleep_skip:
+        extra_metadata["time_acceleration"] = {
+            "clock_scale": options.clock_scale,
+            "guest_time_s": (options.timeout or 0) * options.clock_scale,
+            "clock": clock_scale_report,
+            "sleep_skip": options.sleep_skip,
+            **(summarize_delay_shortening(output_dir) if options.sleep_skip else {}),
+        }
     # Log splitting/compression changes artifact availability during postprocessing.
     extra_metadata["telemetry"] = summarize_telemetry(
         output_dir,

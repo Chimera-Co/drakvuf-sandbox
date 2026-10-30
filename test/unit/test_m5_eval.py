@@ -689,3 +689,44 @@ def test_arm_restore_after_an_egress_drop_leaves_the_worker_stopped(monkeypatch)
     monkeypatch.setattr(m5, "sh", lambda *argv, check=True: calls.append(argv) or "")
     m5.switch_arm("H3", restart_worker=False)
     assert calls == [(str(m5.CHIMERA_ARM), "use", "H3")]
+
+
+@pytest.mark.parametrize(
+    "arm, image, fields",
+    [
+        ("H3", "H3", {}),
+        ("H3+skip", "H3", {"sleep_skip": "1"}),
+        ("H3i+clock12", "H3i", {"clock_scale": "12"}),
+        ("A0di+clock12+skip", "A0di", {"clock_scale": "12", "sleep_skip": "1"}),
+    ],
+)
+def test_arm_variant(arm, image, fields):
+    assert m5.arm_variant(arm) == (image, fields)
+
+
+def test_arm_variant_rejects_unknown_modifier():
+    with pytest.raises(ValueError, match="unknown modifier"):
+        m5.arm_variant("H3+fast")
+
+
+def test_a_variant_switches_to_its_image_and_uploads_its_fields(tmp_path, monkeypatch):
+    switched, submitted = [], []
+    monkeypatch.setattr(m5, "egress_drops", lambda: 0)
+    monkeypatch.setattr(m5, "switch_arm", lambda arm: switched.append(arm))
+    monkeypatch.setattr(m5, "cpu_temperature", lambda: None)
+    monkeypatch.setattr(m5, "run_image", lambda os_, arm, ctx: "img")
+    monkeypatch.setattr(m5, "submit", lambda *a: submitted.append(a[5]) or ("uid", "finished"))
+    monkeypatch.setattr(m5, "label_analysis", lambda d, os_: {})
+    monkeypatch.setattr(m5, "save_to_dataset", lambda *a: None)
+    monkeypatch.setattr(m5, "ANALYSES_DIR", tmp_path)
+    ctx = lane_ctx(tmp_path)
+    item = {"key": f"{SHA[0]}/H3+skip/1", "sha256": SHA[0], "arm": "H3+skip", "run": 1, "os": "windows"}
+    m5.Lane("windows", [item], ctx).run()
+    assert switched == ["H3"]
+    assert submitted == [{"sleep_skip": "1"}]
+    record = json.loads((tmp_path / "results.jsonl").read_text())
+    assert record["arm"] == "H3+skip"
+
+
+def test_stop_rule_also_kills_test_workers():
+    assert "chimera-timetest-worker@*" in m5.VM_WORKER_UNITS

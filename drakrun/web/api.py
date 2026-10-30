@@ -26,9 +26,14 @@ from drakrun.analyzer.worker import (
     get_redis_connection,
     truncate_analysis_list,
 )
+from drakrun.lib.analysis_time import (
+    check_free_disk,
+    public_settings,
+    validate_time_options,
+)
 from drakrun.lib.config import load_config
 from drakrun.lib.intel.online.options import OnlineAnalysisOptions
-from drakrun.lib.paths import STATIC_DIR, UPLOADS_DIR
+from drakrun.lib.paths import ANALYSES_DIR, STATIC_DIR, UPLOADS_DIR
 from drakrun.lib.s3_storage import get_s3_client, is_s3_enabled, upload_sample_to_s3
 from drakrun.web.schema import (
     AnalysisFileRequestQuery,
@@ -103,6 +108,16 @@ def upload_sample(form: OnlineUploadForm):
     timeout = form.timeout
     if not timeout:
         timeout = config.drakrun.default_timeout
+    clock_scale = form.clock_scale or 1
+    if form.mode != "static-only":
+        problem = validate_time_options(timeout, clock_scale, config.analysis_time)
+        if problem is None and (clock_scale > 1 or form.sleep_skip):
+            if form.guest_os != "windows":
+                problem = "clock speed-up and sleep shortening are Windows only"
+        if problem is None:
+            problem = check_free_disk(ANALYSES_DIR, timeout, config.analysis_time)
+        if problem is not None:
+            return jsonify({"error": problem}), 400
     sample_filename = form.file_name
     if not sample_filename:
         sample_filename = request_file.filename
@@ -178,7 +193,10 @@ def upload_sample(form: OnlineUploadForm):
             start_method=start_method,
             plugins=plugins,
             timeout=timeout,
-            job_timeout_leeway=config.drakrun.job_timeout_leeway,
+            # Postprocessing time grows with the log: 10 more minutes per hour of run time.
+            job_timeout_leeway=config.drakrun.job_timeout_leeway + timeout // 6,
+            clock_scale=clock_scale,
+            sleep_skip=bool(form.sleep_skip),
         )
         if no_internet:
             analysis_options.net_enable = False
@@ -671,6 +689,11 @@ def chimera_report_iocs_csv(path: AnalysisRequestPath):
             "X-Content-Type-Options": "nosniff",
         },
     )
+
+
+@api.get("/analysis-time")
+def analysis_time_settings():
+    return jsonify(public_settings(config.analysis_time))
 
 
 @api.get("/intel/providers")

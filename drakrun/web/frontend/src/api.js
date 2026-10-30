@@ -119,6 +119,8 @@ export async function uploadSample({
     file,
     guest_os = "windows",
     timeout,
+    clock_scale,
+    sleep_skip,
     file_name,
     file_path,
     plugins,
@@ -135,6 +137,8 @@ export async function uploadSample({
     formData.append("file", file);
     formData.append("guest_os", guest_os);
     formData.append("timeout", timeout);
+    if (clock_scale) formData.append("clock_scale", clock_scale);
+    if (sleep_skip) formData.append("sleep_skip", "1");
     formData.append("plugins", JSON.stringify(plugins));
     if (file_name) formData.append("file_name", file_name);
     if (file_path) formData.append("file_path", file_path);

@@ -1,0 +1,218 @@
+diff --git a/src/main.cpp b/src/main.cpp
+index 0e758fe..9eb97aa 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -374,6 +374,12 @@ static void print_usage()
+         "\t --ipt-trace-user\n"
+         "\t                           Enable IPT tracing in ring > 0\n"
+ #endif
++#ifdef ENABLE_PLUGIN_DELAYMON
++        "\t --delaymon-skip-above <ms>\n"
++        "\t                           Shorten relative NtDelayExecution delays longer than <ms> (0: off)\n"
++        "\t --delaymon-skip-to <ms>\n"
++        "\t                           Delay that a shortened NtDelayExecution waits instead (default 0)\n"
++#endif
+ #ifdef ENABLE_PLUGIN_HIDSIM
+         "\t --hid-template <path to template>\n"
+         "\t                           The template specifying the HID events to simulate. If not specified, the mouse will move randomly\n"
+@@ -536,6 +542,8 @@ int main(int argc, char** argv)
+         opt_hidsim_template,
+         opt_hidsim_monitor_gui,
+         opt_hidsim_random_clicks,
++        opt_delaymon_skip_above,
++        opt_delaymon_skip_to,
+         opt_rootkitmon_json_fwpkclnt,
+         opt_rootkitmon_json_fltmgr,
+         opt_rootkitmon_json_ci,
+@@ -626,6 +634,8 @@ int main(int argc, char** argv)
+         {"hid-template", required_argument, NULL, opt_hidsim_template},
+         {"hid-monitor-gui", no_argument, NULL, opt_hidsim_monitor_gui},
+         {"hid-random-clicks", no_argument, NULL, opt_hidsim_random_clicks},
++        {"delaymon-skip-above", required_argument, NULL, opt_delaymon_skip_above},
++        {"delaymon-skip-to", required_argument, NULL, opt_delaymon_skip_to},
+         {"json-fwpkclnt", required_argument, NULL, opt_rootkitmon_json_fwpkclnt},
+         {"json-fltmgr", required_argument, NULL, opt_rootkitmon_json_fltmgr},
+         {"json-ci", required_argument, NULL, opt_rootkitmon_json_ci},
+@@ -1026,6 +1036,12 @@ int main(int argc, char** argv)
+             case opt_hidsim_random_clicks:
+                 options.hidsim_random_clicks = true;
+                 break;
++            case opt_delaymon_skip_above:
++                options.delaymon_skip_above_ms = strtoull(optarg, NULL, 0);
++                break;
++            case opt_delaymon_skip_to:
++                options.delaymon_skip_to_ms = strtoull(optarg, NULL, 0);
++                break;
+ #endif
+ #ifdef ENABLE_PLUGIN_ROOTKITMON
+             case opt_rootkitmon_json_fwpkclnt:
+@@ -1201,6 +1217,8 @@ int main(int argc, char** argv)
+     }
+     if (procdump_on_finish)
+         options.procdump_on_finish = injected_pid;
++    // delaymon shortens delays only in the injected process and its descendants
++    options.delaymon_root_pid = injected_pid;
+ 
+     PRINT_DEBUG("Enabling context based interception.\n");
+ 
+diff --git a/src/plugins/delaymon/delaymon.cpp b/src/plugins/delaymon/delaymon.cpp
+index 0706ecf..ae5060e 100644
+--- a/src/plugins/delaymon/delaymon.cpp
++++ b/src/plugins/delaymon/delaymon.cpp
+@@ -133,6 +133,41 @@ static event_response_t trap_NtDelayExecution_cb(drakvuf_t drakvuf, drakvuf_trap
+ 
+     auto delay_interval_miliseconds = fmt::Fval(delay / 10000.0); // delay in miliseconds
+ 
++    /*
++     * A negative DelayInterval is relative (an absolute one is a point in time and is left alone,
++     * as is INT64_MIN, Sleep(INFINITE)). The kernel reads it only after this breakpoint, so
++     * rewriting it shortens the wait. Only the sample's own processes are affected.
++     */
++    uint64_t requested_ms = delay < 0 && delay != INT64_MIN ? (uint64_t)(-delay) / 10000 : 0;
++    if (sm->skip_above_ms && requested_ms > sm->skip_above_ms && sm->in_sample_tree(info))
++    {
++        int64_t shortened = -(int64_t)(sm->skip_to_ms * 10000);
++        bool written;
++        {
++            ACCESS_CONTEXT(ctx);
++            ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
++            ctx.dtb = info->regs->cr3;
++            ctx.addr = delay_addr;
++
++            auto vmi = vmi_lock_guard(drakvuf);
++            written = VMI_SUCCESS == vmi_write_64(vmi, &ctx, reinterpret_cast<uint64_t*>(&shortened));
++        }
++        if (written)
++            sm->skipped_ms += requested_ms - sm->skip_to_ms;
++        else
++            fprintf(stderr, PLUGIN_NAME " Couldn't shorten delay in %s(...) trap.\n", info->trap->name);
++
++        fmt::print(sm->format, "delaymon", drakvuf, info,
++            keyval("VCPU", fmt::Nval(info->vcpu)),
++            keyval("CR3", fmt::Nval(info->regs->cr3)),
++            keyval("DelayIntervalMs", delay_interval_miliseconds),
++            keyval("Shortened", fmt::Rstr(written ? "yes" : "failed")),
++            keyval("ShortenedToMs", fmt::Nval(sm->skip_to_ms)),
++            keyval("SkippedTotalMs", fmt::Nval(sm->skipped_ms))
++        );
++        return 0;
++    }
++
+     fmt::print(sm->format, "delaymon", drakvuf, info,
+         keyval("VCPU", fmt::Nval(info->vcpu)),
+         keyval("CR3", fmt::Nval(info->regs->cr3)),
+@@ -142,6 +177,38 @@ static event_response_t trap_NtDelayExecution_cb(drakvuf_t drakvuf, drakvuf_trap
+     return 0;
+ }
+ 
++/*
++ * True if the trapped thread belongs to the injected sample process or one of its descendants,
++ * by walking parent PIDs (at most 16 levels). Positive answers are cached; a process whose
++ * parent has already exited is not recognised.
++ */
++bool delaymon::in_sample_tree(drakvuf_trap_info_t* info)
++{
++    if (!root_pid)
++        return false;
++    vmi_pid_t pid = info->proc_data.pid;
++    vmi_pid_t ppid = info->proc_data.ppid;
++    for (int depth = 0; depth < 16; depth++)
++    {
++        if (pid == root_pid || sample_pids.count(pid))
++        {
++            sample_pids.insert(info->proc_data.pid);
++            return true;
++        }
++        if (ppid <= 4 || ppid == pid)
++            return false;
++        pid = ppid;
++        addr_t process_base;
++        if (!drakvuf_find_process(drakvuf, pid, nullptr, &process_base) ||
++            !drakvuf_get_process_ppid(drakvuf, process_base, &ppid))
++        {
++            // The parent is gone: only its own PID can still tell
++            return pid == root_pid || sample_pids.count(pid);
++        }
++    }
++    return false;
++}
++
+ static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
+     drakvuf_trap_t* trap,
+     event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
+@@ -155,9 +222,13 @@ static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
+     if ( ! drakvuf_add_trap( drakvuf, trap ) ) throw -1;
+ }
+ 
+-delaymon::delaymon(drakvuf_t drakvuf, output_format_t output)
+-    : drakvuf{drakvuf}, format{output}
++delaymon::delaymon(drakvuf_t drakvuf, uint64_t skip_above_ms, uint64_t skip_to_ms, vmi_pid_t root_pid, output_format_t output)
++    : drakvuf{drakvuf}, format{output}, skip_above_ms{skip_above_ms}, skip_to_ms{skip_to_ms}, root_pid{root_pid}
+ {
++    if (skip_above_ms && skip_to_ms >= skip_above_ms)
++        throw -1;
++    if (skip_above_ms && !root_pid)
++        fprintf(stderr, PLUGIN_NAME " No injected process: no delay will be shortened.\n");
+     register_trap(drakvuf, "NtDelayExecution", &trap, trap_NtDelayExecution_cb);
+ }
+ 
+diff --git a/src/plugins/delaymon/delaymon.h b/src/plugins/delaymon/delaymon.h
+index 2ec406e..c5ff79b 100644
+--- a/src/plugins/delaymon/delaymon.h
++++ b/src/plugins/delaymon/delaymon.h
+@@ -104,6 +104,8 @@
+ 
+ #pragma once
+ 
++#include <unordered_set>
++
+ #include "plugins/plugins.h"
+ 
+ class delaymon: public plugin
+@@ -124,7 +126,18 @@ public:
+         .ah_cb = nullptr
+     };
+ 
+-    delaymon(drakvuf_t drakvuf, output_format_t output);
++    // Relative delays longer than skip_above_ms are shortened to skip_to_ms (0: off)
++    uint64_t skip_above_ms;
++    uint64_t skip_to_ms;
++    // Total delay removed so far, in milliseconds
++    uint64_t skipped_ms = 0;
++    // The injected sample process: only it and its descendants get shortened delays
++    vmi_pid_t root_pid;
++    std::unordered_set<vmi_pid_t> sample_pids;
++
++    bool in_sample_tree(drakvuf_trap_info_t* info);
++
++    delaymon(drakvuf_t drakvuf, uint64_t skip_above_ms, uint64_t skip_to_ms, vmi_pid_t root_pid, output_format_t output);
+     ~delaymon() = default;
+     virtual bool stop_impl() override;
+ };
+diff --git a/src/plugins/plugins.cpp b/src/plugins/plugins.cpp
+index 68fb7ab..f925e83 100644
+--- a/src/plugins/plugins.cpp
++++ b/src/plugins/plugins.cpp
+@@ -265,7 +265,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
+ #endif
+ #ifdef ENABLE_PLUGIN_DELAYMON
+                 case PLUGIN_DELAYMON:
+-                    this->plugins[plugin_id] = std::make_unique<delaymon>(this->drakvuf, this->output);
++                    this->plugins[plugin_id] = std::make_unique<delaymon>(this->drakvuf, options->delaymon_skip_above_ms, options->delaymon_skip_to_ms, options->delaymon_root_pid, this->output);
+                     break;
+ #endif
+ #ifdef ENABLE_PLUGIN_CPUIDMON
+diff --git a/src/plugins/plugins.h b/src/plugins/plugins.h
+index d5cc0cd..9bf331b 100644
+--- a/src/plugins/plugins.h
++++ b/src/plugins/plugins.h
+@@ -202,6 +202,9 @@ struct plugins_options
+     const char* hidsim_template;        // PLUGIN_HIDSIM
+     bool hidsim_monitor_gui;            // PLUGIN_HIDSIM
+     bool hidsim_random_clicks;          // PLUGIN_HIDSIM
++    uint64_t delaymon_skip_above_ms;    // PLUGIN_DELAYMON
++    uint64_t delaymon_skip_to_ms;       // PLUGIN_DELAYMON
++    vmi_pid_t delaymon_root_pid;        // PLUGIN_DELAYMON
+     const char* fwpkclnt_profile;       // PLUGIN_ROOTKITMON
+     const char* fltmgr_profile;         // PLUGIN_ROOTKITMON
+     const char* ci_profile;             // PLUGIN_ROOTKITMON

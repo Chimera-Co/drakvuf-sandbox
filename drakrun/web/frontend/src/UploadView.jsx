@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { uploadSample } from "./api.js";
 import { getIntelProviders } from "./intelApi.js";
+import { AnalysisTimeOptions } from "./AnalysisTimeOptions.jsx";
+import { getAnalysisTimeSettings } from "./analysisTimeApi.js";
 
 function FormError({ errors, field }) {
     const error = errors[field];
@@ -72,12 +74,23 @@ function UploadForm() {
     const formRef = useRef(undefined);
     const [formErrors, setFormErrors] = useState({});
     const [error, setError] = useState();
-    const [analysisTime, setAnalysisTime] = useState(10);
     const [extractArchive, setExtractArchive] = useState(false);
     const [guestOs, setGuestOs] = useState("windows");
     const [mode, setMode] = useState("combined");
     const [intelSettings, setIntelSettings] = useState(null);
     const [intelOnline, setIntelOnline] = useState(false);
+    const [timeSettings, setTimeSettings] = useState(null);
+    useEffect(() => {
+        let active = true;
+        getAnalysisTimeSettings()
+            .then(({ data }) => {
+                if (active) setTimeSettings(data);
+            })
+            .catch(() => {});
+        return () => {
+            active = false;
+        };
+    }, []);
     useEffect(() => {
         let active = true;
         getIntelProviders()
@@ -172,7 +185,9 @@ function UploadForm() {
                     mode: form.get("mode"),
                     file: form.get("file"),
                     guest_os: form.get("guest_os"),
-                    timeout: form.get("timeout") * 60,
+                    timeout: Number(form.get("timeout")),
+                    clock_scale: form.get("clock_scale"),
+                    sleep_skip: form.get("sleep_skip"),
                     plugins: form.getAll("plugins"),
                     file_name: form.get("file_name"),
                     file_path: form.get("file_path"),
@@ -261,22 +276,10 @@ function UploadForm() {
             </div>
             {!isStatic && (
                 <>
-                    <div className="mb-3">
-                        <label htmlFor="form-timeout" className="form-label">
-                            Analysis time: {analysisTime} minute
-                            {analysisTime > 1 ? "s" : ""}
-                        </label>
-                        <input
-                            type="range"
-                            className="form-range"
-                            min="1"
-                            max="15"
-                            value={analysisTime}
-                            onChange={(ev) => setAnalysisTime(+ev.target.value)}
-                            id="form-timeout"
-                            name="timeout"
-                        />
-                    </div>
+                    <AnalysisTimeOptions
+                        windows={!isLinux}
+                        settings={timeSettings}
+                    />
                     {!isLinux && (
                         <div className="mb-3 form-check">
                             <input

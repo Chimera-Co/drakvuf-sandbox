@@ -18,7 +18,16 @@ class UploadFileForm(BaseModel):
     guest_os: GuestOS | Literal["android", "ios"] = Field(
         default="windows", description="Guest operating system, or a mobile platform"
     )
-    timeout: Optional[int] = Field(default=None, description="Analysis timeout")
+    timeout: Optional[int] = Field(
+        default=None, description="Analysis timeout (real seconds)"
+    )
+    clock_scale: Optional[int] = Field(
+        default=None,
+        description="Guest clock speed-up factor (Windows; 1 or unset: off)",
+    )
+    sleep_skip: Optional[bool] = Field(
+        default=False, description="Shorten long sleeps (Windows)"
+    )
     file_name: Optional[str] = Field(default=None, description="Target file name")
     file_path: Optional[str] = Field(default=None, description="Target file path")
     start_command: Optional[str] = Field(default=None, description="Start command")

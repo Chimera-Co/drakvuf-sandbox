@@ -333,8 +333,21 @@ def capa_analysis(context: PostprocessContext) -> None:
             pstree_path=analysis_dir / "process_tree.json",
         )
 
+    # dynamic_capa_analysis holds every call in memory: on a 1-hour run (531 MB apimon.log,
+    # 30 Oct) that took dom0 into swap for over 15 minutes, so long runs skip it.
+    dynamic_log_mb = sum(
+        (analysis_dir / name).stat().st_size
+        for name in ("apimon.log", "syscall.log")
+        if (analysis_dir / name).exists()
+    ) / (1024 * 1024)
+    if config.analyze_drakmon_log and dynamic_log_mb > config.max_dynamic_log_mb:
+        logger.warning(
+            "capa: skipping the dynamic logs (%.0f MB, limit %d MB)",
+            dynamic_log_mb,
+            config.max_dynamic_log_mb,
+        )
     # extract capabilities from the Drakvuf report
-    if config.analyze_drakmon_log:
+    elif config.analyze_drakmon_log:
         dynamic_capabilities = dynamic_capa_analysis(
             analysis_dir, rules, malware_pids=malware_pids
         )
