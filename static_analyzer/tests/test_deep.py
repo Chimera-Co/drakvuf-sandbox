@@ -1,6 +1,7 @@
 """Deep pass (capa + FLOSS): runs per format, records versions, and keeps going when one tool fails."""
 
 import json
+import time
 from pathlib import Path
 
 from chimera_static import deep
@@ -34,6 +35,32 @@ def test_other_formats_and_budget(tmp_path):
     assert r["capa"] is None and r["floss"] is None and not r["errors"]
     r = deep.run_deep(str(PE), None, timeout_s=1)
     assert {e["stage"] for e in r["errors"]} == {"capa", "floss"}
+
+
+def test_timeout_gets_past_a_tool_that_swallows_it(tmp_path, monkeypatch):
+    def stubborn(path, *args):  # like capa and FLOSS: swallows the timeout, keeps going
+        while True:
+            try:
+                time.sleep(0.01)
+            except BaseException:
+                pass
+            time.sleep(0.01)
+
+    monkeypatch.setattr(deep, "_capa", stubborn)
+    seen = {}
+
+    def floss(path):
+        seen["partial"] = json.loads((tmp_path / "deep.json").read_text())
+        return {"version": "x"}
+
+    monkeypatch.setattr(deep, "_floss", floss)
+    t0 = time.monotonic()
+    r = deep.run_deep(str(PE), str(tmp_path), timeout_s=20)
+    assert time.monotonic() - t0 < 25  # capa gets 60% of 20 s, then FLOSS returns at once
+    assert r["errors"][0]["stage"] == "capa" and "timed out" in r["errors"][0]["error"]
+    assert r["floss"] == {"version": "x"}
+    # deep.json is written after each tool, so the capa outcome is on disk before FLOSS starts
+    assert seen["partial"]["errors"][0]["stage"] == "capa"
 
 
 def test_one_tool_failing_keeps_the_other(tmp_path, monkeypatch):

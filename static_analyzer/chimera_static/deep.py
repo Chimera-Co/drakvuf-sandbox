@@ -28,7 +28,7 @@ MAX_RULES = 200
 MAX_STRINGS = 300
 
 
-class _Timeout(Exception):
+class _Timeout(BaseException):  # not Exception: capa and FLOSS catch Exception while analysing functions
     pass
 
 
@@ -38,7 +38,9 @@ def _alarm(seconds: float):
         raise _Timeout()
 
     previous = signal.signal(signal.SIGALRM, fire)
-    signal.setitimer(signal.ITIMER_REAL, max(1.0, seconds))
+    # capa and FLOSS swallow a single raise and run on until RLIMIT_CPU kills the process with no output;
+    # re-firing every 0.25 s gets the timeout out within a second or two.
+    signal.setitimer(signal.ITIMER_REAL, max(1.0, seconds), 0.25)
     try:
         yield
     finally:
@@ -141,6 +143,9 @@ def run_deep(path: str, out_dir: str | None, file_name: str = "", timeout_s: flo
             result["errors"].append({"stage": name, "error": f"{type(exc).__name__}: {str(exc)[:300]}"})
         finally:
             result["timings_s"][name] = round(time.monotonic() - started, 3)
+        result["duration_s"] = round(time.monotonic() - t0, 3)
+        if out_dir:  # after each tool, so a later crash or kill keeps what already finished
+            write_output(os.path.join(out_dir, "deep.json"), json.dumps(result, allow_nan=False).encode())
     result["duration_s"] = round(time.monotonic() - t0, 3)
     if out_dir:
         write_output(os.path.join(out_dir, "deep.json"), json.dumps(result, allow_nan=False).encode())
